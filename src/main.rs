@@ -32,6 +32,8 @@ fn App() -> impl IntoView {
     let (input, set_input) = signal("".to_string());
     let (api_key, set_api_key, _) =
         use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
+    let (system_prompt, set_system_prompt, _) =
+        use_local_storage::<String, FromToStringCodec>("system_prompt");
 
     view! {
         <div>
@@ -40,6 +42,11 @@ fn App() -> impl IntoView {
                 prop:value=move || api_key.get()
                 on:input:target=move |ev| set_api_key.set(ev.target().value())
                 placeholder="OPENAI_API_KEY"
+            />
+            <textarea
+                prop:value=move || system_prompt.get()
+                on:input:target=move |ev| set_system_prompt.set(ev.target().value())
+                placeholder="system prompt"
             />
         </div>
 
@@ -62,19 +69,24 @@ fn App() -> impl IntoView {
         <textarea
             prop:value=move || input.get()
             on:input:target=move |ev| set_input.set(ev.target().value())
-        >
-            {input.get_untracked()}
-        </textarea>
+        />
         <button on:click=move |_| spawn_local(async move {
             let mut new_messages = messages.get();
+            let system_message = Message {
+                role: "system".to_string(),
+                content: system_prompt.get(),
+            };
+            let mut messages_to_submit = vec![system_message];
             let user_message = Message {
                 role: "user".to_string(),
                 content: input.get(),
             };
             new_messages.push(user_message);
+            set_messages.set(new_messages.clone());
+            messages_to_submit.extend(new_messages.clone());
             set_input.set("".to_string());
             let assistant_content = llm::request_str(
-                new_messages.iter().map(|m| m.to_llm()).collect(),
+                messages_to_submit.iter().map(|m| m.to_llm()).collect(),
                 api_key.get(),
             );
             let assistant_message = Message {
