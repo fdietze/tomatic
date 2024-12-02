@@ -69,32 +69,68 @@ fn App() -> impl IntoView {
         <textarea
             prop:value=move || input.get()
             on:input:target=move |ev| set_input.set(ev.target().value())
+            placeholder="ctrl+enter to submit"
+            on:keydown:target=move |ev| spawn_local(async move {
+                if ev.key() == "Enter" && ev.ctrl_key() {
+                    ev.prevent_default();
+                    submit(
+                            api_key.get(),
+                            system_prompt.get(),
+                            messages.get(),
+                            input.get(),
+                            |new_input| set_input.set(new_input),
+                            |new_messages| set_messages.set(new_messages),
+                        )
+                        .await;
+                }
+            })
         />
         <button on:click=move |_| spawn_local(async move {
-            let mut new_messages = messages.get();
-            let system_message = Message {
-                role: "system".to_string(),
-                content: system_prompt.get(),
-            };
-            let mut messages_to_submit = vec![system_message];
-            let user_message = Message {
-                role: "user".to_string(),
-                content: input.get(),
-            };
-            new_messages.push(user_message);
-            set_messages.set(new_messages.clone());
-            messages_to_submit.extend(new_messages.clone());
-            set_input.set("".to_string());
-            let assistant_content = llm::request_str(
-                messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-                api_key.get(),
-            );
-            let assistant_message = Message {
-                role: "assistant".to_string(),
-                content: assistant_content.await.unwrap(),
-            };
-            new_messages.push(assistant_message);
-            set_messages.set(new_messages);
+            submit(
+                    api_key.get(),
+                    system_prompt.get(),
+                    messages.get(),
+                    input.get(),
+                    |new_input| set_input.set(new_input),
+                    |new_messages| set_messages.set(new_messages),
+                )
+                .await;
         })>"Submit"</button>
     }
+}
+
+async fn submit(
+    api_key: String,
+    system_prompt: String,
+    messages: Vec<Message>,
+    input: String,
+    set_input: impl Fn(String),
+    set_messages: impl Fn(Vec<Message>),
+) {
+    let mut new_messages = messages;
+    let system_message = Message {
+        role: "system".to_string(),
+        content: system_prompt,
+    };
+    let mut messages_to_submit = vec![system_message];
+    let user_message = Message {
+        role: "user".to_string(),
+        content: input,
+    };
+    new_messages.push(user_message);
+    set_messages(new_messages.clone());
+    messages_to_submit.extend(new_messages.clone());
+    set_input("".to_string());
+    let assistant_content = llm::request_str(
+        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+        api_key,
+    )
+    .await
+    .unwrap();
+    let assistant_message = Message {
+        role: "assistant".to_string(),
+        content: assistant_content,
+    };
+    new_messages.push(assistant_message);
+    set_messages(new_messages);
 }
