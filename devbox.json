@@ -1,0 +1,31 @@
+// https://www.jetpack.io/devbox
+{
+  "$schema": "https://raw.githubusercontent.com/jetpack-io/devbox/0.10.1/.schema/devbox.schema.json",
+  "packages": {
+    "rustup": "latest",
+    "openssl": {
+      "version": "latest",
+      "outputs": [
+        "dev",
+      ],
+    },
+    "pkg-config":  "latest",
+    "cargo-watch": "latest",
+    "just":        "latest",
+    "trunk":       "latest",
+    "leptosfmt":   "latest",
+  },
+  "shell": {
+    "init_hook": [
+      "projectDir=$PWD",
+      "rustupHomeDir=\"$projectDir\"/.rustup",
+      "mkdir -p $rustupHomeDir",
+      "export RUSTUP_HOME=$rustupHomeDir",
+      "export LIBRARY_PATH=$LIBRARY_PATH:\"$projectDir/nix/profile/default/lib\"",
+      "cargo fetch",
+      "export RUST_BACKTRACE=1",
+    ],
+  },
+}
+// this file supports comments
+// vim: set ft=jsonc:
