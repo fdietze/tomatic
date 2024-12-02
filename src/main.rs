@@ -52,7 +52,7 @@ fn App() -> impl IntoView {
                         view! {
                             <div>
                                 <div style:opacity="0.5">{message.role}</div>
-                                <pre>{message.content}</pre>
+                                <pre style:white-space="break-spaces">{message.content}</pre>
                             </div>
                         }
                     })
