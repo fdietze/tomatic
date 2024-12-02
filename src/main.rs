@@ -3,7 +3,7 @@
 mod llm;
 
 use codee::string::FromToStringCodec;
-use leptos::{prelude::*, task::spawn_local};
+use leptos::{html, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 
 fn main() {
@@ -34,6 +34,14 @@ fn App() -> impl IntoView {
         use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
     let (system_prompt, set_system_prompt, _) =
         use_local_storage::<String, FromToStringCodec>("system_prompt");
+
+    let ref_input: NodeRef<html::Textarea> = NodeRef::new();
+
+    Effect::new(move |_| {
+        if let Some(ref_input) = ref_input.get() {
+            let _ = ref_input.focus();
+        }
+    });
 
     view! {
         <div>
@@ -70,6 +78,7 @@ fn App() -> impl IntoView {
             prop:value=move || input.get()
             on:input:target=move |ev| set_input.set(ev.target().value())
             placeholder="ctrl+enter to submit"
+            node_ref=ref_input
             on:keydown:target=move |ev| spawn_local(async move {
                 if ev.key() == "Enter" && ev.ctrl_key() {
                     ev.prevent_default();
