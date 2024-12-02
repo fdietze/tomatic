@@ -83,10 +83,10 @@ fn App() -> impl IntoView {
                 if ev.key() == "Enter" && ev.ctrl_key() {
                     ev.prevent_default();
                     submit(
-                            api_key.get(),
-                            system_prompt.get(),
-                            messages.get(),
-                            input.get(),
+                            api_key.get_untracked(),
+                            system_prompt.get_untracked(),
+                            messages.get_untracked(),
+                            input.get_untracked(),
                             |new_input| set_input.set(new_input),
                             |new_messages| set_messages.set(new_messages),
                         )
@@ -96,10 +96,10 @@ fn App() -> impl IntoView {
         />
         <button on:click=move |_| spawn_local(async move {
             submit(
-                    api_key.get(),
-                    system_prompt.get(),
-                    messages.get(),
-                    input.get(),
+                    api_key.get_untracked(),
+                    system_prompt.get_untracked(),
+                    messages.get_untracked(),
+                    input.get_untracked(),
                     |new_input| set_input.set(new_input),
                     |new_messages| set_messages.set(new_messages),
                 )
