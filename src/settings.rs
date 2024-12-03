@@ -1,13 +1,8 @@
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::prelude::*;
 use leptos_use::storage::use_local_storage;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct SystemPrompt {
-    pub name: String,
-    pub prompt: String,
-}
+use crate::chat::SystemPrompt;
 
 #[component]
 pub fn Settings() -> impl IntoView {
@@ -44,12 +39,6 @@ pub fn Settings() -> impl IntoView {
         </settings-section>
         <settings-section>
             <settings-label>"system prompts"</settings-label>
-            <button on:click=move |_| {
-                set_system_prompts
-                    .update(|items| {
-                        items.push(SystemPrompt::default());
-                    })
-            }>"New"</button>
             {move || {
                 system_prompts
                     .get()
@@ -90,6 +79,12 @@ pub fn Settings() -> impl IntoView {
                     })
                     .collect_view()
             }}
+            <button on:click=move |_| {
+                set_system_prompts
+                    .update(|items| {
+                        items.push(SystemPrompt::default());
+                    })
+            }>"New"</button>
         </settings-section>
     }
 }
