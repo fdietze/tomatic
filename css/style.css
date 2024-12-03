@@ -15,5 +15,6 @@ body {
 
 textarea, input {
   background-color: white;
+  padding: 4px;
 }
 

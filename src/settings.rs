@@ -1,13 +1,36 @@
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
-use leptos::{html, prelude::*, task::spawn_local};
+use leptos::prelude::*;
 use leptos_use::storage::use_local_storage;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct SystemPrompt {
+    pub name: String,
+    pub prompt: String,
+}
 
 #[component]
 pub fn Settings() -> impl IntoView {
     let (api_key, set_api_key, _) =
         use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
-    let (system_prompt, set_system_prompt, _) =
-        use_local_storage::<String, FromToStringCodec>("system_prompt");
+    let (system_prompts, set_system_prompts, _) =
+        use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
+
+    let on_name_change = move |index: usize, new_value: String| {
+        set_system_prompts.update(|items| {
+            if let Some(item) = items.get_mut(index) {
+                item.name = new_value;
+            }
+        });
+    };
+
+    let on_prompt_change = move |index: usize, new_value: String| {
+        set_system_prompts.update(|items| {
+            if let Some(item) = items.get_mut(index) {
+                item.prompt = new_value;
+            }
+        });
+    };
 
     view! {
         <settings-section>
@@ -20,13 +43,53 @@ pub fn Settings() -> impl IntoView {
             />
         </settings-section>
         <settings-section>
-            <settings-label>"system prompt:"</settings-label>
-            <textarea
-                prop:value=move || system_prompt.get()
-                on:input:target=move |ev| set_system_prompt.set(ev.target().value())
-                placeholder="system prompt"
-                style:height="200px"
-            />
+            <settings-label>"system prompts"</settings-label>
+            <button on:click=move |_| {
+                set_system_prompts
+                    .update(|items| {
+                        items.push(SystemPrompt::default());
+                    })
+            }>"New"</button>
+            {move || {
+                system_prompts
+                    .get()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        let value = value.clone();
+                        view! {
+                            <settings-system-prompt>
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="name"
+                                        prop:value=value.name
+                                        on:input:target=move |ev| {
+                                            let input_value = ev.target().value();
+                                            on_name_change(index, input_value);
+                                        }
+                                        style:margin-bottom="4px"
+                                    />
+                                    <textarea
+                                        prop:value=value.prompt
+                                        placeholder="system prompt"
+                                        on:input:target=move |ev| {
+                                            let input_value = ev.target().value();
+                                            on_prompt_change(index, input_value);
+                                        }
+                                    />
+                                </div>
+                                <button on:click=move |_| {
+                                    set_system_prompts
+                                        .update(|items| {
+                                            items.remove(index);
+                                        })
+                                }>"Remove"</button>
+                            </settings-system-prompt>
+                        }
+                    })
+                    .collect_view()
+            }}
         </settings-section>
     }
 }
