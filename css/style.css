@@ -1,0 +1,19 @@
+body,html {
+  width: 100%;
+  height: 100%;
+}
+
+header {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2em;
+}
+
+body {
+  background-color: #eff1f5;
+}
+
+textarea, input {
+  background-color: white;
+}
+

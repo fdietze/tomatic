@@ -1,17 +1,46 @@
 #![feature(async_closure)]
 
 mod llm;
+mod settings;
 
-use codee::string::FromToStringCodec;
+use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::{html, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
+use serde::{Deserialize, Serialize};
+
+// TODO: model selection
+// TODO: streaming
+// TODO: markdown
+// TODO: math symbols
 
 fn main() {
     console_error_panic_hook::set_once();
     mount_to_body(App);
 }
 
-#[derive(Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Default)]
+enum Page {
+    #[default]
+    Chat,
+    Settings,
+}
+
+#[component]
+fn App() -> impl IntoView {
+    let (page, set_page, _) = use_local_storage::<Page, JsonSerdeCodec>("page");
+    view! {
+        <header>
+            <button on:click=move |_| set_page.set(Page::Chat)>Chat</button>
+            <button on:click=move |_| set_page.set(Page::Settings)>Settings</button>
+        </header>
+        {move || match page.get() {
+            Page::Chat => view! { <ChatInterface /> }.into_any(),
+            Page::Settings => view! { <settings::Settings /> }.into_any(),
+        }}
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 struct Message {
     role: String,
     content: String,
@@ -27,8 +56,8 @@ impl Message {
 }
 
 #[component]
-fn App() -> impl IntoView {
-    let (messages, set_messages) = signal::<Vec<Message>>(vec![]);
+fn ChatInterface() -> impl IntoView {
+    let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
     let (input, set_input) = signal("".to_string());
     let (api_key, set_api_key, _) =
         use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
@@ -44,67 +73,56 @@ fn App() -> impl IntoView {
     });
 
     view! {
-        <div>
-            <input
-                type="text"
-                prop:value=move || api_key.get()
-                on:input:target=move |ev| set_api_key.set(ev.target().value())
-                placeholder="OPENAI_API_KEY"
-            />
-            <textarea
-                prop:value=move || system_prompt.get()
-                on:input:target=move |ev| set_system_prompt.set(ev.target().value())
-                placeholder="system prompt"
-            />
-        </div>
-
-        <div>
-            {move || {
-                messages
-                    .get()
-                    .into_iter()
-                    .map(|message| {
-                        view! {
-                            <div>
-                                <div style:opacity="0.5">{message.role}</div>
-                                <pre style:white-space="break-spaces">{message.content}</pre>
-                            </div>
+        <chat-interface>
+            <chat-history>
+                {move || {
+                    messages
+                        .get()
+                        .into_iter()
+                        .map(|message| {
+                            view! {
+                                <chat-message>
+                                    <chat-message-role>{message.role}</chat-message-role>
+                                    <chat-message-content>{message.content}</chat-message-content>
+                                </chat-message>
+                            }
+                        })
+                        .collect_view()
+                }}
+            </chat-history>
+            <form on:submit=move |_| spawn_local(async move {
+                submit(
+                        api_key.get_untracked(),
+                        system_prompt.get_untracked(),
+                        messages.get_untracked(),
+                        input.get_untracked(),
+                        |new_input| set_input.set(new_input),
+                        |new_messages| set_messages.set(new_messages),
+                    )
+                    .await;
+            })>
+                <textarea
+                    prop:value=move || input.get()
+                    on:input:target=move |ev| set_input.set(ev.target().value())
+                    title="ctrl+enter to submit"
+                    node_ref=ref_input
+                    on:keydown:target=move |ev| spawn_local(async move {
+                        if ev.key() == "Enter" && ev.ctrl_key() {
+                            ev.prevent_default();
+                            submit(
+                                    api_key.get_untracked(),
+                                    system_prompt.get_untracked(),
+                                    messages.get_untracked(),
+                                    input.get_untracked(),
+                                    |new_input| set_input.set(new_input),
+                                    |new_messages| set_messages.set(new_messages),
+                                )
+                                .await;
                         }
                     })
-                    .collect_view()
-            }}
-        </div>
-        <textarea
-            prop:value=move || input.get()
-            on:input:target=move |ev| set_input.set(ev.target().value())
-            placeholder="ctrl+enter to submit"
-            node_ref=ref_input
-            on:keydown:target=move |ev| spawn_local(async move {
-                if ev.key() == "Enter" && ev.ctrl_key() {
-                    ev.prevent_default();
-                    submit(
-                            api_key.get_untracked(),
-                            system_prompt.get_untracked(),
-                            messages.get_untracked(),
-                            input.get_untracked(),
-                            |new_input| set_input.set(new_input),
-                            |new_messages| set_messages.set(new_messages),
-                        )
-                        .await;
-                }
-            })
-        />
-        <button on:click=move |_| spawn_local(async move {
-            submit(
-                    api_key.get_untracked(),
-                    system_prompt.get_untracked(),
-                    messages.get_untracked(),
-                    input.get_untracked(),
-                    |new_input| set_input.set(new_input),
-                    |new_messages| set_messages.set(new_messages),
-                )
-                .await;
-        })>"Submit"</button>
+                />
+            </form>
+        </chat-interface>
     }
 }
 
