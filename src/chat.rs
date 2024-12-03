@@ -79,10 +79,30 @@ pub fn ChatInterface() -> impl IntoView {
                         .get()
                         .into_iter()
                         .map(|message| {
+                            let markdown_options = markdown::Options {
+                                parse: markdown::ParseOptions {
+                                    constructs: markdown::Constructs {
+                                        math_flow: true,
+                                        math_text: true,
+                                        ..markdown::Constructs::gfm()
+                                    },
+                                    ..markdown::ParseOptions::default()
+                                },
+                                compile: markdown::CompileOptions {
+                                    ..markdown::CompileOptions::default()
+                                },
+                            };
+                            let markdown_raw_html: String = markdown::to_html_with_options(
+                                    &message.content,
+                                    &markdown_options,
+                                )
+                                .unwrap_or(message.content);
                             view! {
                                 <chat-message>
                                     <chat-message-role>{message.role}</chat-message-role>
-                                    <chat-message-content>{message.content}</chat-message-content>
+                                    <chat-message-content>
+                                        <div inner_html=markdown_raw_html></div>
+                                    </chat-message-content>
                                 </chat-message>
                             }
                         })
