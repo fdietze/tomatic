@@ -18,3 +18,8 @@ textarea, input {
   padding: 4px;
 }
 
+button {
+  padding: 4px;
+  background-color: black;
+  color: white;
+}

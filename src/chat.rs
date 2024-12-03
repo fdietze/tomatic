@@ -13,6 +13,7 @@ pub struct SystemPrompt {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
+    system_prompt_name: Option<String>,
     role: String,
     content: String,
 }
@@ -99,7 +100,12 @@ pub fn ChatInterface() -> impl IntoView {
                                 .unwrap_or(message.content);
                             view! {
                                 <chat-message>
-                                    <chat-message-role>{message.role}</chat-message-role>
+                                    <chat-message-role>
+                                        {message
+                                            .system_prompt_name
+                                            .map(|name| "@".to_owned() + name.as_str())
+                                            .unwrap_or(message.role)}
+                                    </chat-message-role>
                                     <chat-message-content>
                                         <div inner_html=markdown_raw_html></div>
                                     </chat-message-content>
@@ -110,12 +116,20 @@ pub fn ChatInterface() -> impl IntoView {
                 }}
             </chat-history>
             <chat-controls>
-                <button on:click=move |_| {
-                    set_messages.set(vec![]);
-                }>"New Chat"</button>
+                <div style:display="flex">
+                    <button
+                        on:click=move |_| {
+                            set_messages.set(vec![]);
+                        }
+                        style:margin-left="auto"
+                    >
+                        "New Chat"
+                    </button>
+                </div>
                 <form on:submit=move |_| spawn_local(async move {
                     submit(
                             api_key.get_untracked(),
+                            system_prompt_name(),
                             system_prompt(),
                             messages.get_untracked(),
                             input.get_untracked(),
@@ -135,6 +149,7 @@ pub fn ChatInterface() -> impl IntoView {
                                 ev.prevent_default();
                                 submit(
                                         api_key.get_untracked(),
+                                        system_prompt_name(),
                                         system_prompt(),
                                         messages.get_untracked(),
                                         input.get_untracked(),
@@ -153,6 +168,7 @@ pub fn ChatInterface() -> impl IntoView {
 
 async fn submit(
     api_key: String,
+    system_prompt_name: Option<String>,
     system_prompt: String,
     messages: Vec<Message>,
     input: String,
@@ -163,11 +179,13 @@ async fn submit(
     let system_message = Message {
         role: "system".to_string(),
         content: system_prompt,
+        system_prompt_name: None,
     };
     let mut messages_to_submit = vec![system_message];
     let user_message = Message {
         role: "user".to_string(),
         content: input,
+        system_prompt_name: None,
     };
     new_messages.push(user_message);
     set_messages(new_messages.clone());
@@ -182,6 +200,7 @@ async fn submit(
     let assistant_message = Message {
         role: "assistant".to_string(),
         content: assistant_content,
+        system_prompt_name,
     };
     new_messages.push(assistant_message);
     set_messages(new_messages);

@@ -3,12 +3,15 @@ chat-interface {
   display:flex;
   flex-direction: column;
   min-height: 100%;
+  padding: 8px;
 }
 
 chat-message {
   display:flex;
   flex-direction: column;
+  padding-bottom: 12px;
   margin-bottom: 12px;
+  border-bottom: 1px solid #9a9a9a;
 }
 
 chat-message-role {
@@ -18,6 +21,9 @@ chat-message-role {
 
 chat-message-content {
   white-space: break-spaces;
+  pre {
+    overflow-x: auto;
+  }
 }
 
 chat-history {
