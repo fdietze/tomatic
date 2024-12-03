@@ -44,6 +44,8 @@ pub fn ChatInterface() -> impl IntoView {
                 return None;
             }
             let name = &word[1..];
+            // remove punctuation at the end
+            let name = name.trim_matches(|c: char| !c.is_alphanumeric());
             if system_prompts.iter().any(|sp| sp.name == name) {
                 Some(name.to_string())
             } else {
@@ -71,6 +73,53 @@ pub fn ChatInterface() -> impl IntoView {
             let _ = ref_input.focus();
         }
     });
+
+    let model = llm::Model {
+        model: "gpt-4o".to_string(),
+        seed: None,
+        top_p: None,
+        temperature: None,
+    };
+
+    let submit = move || {
+        spawn_local(async move {
+            let mut new_messages = messages.get();
+            let system_message = Message {
+                role: "system".to_string(),
+                content: system_prompt(),
+                system_prompt_name: None,
+            };
+            let mut messages_to_submit = vec![system_message];
+            let user_message = Message {
+                role: "user".to_string(),
+                content: input.get(),
+                system_prompt_name: None,
+            };
+            new_messages.push(user_message);
+            set_messages.set(new_messages.clone());
+            messages_to_submit.extend(new_messages.clone());
+            set_input.set(
+                system_prompt_name()
+                    .map(|sp| format!("@{sp} "))
+                    .unwrap_or("".to_string()),
+            );
+            let assistant_content = llm::request_message_content(
+                messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                model,
+                api_key.get(),
+            )
+            .await
+            .unwrap();
+            let assistant_message = Message {
+                role: "assistant".to_string(),
+                content: assistant_content,
+                system_prompt_name: system_prompt_name(),
+            };
+            new_messages.push(assistant_message);
+            set_messages.set(new_messages);
+        })
+    };
+    let submit2 = submit.clone();
 
     view! {
         <chat-interface>
@@ -126,82 +175,22 @@ pub fn ChatInterface() -> impl IntoView {
                         "New Chat"
                     </button>
                 </div>
-                <form on:submit=move |_| spawn_local(async move {
-                    submit(
-                            api_key.get_untracked(),
-                            system_prompt_name(),
-                            system_prompt(),
-                            messages.get_untracked(),
-                            input.get_untracked(),
-                            |new_input| set_input.set(new_input),
-                            |new_messages| set_messages.set(new_messages),
-                        )
-                        .await;
-                })>
+                <form on:submit=move |_| submit.clone()()>
                     <textarea
                         prop:value=move || input.get()
                         on:input:target=move |ev| set_input.set(ev.target().value())
                         placeholder="Message"
                         title="ctrl+enter to submit"
                         node_ref=ref_input
-                        on:keydown:target=move |ev| spawn_local(async move {
+                        on:keydown:target=move |ev| {
                             if ev.key() == "Enter" && ev.ctrl_key() {
                                 ev.prevent_default();
-                                submit(
-                                        api_key.get_untracked(),
-                                        system_prompt_name(),
-                                        system_prompt(),
-                                        messages.get_untracked(),
-                                        input.get_untracked(),
-                                        |new_input| set_input.set(new_input),
-                                        |new_messages| set_messages.set(new_messages),
-                                    )
-                                    .await;
+                                submit2.clone()();
                             }
-                        })
+                        }
                     />
                 </form>
             </chat-controls>
         </chat-interface>
     }
-}
-
-async fn submit(
-    api_key: String,
-    system_prompt_name: Option<String>,
-    system_prompt: String,
-    messages: Vec<Message>,
-    input: String,
-    set_input: impl Fn(String),
-    set_messages: impl Fn(Vec<Message>),
-) {
-    let mut new_messages = messages;
-    let system_message = Message {
-        role: "system".to_string(),
-        content: system_prompt,
-        system_prompt_name: None,
-    };
-    let mut messages_to_submit = vec![system_message];
-    let user_message = Message {
-        role: "user".to_string(),
-        content: input,
-        system_prompt_name: None,
-    };
-    new_messages.push(user_message);
-    set_messages(new_messages.clone());
-    messages_to_submit.extend(new_messages.clone());
-    set_input("".to_string());
-    let assistant_content = llm::request_str(
-        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-        api_key,
-    )
-    .await
-    .unwrap();
-    let assistant_message = Message {
-        role: "assistant".to_string(),
-        content: assistant_content,
-        system_prompt_name,
-    };
-    new_messages.push(assistant_message);
-    set_messages(new_messages);
 }
