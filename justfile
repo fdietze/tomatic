@@ -5,7 +5,7 @@ _default:
   @just --list --unsorted
 
 dev:
-  trunk serve
+  trunk serve --no-error-reporting
 
 # count lines of code in repo
 cloc:
