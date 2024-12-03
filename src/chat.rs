@@ -30,7 +30,7 @@ impl Message {
 #[component]
 pub fn ChatInterface() -> impl IntoView {
     let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
-    let (input, set_input) = signal("".to_string());
+    let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
