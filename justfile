@@ -4,8 +4,13 @@
 _default:
   @just --list --unsorted
 
+# start development environment
 dev:
   trunk serve --no-error-reporting
+
+# run ci checks locally
+ci:
+  (git ls-files && git ls-files --others --exclude-standard) | entr -cnr earthly +ci-test
 
 # count lines of code in repo
 cloc:

@@ -1,0 +1,45 @@
+name: Test
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+env:
+  EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
+  EARTHLY_ORG: ${{ secrets.EARTHLY_ORG }}
+  EARTHLY_SATELLITE: ${{ secrets.EARTHLY_SATELLITE }}
+  EARTHLY_CI: true
+  GITHUB_ACTIONS: true # Better earthly outputs in github actions
+  FORCE_COLOR: 1
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-22.04 # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Expose EARTHLY_VERSION from devbox.lock
+      run: |
+        # https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+        EARTHLY_VERSION="$(jq -r ".packages[\"earthly@latest\"].version" devbox.lock)"
+        echo "EARTHLY_VERSION=$EARTHLY_VERSION" >> "$GITHUB_ENV"
+
+    - name: Install earthly
+      uses: earthly/actions-setup@v1
+      with:
+        version: ${{ env.EARTHLY_VERSION }}
+
+    - name: Test
+      run: earthly --ci --verbose +ci-test

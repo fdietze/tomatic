@@ -1,0 +1,53 @@
+name: Deploy
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+env:
+  EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
+  EARTHLY_ORG: ${{ secrets.EARTHLY_ORG }}
+  EARTHLY_SATELLITE: ${{ secrets.EARTHLY_SATELLITE }}
+  EARTHLY_CI: true
+  GITHUB_ACTIONS: true # Better earthly outputs in github actions
+  FORCE_COLOR: 1
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Expose EARTHLY_VERSION from devbox.lock
+      run: |
+        # https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+        EARTHLY_VERSION="$(jq -r ".packages[\"earthly@latest\"].version" devbox.lock)"
+        echo "EARTHLY_VERSION=$EARTHLY_VERSION" >> "$GITHUB_ENV"
+
+    - name: Install earthly
+      uses: earthly/actions-setup@v1
+      with:
+        version: ${{ env.EARTHLY_VERSION }}
+
+    - name: Release build
+      run:
+        earthly --artifact +release/dist dist
+
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@920cbb300dcd3f0568dbc42700c61e2fd9e6139c # v4
+      with:
+        folder: static
+        clean: true # keep old files if not overridden
+        single-commit: true # don't keep history

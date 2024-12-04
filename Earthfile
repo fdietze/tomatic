@@ -1,0 +1,39 @@
+# https://docs.earthly.dev/basics
+
+VERSION 0.8
+
+devbox:
+  FROM jetpackio/devbox:latest
+  # code generated using `devbox generate dockerfile`:
+  # Installing your devbox project
+  WORKDIR /code
+  USER root:root
+  RUN mkdir -p /code && chown ${DEVBOX_USER}:${DEVBOX_USER} /code
+  USER ${DEVBOX_USER}:${DEVBOX_USER}
+  COPY --chown=${DEVBOX_USER}:${DEVBOX_USER} devbox.json devbox.lock .
+  RUN devbox run -- echo "Installed Packages."
+  RUN find / \( -type f -o -type d \) -mindepth 1 -maxdepth 1 -print0 | xargs -0 du -sh | sort -hr | head -20 \
+   && find /nix/store \( -type f -o -type d \) -mindepth 1 -maxdepth 1 -print0 | xargs -0 du -sh | sort -hr | head -20 
+
+build:
+  FROM +devbox
+  COPY rust-toolchain.toml Cargo.toml Cargo.lock .
+  RUN devbox run -- cargo fetch
+  COPY --dir src css index.html .
+  RUN devbox run -- trunk build
+
+release:
+  BUILD +ci-test
+  FROM +build
+  RUN devbox run -- trunk build --release --minify
+  RUN find dist
+  SAVE ARTIFACT dist
+
+check-formatting:
+  FROM +devbox
+  COPY --dir src .
+  RUN devbox run -- leptosfmt --check src
+
+ci-test:
+  BUILD +check-formatting
+  BUILD +build
