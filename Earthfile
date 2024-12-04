@@ -30,7 +30,8 @@ build:
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --no-build --target wasm32-unknown-unknown --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --recipe-path recipe.json
+  COPY Cargo.toml . # cargo chef cook overwrites Cargo.toml, which seems to confuse trunk
   COPY --dir src css index.html Trunk.toml .
   RUN devbox run -- trunk build --skip-version-check
   RUN ls -lh dist
@@ -40,23 +41,25 @@ release:
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --no-build --target wasm32-unknown-unknown --release --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
+  COPY Cargo.toml . # cargo chef cook overwrites Cargo.toml, which seems to confuse trunk
   COPY --dir src css index.html Trunk.toml .
   RUN devbox run -- trunk build --release --minify --skip-version-check
   RUN ls -lh dist
   SAVE ARTIFACT dist
 
 check-formatting:
-  FROM +devbox
+  FROM +rustup
   COPY --dir src .
   RUN devbox run -- leptosfmt --check src
 
 lint:
-  # TODO
-  FROM +devbox
+  FROM +build
+  CACHE --chmod 0777 target
   COPY --dir src .
-  RUN devbox run -- cargo clippy --all-features --all-targets -- -D warnings
+  RUN devbox run -- cargo clippy --all-targets --all-features -- -D warnings
 
 ci-test:
   BUILD +check-formatting
+  BUILD +lint
   BUILD +build
