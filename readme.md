@@ -42,3 +42,5 @@ Agentic LLM UI and maybe more.
    ```bash
    just
    ```
+
+1. To learn how the production build works, check out the [Earthfile](Earthfile).
