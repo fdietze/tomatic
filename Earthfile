@@ -31,7 +31,7 @@ build:
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
   RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --recipe-path recipe.json
-  COPY --dir src css index.html .
+  COPY --dir src css index.html Trunk.toml .
   RUN devbox run -- trunk build
 
 release:
@@ -40,7 +40,7 @@ release:
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
   RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
-  COPY --dir src css index.html .
+  COPY --dir src css index.html Trunk.toml .
   RUN devbox run -- trunk build --release --minify
   RUN find dist
   SAVE ARTIFACT dist
