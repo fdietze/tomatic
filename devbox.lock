@@ -1,6 +1,54 @@
 {
   "lockfile_version": "1",
   "packages": {
+    "cargo-chef@latest": {
+      "last_modified": "2024-11-16T04:25:12Z",
+      "resolved": "github:NixOS/nixpkgs/34a626458d686f1b58139620a8b2793e9e123bba#cargo-chef",
+      "source": "devbox-search",
+      "version": "0.1.68",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0q7hz0ihdrwy5534vwvxk883jk2x40ia-cargo-chef-0.1.68",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0q7hz0ihdrwy5534vwvxk883jk2x40ia-cargo-chef-0.1.68"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/avifswncgy0sbqrbf2lcc9m04mnj9113-cargo-chef-0.1.68",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/avifswncgy0sbqrbf2lcc9m04mnj9113-cargo-chef-0.1.68"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/j37wagfw8b4qvspjp9fibafw8s6by0ld-cargo-chef-0.1.68",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/j37wagfw8b4qvspjp9fibafw8s6by0ld-cargo-chef-0.1.68"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/m55p8h2njwzbq235z5anbkzwv2cswsqd-cargo-chef-0.1.68",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/m55p8h2njwzbq235z5anbkzwv2cswsqd-cargo-chef-0.1.68"
+        }
+      }
+    },
     "cargo-watch@latest": {
       "last_modified": "2024-10-25T01:11:56Z",
       "resolved": "github:NixOS/nixpkgs/062c4f59744fcffa2e5aa3ef443dc8b4d1674ed6#cargo-watch",

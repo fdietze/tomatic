@@ -48,6 +48,6 @@ jobs:
     - name: Deploy 🚀
       uses: JamesIves/github-pages-deploy-action@920cbb300dcd3f0568dbc42700c61e2fd9e6139c # v4
       with:
-        folder: static
+        folder: dist
         clean: true # keep old files if not overridden
         single-commit: true # don't keep history
