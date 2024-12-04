@@ -1,22 +1,39 @@
+body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1em;
+}
 
 chat-interface {
   display:flex;
   flex-direction: column;
-  min-height: 100%;
-  padding: 8px;
+  height: 100%;
+  min-height: 0;
 }
 
 chat-message {
   display:flex;
   flex-direction: column;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #9a9a9a;
+  padding-top: 12px;
+  padding-bottom: 16px;
+  padding-left: 8px;
+  padding-right: 8px;
+  &[data-role="user"] {
+    background-color: #d6dae2;
+  }
 }
 
 chat-message-role {
   font-size: smaller;
-  opacity: 0.5;
+  color: #444a58;
+  font-weight: bold;
+  padding-bottom: 4px;
 }
 
 chat-message-content {
@@ -27,26 +44,34 @@ chat-message-content {
 }
 
 chat-history {
+  width: 50rem;
+  margin-left: auto;
+  margin-right: auto;
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 chat-controls {
-  margin-top: auto;
+  width: 50rem;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 4px;
   form {
     textarea {
       width: 100%;
       resize: none;
-      height: 100px;
+      height: 60px;
     }
   }
 }
 
 settings-section {
   display:block;
-  margin-bottom: 2em;
+  margin: 12px;
+  margin-bottom: 20px;
 
   input, textarea {
     width: 100%;
@@ -61,5 +86,5 @@ settings-label {
 
 settings-system-prompt {
   display:block;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
 }

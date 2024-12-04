@@ -34,6 +34,7 @@ pub fn ChatInterface() -> impl IntoView {
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
+    let (textarea_disabled, set_textarea_disabled) = signal(false);
     let system_prompt_name = move || {
         let system_prompts = system_prompts.get();
         let input = input.get();
@@ -83,6 +84,7 @@ pub fn ChatInterface() -> impl IntoView {
 
     let submit = move || {
         spawn_local(async move {
+            set_textarea_disabled.set(true);
             let mut new_messages = messages.get();
             let system_message = Message {
                 role: "system".to_string(),
@@ -98,11 +100,6 @@ pub fn ChatInterface() -> impl IntoView {
             new_messages.push(user_message);
             set_messages.set(new_messages.clone());
             messages_to_submit.extend(new_messages.clone());
-            set_input.set(
-                system_prompt_name()
-                    .map(|sp| format!("@{sp} "))
-                    .unwrap_or("".to_string()),
-            );
             let assistant_content = llm::request_message_content(
                 messages_to_submit.iter().map(|m| m.to_llm()).collect(),
                 model,
@@ -117,6 +114,12 @@ pub fn ChatInterface() -> impl IntoView {
             };
             new_messages.push(assistant_message);
             set_messages.set(new_messages);
+            set_input.set(
+                system_prompt_name()
+                    .map(|sp| format!("@{sp} "))
+                    .unwrap_or("".to_string()),
+            );
+            set_textarea_disabled.set(false);
         })
     };
     let submit2 = submit.clone();
@@ -129,6 +132,7 @@ pub fn ChatInterface() -> impl IntoView {
                         .get()
                         .into_iter()
                         .map(|message| {
+                            let role = message.role.clone();
                             let markdown_options = markdown::Options {
                                 parse: markdown::ParseOptions {
                                     constructs: markdown::Constructs {
@@ -148,7 +152,7 @@ pub fn ChatInterface() -> impl IntoView {
                                 )
                                 .unwrap_or(message.content);
                             view! {
-                                <chat-message>
+                                <chat-message data-role=role>
                                     <chat-message-role>
                                         {message
                                             .system_prompt_name
@@ -188,6 +192,7 @@ pub fn ChatInterface() -> impl IntoView {
                                 submit2.clone()();
                             }
                         }
+                        disabled=textarea_disabled
                     />
                 </form>
             </chat-controls>

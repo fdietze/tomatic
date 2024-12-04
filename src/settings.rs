@@ -39,6 +39,18 @@ pub fn Settings() -> impl IntoView {
         </settings-section>
         <settings-section>
             <settings-label>"system prompts"</settings-label>
+            <button
+                on:click=move |_| {
+                    set_system_prompts
+                        .update(|items| {
+                            items.insert(0, SystemPrompt::default());
+                        })
+                }
+                style:margin-bottom="20px"
+            >
+
+                "New"
+            </button>
             {move || {
                 system_prompts
                     .get()
@@ -79,12 +91,6 @@ pub fn Settings() -> impl IntoView {
                     })
                     .collect_view()
             }}
-            <button on:click=move |_| {
-                set_system_prompts
-                    .update(|items| {
-                        items.push(SystemPrompt::default());
-                    })
-            }>"New"</button>
         </settings-section>
     }
 }

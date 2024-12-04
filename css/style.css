@@ -3,12 +3,6 @@ body,html {
   height: 100%;
 }
 
-header {
-  display: flex;
-  justify-content: flex-end;
-  gap: 2em;
-}
-
 body {
   background-color: #eff1f5;
 }
