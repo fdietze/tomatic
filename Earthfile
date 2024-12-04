@@ -30,19 +30,20 @@ build:
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --no-build --target wasm32-unknown-unknown --recipe-path recipe.json
   COPY --dir src css index.html Trunk.toml .
-  RUN devbox run -- trunk build
+  RUN devbox run -- trunk build --skip-version-check
+  RUN ls -lh dist
 
 release:
   BUILD +ci-test
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --no-build --target wasm32-unknown-unknown --release --recipe-path recipe.json
   COPY --dir src css index.html Trunk.toml .
-  RUN devbox run -- trunk build --release --minify
-  RUN find dist
+  RUN devbox run -- trunk build --release --minify --skip-version-check
+  RUN ls -lh dist
   SAVE ARTIFACT dist
 
 check-formatting:
