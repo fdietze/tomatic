@@ -1,0 +1,10 @@
+{
+  "manifest_version": 2,
+  "version": "0.1",
+  "name": "Tomatic",
+  "short_name": "Tomatic",
+  "display": "standalone",
+  "theme_color": "#eff1f5",
+  "background_color": "#eff1f5",
+  "start_url": "."
+}
