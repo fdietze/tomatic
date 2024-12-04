@@ -35,6 +35,7 @@ pub fn ChatInterface() -> impl IntoView {
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (textarea_disabled, set_textarea_disabled) = signal(false);
+    let (error, set_error) = signal::<Option<String>>(None);
     let system_prompt_name = move || {
         let system_prompts = system_prompts.get();
         let input = input.get();
@@ -100,25 +101,41 @@ pub fn ChatInterface() -> impl IntoView {
             new_messages.push(user_message);
             set_messages.set(new_messages.clone());
             messages_to_submit.extend(new_messages.clone());
-            let assistant_content = llm::request_message_content(
-                messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-                model,
-                api_key.get(),
-            )
-            .await
-            .unwrap();
-            let assistant_message = Message {
-                role: "assistant".to_string(),
-                content: assistant_content,
-                system_prompt_name: system_prompt_name(),
+            let assistant_content: Result<String, anyhow::Error> = {
+                if api_key.get().is_empty() {
+                    Err(anyhow::anyhow!(
+                        "No API key provided. Please add one in Settings."
+                    ))
+                } else {
+                    llm::request_message_content(
+                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                        model,
+                        api_key.get(),
+                    )
+                    .await
+                }
             };
-            new_messages.push(assistant_message);
-            set_messages.set(new_messages);
-            set_input.set(
-                system_prompt_name()
-                    .map(|sp| format!("@{sp} "))
-                    .unwrap_or("".to_string()),
-            );
+            match assistant_content {
+                Ok(assistant_content) => {
+                    new_messages.push(Message {
+                        role: "assistant".to_string(),
+                        content: assistant_content,
+                        system_prompt_name: system_prompt_name(),
+                    });
+                    set_messages.set(new_messages);
+                    set_input.set(
+                        system_prompt_name()
+                            .map(|sp| format!("@{sp} "))
+                            .unwrap_or("".to_string()),
+                    );
+                }
+                Err(err) => {
+                    // remove previously added user message
+                    new_messages.pop();
+                    set_messages.set(new_messages);
+                    set_error.set(Some(err.to_string()));
+                }
+            };
             set_textarea_disabled.set(false);
         })
     };
@@ -166,13 +183,14 @@ pub fn ChatInterface() -> impl IntoView {
                             }
                         })
                         .collect_view()
-                }}
+                }} {move || error.get().map(|error| view! { <error-box>{error}</error-box> })}
             </chat-history>
             <chat-controls>
                 <div style:display="flex">
                     <button
                         on:click=move |_| {
                             set_messages.set(vec![]);
+                            set_error.set(None);
                         }
                         style:margin-left="auto"
                     >

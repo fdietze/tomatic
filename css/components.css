@@ -88,3 +88,10 @@ settings-system-prompt {
   display:block;
   margin-bottom: 20px;
 }
+
+error-box {
+  background-color: #ffe8ec;
+  color: #620a19;
+  padding: 16px;
+  white-space: break-spaces;
+}
