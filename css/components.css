@@ -65,12 +65,14 @@ chat-controls {
   max-width: var(--chat-width);
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 4px;
   form {
     textarea {
       width: 100%;
       resize: none;
       height: 60px;
+    }
+    textarea:focus {
+      outline: none;
     }
   }
 }
