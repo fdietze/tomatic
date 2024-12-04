@@ -137,6 +137,10 @@ pub fn ChatInterface() -> impl IntoView {
                 }
             };
             set_textarea_disabled.set(false);
+            if let Some(ref_input) = ref_input.get() {
+                println!("focus");
+                let _ = ref_input.focus();
+            }
         })
     };
     let submit2 = submit.clone();
@@ -197,21 +201,27 @@ pub fn ChatInterface() -> impl IntoView {
                         "New Chat"
                     </button>
                 </div>
-                <form on:submit=move |_| submit.clone()()>
-                    <textarea
-                        prop:value=move || input.get()
-                        on:input:target=move |ev| set_input.set(ev.target().value())
-                        placeholder="Message"
-                        title="ctrl+enter to submit"
-                        node_ref=ref_input
-                        on:keydown:target=move |ev| {
-                            if ev.key() == "Enter" && ev.ctrl_key() {
-                                ev.prevent_default();
-                                submit2.clone()();
+                <form on:submit=move |ev| {
+                    ev.prevent_default();
+                    submit.clone()()
+                }>
+                    <div style:display="flex">
+                        <textarea
+                            prop:value=move || input.get()
+                            on:input:target=move |ev| set_input.set(ev.target().value())
+                            placeholder="Message"
+                            title="ctrl+enter to submit"
+                            node_ref=ref_input
+                            on:keydown:target=move |ev| {
+                                if ev.key() == "Enter" && ev.ctrl_key() {
+                                    ev.prevent_default();
+                                    submit2.clone()();
+                                }
                             }
-                        }
-                        disabled=textarea_disabled
-                    />
+                            disabled=textarea_disabled
+                        />
+                        <button style="flex-shrink:0; width:40px">"Go"</button>
+                    </div>
                 </form>
             </chat-controls>
         </chat-interface>
