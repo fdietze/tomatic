@@ -1,5 +1,5 @@
 <h1 align="center" style="border-bottom: none">
-        <img src="logo.png" width="100" />
+        <img src="logo.svg" width="100" />
         <br>
         Tomatic
 </h1>
@@ -7,7 +7,7 @@
 <div align="center">
 
 <a href="https://tomatic.app">https://tomatic.app</a>
-    
+
 ![GitHub](https://img.shields.io/github/license/fdietze/tomatic?style=flat-square)
 
 </div>
