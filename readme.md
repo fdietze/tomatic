@@ -1,22 +1,19 @@
 <h1 align="center" style="border-bottom: none">
-    <div>
-        <a href="https://tomatic.app">
-            <img src="logo.png" width="80" />
-            <br>
-            Tomatic
-        </a>
-    </div>
+        <img src="logo.png" width="100" />
+        <br>
+        Tomatic
 </h1>
 
 <div align="center">
 
+<a href="https://tomatic.app">https://tomatic.app</a>
+    
 ![GitHub](https://img.shields.io/github/license/fdietze/tomatic?style=flat-square)
 
 </div>
 
-# Tomatic
-
-Agentic LLM UI and maybe more.
+<h1>Tomatic</h1>
+Agentic LLM Group Chat UI and maybe more.
 
 ## Getting Started
 
