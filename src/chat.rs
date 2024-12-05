@@ -196,6 +196,8 @@ pub fn ChatInterface() -> impl IntoView {
                     <SystemPromptBar
                         system_prompts=system_prompts
                         selected_prompt_name=selected_system_prompt_name
+                        input=input
+                        set_input=set_input
                     />
                     <button
                         on:click=move |_| {
@@ -238,6 +240,8 @@ pub fn ChatInterface() -> impl IntoView {
 fn SystemPromptBar(
     #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
     #[prop(into)] selected_prompt_name: Signal<Option<String>>,
+    #[prop(into)] input: Signal<String>,
+    #[prop(into)] set_input: WriteSignal<String>,
 ) -> impl IntoView {
     view! {
         {move || {
@@ -245,11 +249,15 @@ fn SystemPromptBar(
             system_prompts()
                 .iter()
                 .map(|system_prompt| {
-                    let name = &system_prompt.name;
+                    let name = system_prompt.name.clone();
                     let selected = selected_prompt_name == Some(name.clone());
                     view! {
-                        <chat-controls-system-prompt data-selected=selected
-                            .to_string()>{name.clone()}</chat-controls-system-prompt>
+                        <chat-controls-system-prompt
+                            data-selected=selected.to_string()
+                            on:click=move |_| set_input(format!("{}@{} ", input(), &name.clone()))
+                        >
+                            {name.clone()}
+                        </chat-controls-system-prompt>
                     }
                 })
                 .collect_view()
