@@ -37,8 +37,8 @@ pub fn ChatInterface() -> impl IntoView {
     let (textarea_disabled, set_textarea_disabled) = signal(false);
     let (error, set_error) = signal::<Option<String>>(None);
     let selected_system_prompt_name = Memo::new(move |_| {
-        let system_prompts = system_prompts.get();
-        let input = input.get();
+        let system_prompts = system_prompts();
+        let input = input();
 
         // find first occurrence of mention @name from a list of valid names in input.
         input.split(' ').find_map(|word| {
@@ -56,14 +56,11 @@ pub fn ChatInterface() -> impl IntoView {
         })
     });
     let selected_system_prompt = Memo::new(move |_| {
-        let system_prompts = system_prompts.get();
-        let system_prompt_name: Option<String> = selected_system_prompt_name.get();
-        system_prompt_name.and_then(|name| {
-            system_prompts
-                .iter()
-                .find(|sp| sp.name == name)
-                .map(|sp| sp.prompt.clone())
-        })
+        let system_prompts = system_prompts();
+        let system_prompt_name: Option<String> = selected_system_prompt_name();
+        system_prompt_name
+            .and_then(|name| system_prompts.iter().find(|sp| sp.name == name))
+            .cloned()
     });
 
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
@@ -84,23 +81,25 @@ pub fn ChatInterface() -> impl IntoView {
     let submit = move || {
         spawn_local(async move {
             set_textarea_disabled.set(true);
-            let mut new_messages = messages.get();
+            let mut new_messages = messages();
             let system_message = Message {
                 role: "system".to_string(),
-                content: selected_system_prompt.get().unwrap_or("".to_string()),
+                content: selected_system_prompt()
+                    .map(|sp| sp.prompt)
+                    .unwrap_or("".to_string()),
                 system_prompt_name: None,
             };
             let mut messages_to_submit = vec![system_message];
             let user_message = Message {
                 role: "user".to_string(),
-                content: input.get(),
+                content: input(),
                 system_prompt_name: None,
             };
             new_messages.push(user_message);
             set_messages.set(new_messages.clone());
             messages_to_submit.extend(new_messages.clone());
             let assistant_content: Result<String, anyhow::Error> = {
-                if api_key.get().is_empty() {
+                if api_key().is_empty() {
                     Err(anyhow::anyhow!(
                         "No API key provided. Please add one in Settings."
                     ))
@@ -108,7 +107,7 @@ pub fn ChatInterface() -> impl IntoView {
                     llm::request_message_content(
                         messages_to_submit.iter().map(|m| m.to_llm()).collect(),
                         model,
-                        api_key.get(),
+                        api_key(),
                     )
                     .await
                 }
@@ -118,12 +117,11 @@ pub fn ChatInterface() -> impl IntoView {
                     new_messages.push(Message {
                         role: "assistant".to_string(),
                         content: assistant_content,
-                        system_prompt_name: selected_system_prompt_name.get(),
+                        system_prompt_name: selected_system_prompt_name(),
                     });
                     set_messages.set(new_messages);
                     set_input.set(
-                        selected_system_prompt_name
-                            .get()
+                        selected_system_prompt_name()
                             .map(|sp| format!("@{sp} "))
                             .unwrap_or("".to_string()),
                     );
@@ -148,8 +146,7 @@ pub fn ChatInterface() -> impl IntoView {
         <chat-interface>
             <chat-history>
                 {move || {
-                    messages
-                        .get()
+                    messages()
                         .into_iter()
                         .map(|message| {
                             let role = message.role.clone();
@@ -186,7 +183,13 @@ pub fn ChatInterface() -> impl IntoView {
                             }
                         })
                         .collect_view()
-                }} {move || error.get().map(|error| view! { <error-box>{error}</error-box> })}
+                }} {move || error().map(|error| view! { <error-box>{error}</error-box> })}
+                // workaround to
+                // make Memo keep its state
+                {move || {
+                    let _ = selected_system_prompt();
+                    ""
+                }}
             </chat-history>
             <chat-controls>
                 <div style="display: flex; flex-wrap: wrap;">
@@ -210,7 +213,7 @@ pub fn ChatInterface() -> impl IntoView {
                 }>
                     <div style:display="flex">
                         <textarea
-                            prop:value=move || input.get()
+                            prop:value=input
                             on:input:target=move |ev| set_input.set(ev.target().value())
                             placeholder="Message"
                             title="ctrl+enter to submit"
@@ -238,9 +241,8 @@ fn SystemPromptBar(
 ) -> impl IntoView {
     view! {
         {move || {
-            let selected_prompt_name = selected_prompt_name.get();
-            system_prompts
-                .get()
+            let selected_prompt_name = selected_prompt_name();
+            system_prompts()
                 .iter()
                 .map(|system_prompt| {
                     let name = &system_prompt.name;
