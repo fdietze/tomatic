@@ -77,6 +77,15 @@ chat-controls {
   }
 }
 
+chat-controls-system-prompt {
+  background-color: #d6dae2;
+  padding: 4px;
+  &[data-selected="true"] {
+    background-color: black;
+    color: white;
+  }
+}
+
 settings-section {
   display:block;
   margin: 12px;

@@ -36,7 +36,7 @@ pub fn ChatInterface() -> impl IntoView {
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (textarea_disabled, set_textarea_disabled) = signal(false);
     let (error, set_error) = signal::<Option<String>>(None);
-    let system_prompt_name = move || {
+    let selected_system_prompt_name = Memo::new(move |_| {
         let system_prompts = system_prompts.get();
         let input = input.get();
 
@@ -54,19 +54,17 @@ pub fn ChatInterface() -> impl IntoView {
                 None
             }
         })
-    };
-    let system_prompt = move || {
+    });
+    let selected_system_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts.get();
-        let system_prompt_name: Option<String> = system_prompt_name();
-        system_prompt_name
-            .and_then(|name| {
-                system_prompts
-                    .iter()
-                    .find(|sp| sp.name == name)
-                    .map(|sp| sp.prompt.clone())
-            })
-            .unwrap_or("".to_string())
-    };
+        let system_prompt_name: Option<String> = selected_system_prompt_name.get();
+        system_prompt_name.and_then(|name| {
+            system_prompts
+                .iter()
+                .find(|sp| sp.name == name)
+                .map(|sp| sp.prompt.clone())
+        })
+    });
 
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
 
@@ -89,7 +87,7 @@ pub fn ChatInterface() -> impl IntoView {
             let mut new_messages = messages.get();
             let system_message = Message {
                 role: "system".to_string(),
-                content: system_prompt(),
+                content: selected_system_prompt.get().unwrap_or("".to_string()),
                 system_prompt_name: None,
             };
             let mut messages_to_submit = vec![system_message];
@@ -120,11 +118,12 @@ pub fn ChatInterface() -> impl IntoView {
                     new_messages.push(Message {
                         role: "assistant".to_string(),
                         content: assistant_content,
-                        system_prompt_name: system_prompt_name(),
+                        system_prompt_name: selected_system_prompt_name.get(),
                     });
                     set_messages.set(new_messages);
                     set_input.set(
-                        system_prompt_name()
+                        selected_system_prompt_name
+                            .get()
                             .map(|sp| format!("@{sp} "))
                             .unwrap_or("".to_string()),
                     );
@@ -190,7 +189,11 @@ pub fn ChatInterface() -> impl IntoView {
                 }} {move || error.get().map(|error| view! { <error-box>{error}</error-box> })}
             </chat-history>
             <chat-controls>
-                <div style:display="flex">
+                <div style="display: flex; flex-wrap: wrap;">
+                    <SystemPromptBar
+                        system_prompts=system_prompts
+                        selected_prompt_name=selected_system_prompt_name
+                    />
                     <button
                         on:click=move |_| {
                             set_messages.set(vec![]);
@@ -225,5 +228,29 @@ pub fn ChatInterface() -> impl IntoView {
                 </form>
             </chat-controls>
         </chat-interface>
+    }
+}
+
+#[component]
+fn SystemPromptBar(
+    #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
+    #[prop(into)] selected_prompt_name: Signal<Option<String>>,
+) -> impl IntoView {
+    view! {
+        {move || {
+            let selected_prompt_name = selected_prompt_name.get();
+            system_prompts
+                .get()
+                .iter()
+                .map(|system_prompt| {
+                    let name = &system_prompt.name;
+                    let selected = selected_prompt_name == Some(name.clone());
+                    view! {
+                        <chat-controls-system-prompt data-selected=selected
+                            .to_string()>{name.clone()}</chat-controls-system-prompt>
+                    }
+                })
+                .collect_view()
+        }}
     }
 }
