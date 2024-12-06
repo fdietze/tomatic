@@ -1,25 +1,11 @@
 body,html {
   width: 100%;
   height: 100%;
+  margin: 0;
   overscroll-behavior-y: contain; /* mobile: disable pull down to reload behavior */
 }
 
-body {
-  background-color: #eff1f5;
-}
 
-textarea, input {
-  background-color: white;
-  padding: 4px;
-}
-
-button {
-  padding: 4px;
-  background-color: black;
-  color: white;
-}
-
-/* css vars */
 :root {
   --chat-width: 50rem;
 }
@@ -30,11 +16,6 @@ body {
   flex-direction: column;
 }
 
-header {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1em;
-}
 
 chat-interface {
   display:flex;
@@ -51,7 +32,7 @@ chat-message {
   padding-left: 8px;
   padding-right: 8px;
   &[data-role="user"] {
-    background-color: #d6dae2;
+    /*background-color: #d6dae2;*/
   }
 }
 
@@ -100,11 +81,11 @@ chat-controls {
 
 chat-controls-system-prompt {
   /* this should probably be a button, because it can be clicked */
-  background-color: #d6dae2;
+  /*background-color: #d6dae2;*/
   padding: 4px;
   cursor: pointer;
   &[data-selected="true"] {
-    background-color: black;
+    /*background-color: black;*/
     color: white;
   }
 }
@@ -131,7 +112,7 @@ settings-system-prompt {
 }
 
 error-box {
-  background-color: #ffe8ec;
+  /*background-color: #ffe8ec;*/
   color: #620a19;
   padding: 16px;
   white-space: break-spaces;

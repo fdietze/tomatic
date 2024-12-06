@@ -18,3 +18,5 @@ schemars = "0.8.21"
 serde = "1.0.215"
 serde_json = "1.0.133"
 markdown = "1.0.0-alpha.21"
+strum = { version = "0.26.3", features = ["derive"] }
+strum_macros = "0.26.4"
