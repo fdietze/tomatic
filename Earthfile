@@ -18,7 +18,7 @@ devbox:
 rustup:
   FROM +devbox
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
-  RUN devbox run -- cargo fetch
+  RUN devbox run -- cargo fetch --locked
 
 cargo-chef-planner:
   FROM +rustup
@@ -30,10 +30,10 @@ build:
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --locked --target wasm32-unknown-unknown --recipe-path recipe.json
   COPY Cargo.toml . # cargo chef cook overwrites Cargo.toml, which seems to confuse trunk
   COPY --dir src css index.html favicon Trunk.toml .
-  RUN devbox run -- trunk build --skip-version-check
+  RUN devbox run -- trunk build --locked --skip-version-check
   RUN ls -lh dist
 
 release:
@@ -41,10 +41,10 @@ release:
   FROM +rustup
   COPY rust-toolchain.toml Cargo.toml Cargo.lock .
   COPY +cargo-chef-planner/recipe.json recipe.json
-  RUN devbox run -- cargo chef cook --target wasm32-unknown-unknown --release --recipe-path recipe.json
+  RUN devbox run -- cargo chef cook --locked --target wasm32-unknown-unknown --release --recipe-path recipe.json
   COPY Cargo.toml . # cargo chef cook overwrites Cargo.toml, which seems to confuse trunk
   COPY --dir src css index.html favicon Trunk.toml .
-  RUN devbox run -- trunk build --release --minify --skip-version-check
+  RUN devbox run -- trunk build --locked --release --minify --skip-version-check
   RUN ls -lh dist
   SAVE ARTIFACT dist
 

@@ -6,7 +6,7 @@ _default:
 
 # start development environment
 dev:
-  trunk serve --no-error-reporting --skip-version-check
+  trunk serve --locked --no-error-reporting --skip-version-check
 
 # run ci checks locally
 ci:
