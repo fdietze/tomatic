@@ -1,17 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content"/>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
 
-    <link data-trunk rel="copy-dir" href="favicon">
-    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" sizes="any" />
+    <link data-trunk rel="copy-dir" href="favicon" />
+    <link
+      rel="icon"
+      type="image/png"
+      href="favicon/favicon-96x96.png"
+      sizes="96x96"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="favicon/favicon.svg"
+      sizes="any"
+    />
     <link rel="shortcut icon" href="favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="favicon/apple-touch-icon.png"
+    />
     <meta name="apple-mobile-web-app-title" content="Tomatic" />
     <link rel="manifest" href="favicon/site.webmanifest" />
-
 
     <link
       rel="stylesheet"
@@ -24,10 +40,24 @@
       href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/themes/dark.css"
       onload="document.documentElement.classList.add('sl-theme-dark');"
     />
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/shoelace-autoloader.js"></script>
+    <script type="module">
+      // Core utilities
+      import { setBasePath } from "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/utilities/base-path.js";
 
-    <link data-trunk rel="inline" href="css/fonts.css"/>
-    <link data-trunk rel="inline" href="css/style.css"/>
+      // Components
+      import "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/components/button/button.js";
+      import "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/components/tab/tab.js";
+      import "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/components/tab-group/tab-group.js";
+      import "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/components/tab-panel/tab-panel.js";
+
+      // Set base path for assets
+      setBasePath(
+        "https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.0/cdn/"
+      );
+    </script>
+
+    <link data-trunk rel="inline" href="css/fonts.css" />
+    <link data-trunk rel="inline" href="css/style.css" />
     <title>Tomatic</title>
   </head>
   <body></body>

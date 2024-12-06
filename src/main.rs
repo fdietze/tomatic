@@ -37,7 +37,7 @@ fn App() -> impl IntoView {
     };
 
     view! {
-        <sl-tab-group on:sl-tab-show=handle_tab_switch>
+        <sl-tab-group on:sl-tab-show=handle_tab_switch id="navigation-tab-group">
             <sl-tab slot="nav" panel={Page::Chat.to_string()} active={page() == Page::Chat}>
                 Chat
             </sl-tab>
@@ -46,14 +46,14 @@ fn App() -> impl IntoView {
             </sl-tab>
 
             <sl-tab-panel name={Page::Chat.to_string()}>
-                <Show when=move || page() == Page::Chat>
-                    <chat::ChatInterface />
-                </Show>
+                    <Show when=move || page() == Page::Chat>
+                        <chat::ChatInterface />
+                    </Show>
             </sl-tab-panel>
             <sl-tab-panel name={Page::Settings.to_string()}>
-                <Show when=move || page() == Page::Settings>
-                    <settings::Settings />
-                </Show>
+                    <Show when=move || page() == Page::Settings>
+                        <settings::Settings />
+                    </Show>
             </sl-tab-panel>
         </sl-tab-group>
     }
