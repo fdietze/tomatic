@@ -1,7 +1,12 @@
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
-use leptos::{html, prelude::*, task::spawn_local};
+use leptos::{ev::Targeted, html::{self }, logging::log, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
+use crate::web_sys::{HtmlElement, HtmlInputElement};
+use leptos::wasm_bindgen::JsCast;
+use crate::web_sys::js_sys::{Object, Reflect};
+use crate::web_sys::js_sys;
+
 
 use crate::llm;
 
@@ -63,11 +68,19 @@ pub fn ChatInterface() -> impl IntoView {
             .cloned()
     });
 
-    let ref_input: NodeRef<html::Textarea> = NodeRef::new();
+    let ref_input: NodeRef<html::Custom<&'static str>> = NodeRef::new();
 
     Effect::new(move |_| {
+        log!("Effect running, ref_input: {:?}", ref_input.get());
         if let Some(ref_input) = ref_input.get() {
-            let _ = ref_input.focus();
+            // Cast directly to HTMLElement
+            let element = ref_input.dyn_ref::<crate::web_sys::HtmlElement>();
+            log!("Got element: {:?}", element);
+            
+            if let Some(element) = element {
+                let _ = element.focus();
+                log!("Focus called");
+            }
         }
     });
 
@@ -134,13 +147,18 @@ pub fn ChatInterface() -> impl IntoView {
                 }
             };
             set_textarea_disabled.set(false);
-            if let Some(ref_input) = ref_input.get() {
-                println!("focus");
-                let _ = ref_input.focus();
-            }
+            // if let Some(ref_input) = ref_input.get() {
+            //     println!("focus");
+            //     let _ = ref_input.focus();
+            // }
         })
     };
     let submit2 = submit.clone();
+
+    let handle_input = move |ev: Targeted<leptos::ev::Event, HtmlElement>| {
+        let input = ev.target().unchecked_into::<HtmlInputElement>();
+        set_input.set(input.value());
+    };
 
     view! {
         <chat-interface>
@@ -213,10 +231,10 @@ pub fn ChatInterface() -> impl IntoView {
                     ev.prevent_default();
                     submit.clone()()
                 }>
-                    <div style:display="flex">
-                        <textarea
+                    <div style="display: flex; padding: 4px;">
+                        <sl-textarea
                             prop:value=input
-                            on:input:target=move |ev| set_input.set(ev.target().value())
+                            on:input:target=handle_input
                             placeholder="Message"
                             title="ctrl+enter to submit"
                             node_ref=ref_input
@@ -228,7 +246,7 @@ pub fn ChatInterface() -> impl IntoView {
                             }
                             disabled=textarea_disabled
                         />
-                        <button style="flex-shrink:0; width:40px">"Go"</button>
+                        <sl-button type="submit" style="flex-shrink:0; width:40px">"Go"</sl-button>
                     </div>
                 </form>
             </chat-controls>
