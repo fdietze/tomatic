@@ -197,8 +197,10 @@ settings-system-prompt {
 }
 
 error-box {
-  background-color: var(--base02);
+  background-color: var(--base00);
   color: var(--base08);
-  padding: 16px;
+  padding: 12px;
+  margin: 4px;
   white-space: break-spaces;
+  border-radius: 8px;
 }

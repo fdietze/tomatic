@@ -36,25 +36,27 @@ pub fn ChatInterface() -> impl IntoView {
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (textarea_disabled, set_textarea_disabled) = signal(false);
     let (error, set_error) = signal::<Option<String>>(None);
-    let selected_system_prompt_name = Memo::new(move |_| {
-        let system_prompts = system_prompts();
-        let input = input();
-
-        // find first occurrence of mention @name from a list of valid names in input.
-        input.split(' ').find_map(|word| {
-            if !word.starts_with('@') {
-                return None;
-            }
-            let name = &word[1..];
-            // remove punctuation at the end
-            let name = name.trim_matches(|c: char| !c.is_alphanumeric());
-            if system_prompts.iter().any(|sp| sp.name == name) {
-                Some(name.to_string())
-            } else {
-                None
-            }
-        })
-    });
+    let (selected_system_prompt_name, set_selected_system_prompt_name, _) =
+        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_system_prompt_name");
+    // let selected_system_prompt_name = Memo::new(move |_| {
+    //     let system_prompts = system_prompts();
+    //     let input = input();
+    //
+    //     // find first occurrence of mention @name from a list of valid names in input.
+    //     input.split(' ').find_map(|word| {
+    //         if !word.starts_with('@') {
+    //             return None;
+    //         }
+    //         let name = &word[1..];
+    //         // remove punctuation at the end
+    //         let name = name.trim_matches(|c: char| !c.is_alphanumeric());
+    //         if system_prompts.iter().any(|sp| sp.name == name) {
+    //             Some(name.to_string())
+    //         } else {
+    //             None
+    //         }
+    //     })
+    // });
     let selected_system_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let system_prompt_name: Option<String> = selected_system_prompt_name();
@@ -120,11 +122,6 @@ pub fn ChatInterface() -> impl IntoView {
                         system_prompt_name: selected_system_prompt_name(),
                     });
                     set_messages.set(new_messages);
-                    set_input.set(
-                        selected_system_prompt_name()
-                            .map(|sp| format!("@{sp} "))
-                            .unwrap_or("".to_string()),
-                    );
                 }
                 Err(err) => {
                     // remove previously added user message
@@ -183,8 +180,18 @@ pub fn ChatInterface() -> impl IntoView {
                             }
                         })
                         .collect_view()
-                }} {move || error().map(|error| view! { <error-box>{error}</error-box> })}
-                // workaround to
+                }}
+                {move || {
+                    error()
+                        .map(|error| {
+                            view! {
+                                <error-box>
+                                    <div style="font-weight: bold">error</div>
+                                    {error}
+                                </error-box>
+                            }
+                        })
+                }} // workaround to
                 // make Memo keep its state
                 {move || {
                     let _ = selected_system_prompt();
@@ -196,8 +203,7 @@ pub fn ChatInterface() -> impl IntoView {
                     <SystemPromptBar
                         system_prompts=system_prompts
                         selected_prompt_name=selected_system_prompt_name
-                        input=input
-                        set_input=set_input
+                        set_selected_prompt_name=set_selected_system_prompt_name
                     />
                     <button
                         on:click=move |_| {
@@ -240,8 +246,7 @@ pub fn ChatInterface() -> impl IntoView {
 fn SystemPromptBar(
     #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
     #[prop(into)] selected_prompt_name: Signal<Option<String>>,
-    #[prop(into)] input: Signal<String>,
-    #[prop(into)] set_input: WriteSignal<String>,
+    #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
         {move || {
@@ -255,7 +260,7 @@ fn SystemPromptBar(
                         <button
                             class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
-                            on:click=move |_| set_input(format!("{}@{} ", input(), &name.clone()))
+                            on:click=move |_| set_selected_prompt_name(Some(name.clone()))
                         >
                             {name.clone()}
                         </button>
