@@ -1,9 +1,10 @@
 :root {
+  /* based on */
   /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/catppuccin-latte.yaml*/
   /*name: "Catppuccin Latte"*/
   /*author: "https://github.com/catppuccin/catppuccin"*/
   --base00: #eff1f5; /* (Background): Main background color of your UI or application. */                                                             
-  --base01: #e6e9ef; /* (Cursor): Cursor or other highlight elements. */                                                                              
+  --base01: #e1e5ef; /* (Cursor): Cursor or other highlight elements. */                                                                              
   --base02: #ccd0da; /* (Selection Background): Background for selected elements, such as text or active list items. */                               
   --base03: #bcc0cc; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
   --base04: #acb0be; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */                                         
@@ -22,11 +23,12 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* based on */
   /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/material-palenight.yaml*/
 /*name: "Material Palenight"*/
 /*author: "Nate Peterson"*/
   --base00: #292D3E; /* (Background): Main background color of your UI or application. */                                                             
-  --base01: #444267; /* (Cursor): Cursor or other highlight elements. */                                                                              
+  --base01: #414866; /* (Cursor): Cursor or other highlight elements. */                                                                              
   --base02: #32374D; /* (Selection Background): Background for selected elements, such as text or active list items. */                               
   --base03: #676E95; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
   --base04: #8796B0; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */                                         
@@ -69,10 +71,12 @@ textarea, input {
   color: var(--base05);
   padding: 8px;
   border-radius: 4px;
+  outline: none;
+  border: 2px solid transparent;
 }
 
 textarea:focus, input:focus {
-  outline: 2px solid var(--base0B);
+  border: 2px solid var(--base0B);
 }
 
 button {
@@ -111,8 +115,16 @@ chat-message {
   padding: 12px;
   margin: 4px;
   border-radius: 8px;
-  &[data-role="user"] {
+  &[data-role="user"], &[data-role="system"] {
+    background-color: var(--base01);
   }
+}
+
+chat-message-loading {
+  background-color: var(--base00);
+  padding: 12px;
+  margin: 4px;
+  border-radius: 8px;
 }
 
 chat-message-role {
@@ -125,6 +137,9 @@ chat-message-role {
 chat-message-content {
   white-space: break-spaces;
   pre {
+    background-color: var(--base02);
+    padding: 8px;
+    border-radius: 8px;
     overflow-x: auto;
   }
 }

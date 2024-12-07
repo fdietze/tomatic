@@ -1,5 +1,5 @@
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
-use leptos::{html, prelude::*, task::spawn_local};
+use leptos::{html, logging::log, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,7 @@ pub fn ChatInterface() -> impl IntoView {
     let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
+    let (loading, set_loading) = signal::<bool>(false);
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (textarea_disabled, set_textarea_disabled) = signal(false);
@@ -68,6 +69,7 @@ pub fn ChatInterface() -> impl IntoView {
     });
 
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
+    let ref_history: NodeRef<html::Custom<&str>> = NodeRef::new();
 
     Effect::new(move |_| {
         if let Some(ref_input) = ref_input.get() {
@@ -101,6 +103,11 @@ pub fn ChatInterface() -> impl IntoView {
             };
             new_messages.push(user_message);
             set_messages.set(new_messages.clone());
+            set_loading(true);
+            if let Some(ref_history) = ref_history.get() {
+                log!("scrolling");
+                ref_history.set_scroll_top(ref_history.scroll_height());
+            }
             messages_to_submit.extend(new_messages.clone());
             let assistant_content: Result<String, anyhow::Error> = {
                 if api_key().is_empty() {
@@ -123,6 +130,7 @@ pub fn ChatInterface() -> impl IntoView {
                         content: assistant_content,
                         system_prompt_name: selected_system_prompt_name(),
                     });
+                    set_input("".to_string());
                     set_messages.set(new_messages);
                 }
                 Err(err) => {
@@ -132,7 +140,7 @@ pub fn ChatInterface() -> impl IntoView {
                     set_error.set(Some(err.to_string()));
                 }
             };
-            set_input("".to_string());
+            set_loading(false);
             set_textarea_disabled.set(false);
             if let Some(ref_input) = ref_input.get() {
                 println!("focus");
@@ -144,7 +152,20 @@ pub fn ChatInterface() -> impl IntoView {
 
     view! {
         <chat-interface>
-            <chat-history>
+            <chat-history node_ref=ref_history>
+                {move || {
+                    selected_system_prompt()
+                        .map(|system_prompt| {
+                            view! {
+                                <chat-message data-role="system">
+                                    <chat-message-role>"system"</chat-message-role>
+                                    <chat-message-content>
+                                        {system_prompt.prompt}
+                                    </chat-message-content>
+                                </chat-message>
+                            }
+                        })
+                }}
                 {move || {
                     messages()
                         .into_iter()
@@ -194,12 +215,9 @@ pub fn ChatInterface() -> impl IntoView {
                                 </error-box>
                             }
                         })
-                }} // workaround to
-                // make Memo keep its state
-                {move || {
-                    let _ = selected_system_prompt();
-                    ""
-                }}
+                }} <Show when=move || loading()>
+                    <chat-message-loading>"Loading..."</chat-message-loading>
+                </Show>
             </chat-history>
             <chat-controls>
                 <chat-controls-buttons>
