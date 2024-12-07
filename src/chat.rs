@@ -27,6 +27,20 @@ impl Message {
     }
 }
 
+fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Option<SystemPrompt> {
+    input
+        .split_whitespace()
+        .filter_map(|word| {
+            if let Some(name) = word.strip_prefix('@') {
+                let name = name.trim_matches(|c: char| !c.is_alphanumeric());
+                system_prompts.iter().find(|sp| sp.name == name).cloned()
+            } else {
+                None
+            }
+        })
+        .next()
+}
+
 #[component]
 pub fn ChatInterface() -> impl IntoView {
     let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
@@ -38,31 +52,19 @@ pub fn ChatInterface() -> impl IntoView {
     let (error, set_error) = signal::<Option<String>>(None);
     let (selected_system_prompt_name, set_selected_system_prompt_name, _) =
         use_local_storage::<Option<String>, JsonSerdeCodec>("selected_system_prompt_name");
-    // let selected_system_prompt_name = Memo::new(move |_| {
-    //     let system_prompts = system_prompts();
-    //     let input = input();
-    //
-    //     // find first occurrence of mention @name from a list of valid names in input.
-    //     input.split(' ').find_map(|word| {
-    //         if !word.starts_with('@') {
-    //             return None;
-    //         }
-    //         let name = &word[1..];
-    //         // remove punctuation at the end
-    //         let name = name.trim_matches(|c: char| !c.is_alphanumeric());
-    //         if system_prompts.iter().any(|sp| sp.name == name) {
-    //             Some(name.to_string())
-    //         } else {
-    //             None
-    //         }
-    //     })
-    // });
     let selected_system_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let system_prompt_name: Option<String> = selected_system_prompt_name();
         system_prompt_name
             .and_then(|name| system_prompts.iter().find(|sp| sp.name == name))
             .cloned()
+    });
+
+    Effect::new(move |_| {
+        let mentioned_prompt = extract_mentioned_prompt(&input(), &system_prompts());
+        if let Some(prompt) = mentioned_prompt {
+            set_selected_system_prompt_name(Some(prompt.name.clone()));
+        }
     });
 
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
