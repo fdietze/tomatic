@@ -132,6 +132,7 @@ pub fn ChatInterface() -> impl IntoView {
                     set_error.set(Some(err.to_string()));
                 }
             };
+            set_input("".to_string());
             set_textarea_disabled.set(false);
             if let Some(ref_input) = ref_input.get() {
                 println!("focus");
