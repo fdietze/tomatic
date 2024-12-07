@@ -92,6 +92,11 @@ button:hover {
 
 ul, ol {
   list-style-position: inside;
+  margin-top: -35px;
+}
+
+li {
+  margin-bottom: -15px;
 }
 
 header {
