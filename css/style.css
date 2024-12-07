@@ -1,39 +1,100 @@
+:root {
+  /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/catppuccin-latte.yaml*/
+  /*name: "Catppuccin Latte"*/
+  /*author: "https://github.com/catppuccin/catppuccin"*/
+  --base00: #eff1f5; /* (Background): Main background color of your UI or application. */                                                             
+  --base01: #e6e9ef; /* (Cursor): Cursor or other highlight elements. */                                                                              
+  --base02: #ccd0da; /* (Selection Background): Background for selected elements, such as text or active list items. */                               
+  --base03: #bcc0cc; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+  --base04: #acb0be; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */                                         
+  --base05: #4c4f69; /* (Default Foreground): Main text color for readability. */                                                                     
+  --base06: #dc8a78; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */                                           
+  --base07: #7287fd; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */                                                   
+  --base08: #d20f39; /* (Red): Error states, warnings, or destructive actions. */                                                                     
+  --base09: #fe640b; /* (Orange): Warnings, cautions, or less critical alerts. */                                                                     
+  --base0A: #df8e1d; /* (Yellow): Alerts and new notifications. */                                                                                    
+  --base0B: #40a02b; /* (Green): Success messages, validations, or active states. */                                                                  
+  --base0C: #179299; /* (Cyan): Information and neutral notifications. */                                                                             
+  --base0D: #1e66f5; /* (Blue): Action prompts like buttons or links. */                                                                              
+  --base0E: #8839ef; /* (Magenta): Call to action elements or highlighting interactive components. */                                                 
+  --base0F: #dd7878; /* (Brown): Rarely used, can act as a complementary or accent color. */                                                          
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+  /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/material-palenight.yaml*/
+/*name: "Material Palenight"*/
+/*author: "Nate Peterson"*/
+  --base00: #292D3E; /* (Background): Main background color of your UI or application. */                                                             
+  --base01: #444267; /* (Cursor): Cursor or other highlight elements. */                                                                              
+  --base02: #32374D; /* (Selection Background): Background for selected elements, such as text or active list items. */                               
+  --base03: #676E95; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+  --base04: #8796B0; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */                                         
+  --base05: #959DCB; /* (Default Foreground): Main text color for readability. */                                                                     
+  --base06: #959DCB; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */                                           
+  --base07: #FFFFFF; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */                                                   
+  --base08: #F07178; /* (Red): Error states, warnings, or destructive actions. */                                                                     
+  --base09: #F78C6C; /* (Orange): Warnings, cautions, or less critical alerts. */                                                                     
+  --base0A: #FFCB6B; /* (Yellow): Alerts and new notifications. */                                                                                    
+  --base0B: #C3E88D; /* (Green): Success messages, validations, or active states. */                                                                  
+  --base0C: #89DDFF; /* (Cyan): Information and neutral notifications. */                                                                             
+  --base0D: #82AAFF; /* (Blue): Action prompts like buttons or links. */                                                                              
+  --base0E: #C792EA; /* (Magenta): Call to action elements or highlighting interactive components. */                                                 
+  --base0F: #FF5370; /* (Brown): Rarely used, can act as a complementary or accent color. */                                                          
+  }
+}
+
+:root {
+  --chat-width: 50rem;
+}
+
+
 body,html {
   width: 100%;
   height: 100%;
   overscroll-behavior-y: contain; /* mobile: disable pull down to reload behavior */
 }
 
-body {
-  background-color: #eff1f5;
-}
-
-textarea, input {
-  background-color: white;
-  padding: 4px;
-}
-
-button {
-  padding: 4px;
-  background-color: black;
-  color: white;
-}
-
-/* css vars */
-:root {
-  --chat-width: 50rem;
-}
 
 body {
+  background-color: var(--base02);
+  color: var(--base05);
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
+textarea, input {
+  background-color: var(--base00);
+  color: var(--base05);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+textarea:focus, input:focus {
+  outline: 2px solid var(--base0B);
+}
+
+button {
+    background-color: var(--base0D);
+    color: var(--base00);
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+
+button:hover {
+  background-color: var(--base0B);
+}
+
+ul {
+  list-style-position: inside;
+}
+
 header {
   display: flex;
   justify-content: flex-end;
-  gap: 1em;
+  gap: 4px;
+  margin: 4px;
 }
 
 chat-interface {
@@ -44,20 +105,19 @@ chat-interface {
 }
 
 chat-message {
+  background-color: var(--base00);
   display:flex;
   flex-direction: column;
-  padding-top: 12px;
-  padding-bottom: 16px;
-  padding-left: 8px;
-  padding-right: 8px;
+  padding: 12px;
+  margin: 4px;
+  border-radius: 8px;
   &[data-role="user"] {
-    background-color: #d6dae2;
   }
 }
 
 chat-message-role {
   font-size: smaller;
-  color: #444a58;
+  color: var(--base05);
   font-weight: bold;
   padding-bottom: 4px;
 }
@@ -92,20 +152,22 @@ chat-controls {
       resize: none;
       height: 60px;
     }
-    textarea:focus {
-      outline: none;
-    }
+    flex-wrap: wrap;
   }
 }
 
-chat-controls-system-prompt {
-  /* this should probably be a button, because it can be clicked */
-  background-color: #d6dae2;
+chat-controls-buttons {
+  display: flex;
+  flex-wrap: wrap;
   padding: 4px;
-  cursor: pointer;
+}
+
+button.chat-controls-system-prompt {
+  /* this should probably be a button, because it can be clicked */
+  /*background-color: var(--base02);*/
+  margin-right: 4px;
   &[data-selected="true"] {
-    background-color: black;
-    color: white;
+    background-color: var(--base0B);
   }
 }
 
@@ -116,6 +178,10 @@ settings-section {
 
   input, textarea {
     width: 100%;
+  }
+
+  textarea {
+    height: 120px;
   }
 }
 
@@ -131,8 +197,8 @@ settings-system-prompt {
 }
 
 error-box {
-  background-color: #ffe8ec;
-  color: #620a19;
+  background-color: var(--base02);
+  color: var(--base08);
   padding: 16px;
   white-space: break-spaces;
 }

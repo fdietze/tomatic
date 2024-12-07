@@ -192,7 +192,7 @@ pub fn ChatInterface() -> impl IntoView {
                 }}
             </chat-history>
             <chat-controls>
-                <div style="display: flex; flex-wrap: wrap;">
+                <chat-controls-buttons>
                     <SystemPromptBar
                         system_prompts=system_prompts
                         selected_prompt_name=selected_system_prompt_name
@@ -208,12 +208,12 @@ pub fn ChatInterface() -> impl IntoView {
                     >
                         "New Chat"
                     </button>
-                </div>
+                </chat-controls-buttons>
                 <form on:submit=move |ev| {
                     ev.prevent_default();
                     submit.clone()()
                 }>
-                    <div style:display="flex">
+                    <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
                         <textarea
                             prop:value=input
                             on:input:target=move |ev| set_input.set(ev.target().value())
@@ -228,7 +228,7 @@ pub fn ChatInterface() -> impl IntoView {
                             }
                             disabled=textarea_disabled
                         />
-                        <button style="flex-shrink:0; width:40px">"Go"</button>
+                        <button style="flex-shrink:0">"Go"</button>
                     </div>
                 </form>
             </chat-controls>
@@ -252,12 +252,13 @@ fn SystemPromptBar(
                     let name = system_prompt.name.clone();
                     let selected = selected_prompt_name == Some(name.clone());
                     view! {
-                        <chat-controls-system-prompt
+                        <button
+                            class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
                             on:click=move |_| set_input(format!("{}@{} ", input(), &name.clone()))
                         >
                             {name.clone()}
-                        </chat-controls-system-prompt>
+                        </button>
                     }
                 })
                 .collect_view()
