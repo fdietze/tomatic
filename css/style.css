@@ -86,7 +86,7 @@ button:hover {
   background-color: var(--base0B);
 }
 
-ul {
+ul, ol {
   list-style-position: inside;
 }
 
