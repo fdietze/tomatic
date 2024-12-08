@@ -162,6 +162,7 @@ chat-message-role {
 chat-message-content {
   word-wrap: break-word;
   pre {
+    margin: 8px 0;
     background-color: var(--base02);
     padding: 8px;
     border-radius: 8px;
