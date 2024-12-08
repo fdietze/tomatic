@@ -91,12 +91,32 @@ button:hover {
 }
 
 ul, ol {
-  list-style-position: inside;
-  margin-top: -35px;
+  margin: 1em 0;
+  padding-left: 1.5em;
+  list-style-position: outside;
+}
+
+ul {
+  list-style-type: disc;
+}
+
+ol {
+  list-style-type: decimal;
+}
+
+ul li::marker, ol li::marker {
+  color: var(--base05);
+}
+
+/* Nested lists */
+ul ul, ol ol {
+  list-style-type: circle;
+  padding-left: 1.5em;
 }
 
 li {
-  margin-bottom: -15px;
+  margin-bottom: 0.5em;
+  line-height: 1.5;
 }
 
 header {
@@ -140,7 +160,7 @@ chat-message-role {
 }
 
 chat-message-content {
-  white-space: break-spaces;
+  word-wrap: break-word;
   pre {
     background-color: var(--base02);
     padding: 8px;
