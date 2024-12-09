@@ -318,6 +318,7 @@ pub fn ChatInterface() -> impl IntoView {
                         set_selected_prompt_name=set_selected_system_prompt_name
                     />
                     <button
+                        data-role="compact"
                         on:click=move |_| {
                             set_messages.set(vec![]);
                             set_error.set(None);
@@ -370,6 +371,7 @@ fn SystemPromptBar(
                     let selected = selected_prompt_name == Some(name.clone());
                     view! {
                         <button
+                            data-role="compact"
                             class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
                             on:click=move |_| set_selected_prompt_name(Some(name.clone()))

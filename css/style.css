@@ -90,6 +90,16 @@ button {
       }
     }
 
+    &[data-role="compact"] {
+      background-color: var(--base0D);
+      color: var(--base00);
+      padding: 4px 8px;
+      border-radius: 4px;
+      &:hover {
+        background-color: var(--base0B);
+      }
+    }
+
     &[data-role="text"] {
       display: inline;
       color: var(--base05);
@@ -219,13 +229,12 @@ chat-controls {
 chat-controls-buttons {
   display: flex;
   flex-wrap: wrap;
+  gap: 4px;
+  row-gap: 4px;
   padding: 4px;
 }
 
 button.chat-controls-system-prompt {
-  /* this should probably be a button, because it can be clicked */
-  /*background-color: var(--base02);*/
-  margin-right: 4px;
   &[data-selected="true"] {
     background-color: var(--base0B);
   }
