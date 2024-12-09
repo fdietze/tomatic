@@ -14,7 +14,7 @@ pub struct SystemPrompt {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
-    system_prompt_name: Option<String>,
+    prompt_name: Option<String>,
     role: String,
     content: String,
 }
@@ -50,14 +50,14 @@ pub fn ChatInterface() -> impl IntoView {
     let (loading, set_loading) = signal::<bool>(false);
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
-    let (textarea_disabled, set_textarea_disabled) = signal(false);
+    let (input_disabled, set_input_disabled) = signal(false);
     let (error, set_error) = signal::<Option<String>>(None);
-    let (selected_system_prompt_name, set_selected_system_prompt_name, _) =
-        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_system_prompt_name");
-    let selected_system_prompt = Memo::new(move |_| {
+    let (selected_prompt_name, set_selected_prompt_name, _) =
+        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_prompt_name");
+    let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
-        let system_prompt_name: Option<String> = selected_system_prompt_name();
-        system_prompt_name
+        let prompt_name: Option<String> = selected_prompt_name();
+        prompt_name
             .and_then(|name| system_prompts.iter().find(|sp| sp.name == name))
             .cloned()
     });
@@ -65,7 +65,7 @@ pub fn ChatInterface() -> impl IntoView {
     Effect::new(move |_| {
         let mentioned_prompt = extract_mentioned_prompt(&input(), &system_prompts());
         if let Some(prompt) = mentioned_prompt {
-            set_selected_system_prompt_name(Some(prompt.name.clone()));
+            set_selected_prompt_name(Some(prompt.name.clone()));
         }
     });
 
@@ -90,19 +90,19 @@ pub fn ChatInterface() -> impl IntoView {
         move || {
             let model = model.clone();
             spawn_local(async move {
-                set_textarea_disabled.set(true);
+                set_input_disabled.set(true);
                 set_loading(true);
                 let system_message = Message {
                     role: "system".to_string(),
-                    content: selected_system_prompt()
+                    content: selected_prompt()
                         .map(|sp| sp.prompt)
                         .unwrap_or("".to_string()),
-                    system_prompt_name: None,
+                    prompt_name: None,
                 };
                 let user_message = Message {
                     role: "user".to_string(),
                     content: input(),
-                    system_prompt_name: None,
+                    prompt_name: None,
                 };
                 set_messages.update(|m| m.push(user_message));
                 if let Some(ref_history) = ref_history.get() {
@@ -130,7 +130,7 @@ pub fn ChatInterface() -> impl IntoView {
                         let response_message = Message {
                             role: "assistant".to_string(),
                             content: response_content,
-                            system_prompt_name: selected_system_prompt_name(),
+                            prompt_name: selected_prompt_name(),
                         };
                         set_input("".to_string());
                         set_messages.update(|m| m.push(response_message));
@@ -144,7 +144,7 @@ pub fn ChatInterface() -> impl IntoView {
                     }
                 };
                 set_loading(false);
-                set_textarea_disabled.set(false);
+                set_input_disabled.set(false);
                 if let Some(ref_input) = ref_input.get() {
                     // TODO
                     println!("focus");
@@ -159,7 +159,7 @@ pub fn ChatInterface() -> impl IntoView {
         Arc::new(move |index: usize| {
             let model = model.clone();
             spawn_local(async move {
-                set_textarea_disabled.set(true);
+                set_input_disabled.set(true);
                 set_loading(true);
 
                 // remove all messages starting at index
@@ -169,10 +169,10 @@ pub fn ChatInterface() -> impl IntoView {
 
                 let system_message = Message {
                     role: "system".to_string(),
-                    content: selected_system_prompt()
+                    content: selected_prompt()
                         .map(|sp| sp.prompt)
                         .unwrap_or("".to_string()),
-                    system_prompt_name: None,
+                    prompt_name: None,
                 };
 
                 let assistant_content: Result<String, anyhow::Error> = {
@@ -196,7 +196,7 @@ pub fn ChatInterface() -> impl IntoView {
                         let response_message = Message {
                             role: "assistant".to_string(),
                             content: response_content,
-                            system_prompt_name: selected_system_prompt_name(),
+                            prompt_name: selected_prompt_name(),
                         };
                         // set_input("".to_string());
                         set_messages.update(|m| m.push(response_message));
@@ -210,17 +210,16 @@ pub fn ChatInterface() -> impl IntoView {
                     }
                 };
                 set_loading(false);
-                set_textarea_disabled.set(false);
+                set_input_disabled.set(false);
             })
         })
     };
-    let submit2 = submit.clone();
 
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
                 {move || {
-                    selected_system_prompt()
+                    selected_prompt()
                         .map(|system_prompt| {
                             view! {
                                 <chat-message data-role="system">
@@ -237,61 +236,12 @@ pub fn ChatInterface() -> impl IntoView {
                         .into_iter()
                         .enumerate()
                         .map(|(message_index, message)| {
-                            let regenerate = regenerate.clone();
-                            let role = message.role.clone();
-                            let markdown_options = markdown::Options {
-                                parse: markdown::ParseOptions {
-                                    constructs: markdown::Constructs {
-                                        math_flow: true,
-                                        math_text: true,
-                                        ..markdown::Constructs::gfm()
-                                    },
-                                    ..markdown::ParseOptions::default()
-                                },
-                                compile: markdown::CompileOptions {
-                                    ..markdown::CompileOptions::default()
-                                },
-                            };
-                            let markdown_raw_html: String = markdown::to_html_with_options(
-                                    &message.content,
-                                    &markdown_options,
-                                )
-                                .unwrap_or(message.content);
                             view! {
-                                <chat-message data-role=role>
-                                    <div style="display: flex">
-                                        <chat-message-role>
-                                            {message
-                                                .system_prompt_name
-                                                .map(|name| "@".to_owned() + name.as_str())
-                                                .unwrap_or(message.role.clone())}
-                                        </chat-message-role>
-                                        {move || {
-                                            let regenerate = regenerate.clone();
-                                            if message.role.clone() == "assistant" {
-                                                view! {
-                                                    // TODO: use <Show>. The question is how to
-                                                    // clone `regenerate`
-                                                    <chat-message-buttons>
-                                                        <button
-                                                            data-role="text"
-                                                            style="margin-left: auto;"
-                                                            on:click=move |_| { regenerate(message_index) }
-                                                        >
-                                                            regenerate
-                                                        </button>
-                                                    </chat-message-buttons>
-                                                }
-                                                    .into_any()
-                                            } else {
-                                                ().into_any()
-                                            }
-                                        }}
-                                    </div>
-                                    <chat-message-content>
-                                        <div inner_html=markdown_raw_html></div>
-                                    </chat-message-content>
-                                </chat-message>
+                                <ChatMessage
+                                    message=message
+                                    message_index=message_index
+                                    regenerate=regenerate.clone()
+                                />
                             }
                         })
                         .collect_view()
@@ -310,48 +260,140 @@ pub fn ChatInterface() -> impl IntoView {
                     <chat-message-loading>"Loading..."</chat-message-loading>
                 </Show>
             </chat-history>
-            <chat-controls>
-                <chat-controls-buttons>
-                    <SystemPromptBar
-                        system_prompts=system_prompts
-                        selected_prompt_name=selected_system_prompt_name
-                        set_selected_prompt_name=set_selected_system_prompt_name
-                    />
-                    <button
-                        data-role="compact"
-                        on:click=move |_| {
-                            set_messages.set(vec![]);
-                            set_error.set(None);
-                        }
-                        style:margin-left="auto"
-                    >
-                        "New Chat"
-                    </button>
-                </chat-controls-buttons>
-                <form on:submit=move |ev| {
-                    ev.prevent_default();
-                    submit()
-                }>
-                    <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
-                        <textarea
-                            prop:value=input
-                            on:input:target=move |ev| set_input.set(ev.target().value())
-                            placeholder="Message"
-                            title="ctrl+enter to submit"
-                            node_ref=ref_input
-                            on:keydown:target=move |ev| {
-                                if ev.key() == "Enter" && ev.ctrl_key() {
-                                    ev.prevent_default();
-                                    submit2();
-                                }
-                            }
-                            disabled=textarea_disabled
-                        />
-                        <button style="flex-shrink:0">"Go"</button>
-                    </div>
-                </form>
-            </chat-controls>
+            <ChatControls
+                system_prompts=system_prompts
+                selected_prompt_name=selected_prompt_name
+                set_selected_prompt_name=set_selected_prompt_name
+                set_messages=set_messages
+                set_error=set_error
+                input=input
+                set_input=set_input
+                input_disabled=input_disabled
+                ref_input=ref_input
+                submit=submit
+            />
         </chat-interface>
+    }
+}
+
+#[component]
+fn ChatControls(
+    #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
+    #[prop(into)] selected_prompt_name: Signal<Option<String>>,
+    #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
+    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
+    #[prop(into)] set_error: WriteSignal<Option<String>>,
+    #[prop(into)] input: Signal<String>,
+    #[prop(into)] set_input: WriteSignal<String>,
+    #[prop(into)] input_disabled: Signal<bool>,
+    #[prop(into)] ref_input: NodeRef<html::Textarea>,
+    #[prop(into)] submit: Arc<impl Fn() + std::marker::Send + std::marker::Sync + 'static>,
+) -> impl IntoView {
+    let submit2 = submit.clone();
+    view! {
+        <chat-controls>
+            <chat-controls-buttons>
+                <SystemPromptBar
+                    system_prompts=system_prompts
+                    selected_prompt_name=selected_prompt_name
+                    set_selected_prompt_name=set_selected_prompt_name
+                />
+                <button
+                    data-role="compact"
+                    on:click=move |_| {
+                        set_messages(vec![]);
+                        set_error(None);
+                    }
+                    style:margin-left="auto"
+                >
+                    "New Chat"
+                </button>
+            </chat-controls-buttons>
+            <form on:submit=move |ev| {
+                ev.prevent_default();
+                submit()
+            }>
+                <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
+                    <textarea
+                        prop:value=input
+                        on:input:target=move |ev| set_input(ev.target().value())
+                        placeholder="Message"
+                        title="ctrl+enter to submit"
+                        node_ref=ref_input
+                        on:keydown:target=move |ev| {
+                            if ev.key() == "Enter" && ev.ctrl_key() {
+                                ev.prevent_default();
+                                submit2();
+                            }
+                        }
+                        disabled=input_disabled
+                    />
+                    <button style="flex-shrink:0">"Go"</button>
+                </div>
+            </form>
+        </chat-controls>
+    }
+}
+
+#[component]
+fn ChatMessage(
+    #[prop(into)] message: Message,
+    #[prop(into)] message_index: usize,
+    regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
+) -> impl IntoView {
+    let regenerate = regenerate.clone();
+    let role = message.role.clone();
+    let markdown_options = markdown::Options {
+        parse: markdown::ParseOptions {
+            constructs: markdown::Constructs {
+                math_flow: true,
+                math_text: true,
+                ..markdown::Constructs::gfm()
+            },
+            ..markdown::ParseOptions::default()
+        },
+        compile: markdown::CompileOptions {
+            ..markdown::CompileOptions::default()
+        },
+    };
+    let markdown_raw_html: String =
+        markdown::to_html_with_options(&message.content, &markdown_options)
+            .unwrap_or(message.content);
+    view! {
+        <chat-message data-role=role>
+            <div style="display: flex">
+                <chat-message-role>
+                    {message
+                        .prompt_name
+                        .map(|name| "@".to_owned() + name.as_str())
+                        .unwrap_or(message.role.clone())}
+                </chat-message-role>
+                {move || {
+                    let regenerate = regenerate.clone();
+                    if message.role.clone() == "assistant" {
+                        view! {
+                            // TODO: use <Show>. The question is how to
+                            // clone `regenerate`
+                            <chat-message-buttons>
+                                <button
+                                    data-role="text"
+                                    style="margin-left: auto;"
+                                    on:click=move |_| { regenerate(message_index) }
+                                >
+                                    regenerate
+                                </button>
+                            </chat-message-buttons>
+                        }
+                            .into_any()
+                    } else {
+                        ().into_any()
+                    }
+                }}
+            </div>
+            <chat-message-content>
+                <div inner_html=markdown_raw_html></div>
+            </chat-message-content>
+        </chat-message>
     }
 }
 
