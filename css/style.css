@@ -83,25 +83,32 @@ button {
     &:not([data-role]) {
       background-color: var(--base0D);
       color: var(--base00);
-      padding: 8px 12px;
-      border-radius: 4px;
       &:hover {
         background-color: var(--base0B);
       }
     }
 
-    &[data-role="compact"] {
-      background-color: var(--base0D);
-      color: var(--base00);
-      padding: 4px 8px;
+    &:not([data-size]) {
+      padding: 8px 12px;
       border-radius: 4px;
+    }
+
+    &[data-role="secondary"] {
+      background-color: var(--base04);
+      color: var(--base00);
       &:hover {
         background-color: var(--base0B);
       }
+    }
+
+    &[data-size="compact"] {
+      padding: 4px 8px;
+      border-radius: 4px;
     }
 
     &[data-role="text"] {
       display: inline;
+      padding: 0;
       color: var(--base05);
       text-decoration: underline;
       &:hover {

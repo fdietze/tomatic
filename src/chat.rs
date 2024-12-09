@@ -239,7 +239,8 @@ pub fn ChatInterface() -> impl IntoView {
                             view! {
                                 <ChatMessage
                                     message=message
-                                    message_index=message_index
+                                    set_messages
+                                    message_index
                                     regenerate=regenerate.clone()
                                 />
                             }
@@ -299,7 +300,7 @@ fn ChatControls(
                     set_selected_prompt_name=set_selected_prompt_name
                 />
                 <button
-                    data-role="compact"
+                    data-size="compact"
                     on:click=move |_| {
                         set_messages(vec![]);
                         set_error(None);
@@ -338,9 +339,13 @@ fn ChatControls(
 #[component]
 fn ChatMessage(
     #[prop(into)] message: Message,
+    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
     #[prop(into)] message_index: usize,
     regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
 ) -> impl IntoView {
+    let (is_editing, set_is_editing) = signal(false);
+    let (input, set_input) = signal(message.content.clone());
+
     let regenerate = regenerate.clone();
     let role = message.role.clone();
     let markdown_options = markdown::Options {
@@ -356,42 +361,102 @@ fn ChatMessage(
             ..markdown::CompileOptions::default()
         },
     };
+
     let markdown_raw_html: String =
-        markdown::to_html_with_options(&message.content, &markdown_options)
-            .unwrap_or(message.content);
+        markdown::to_html_with_options(&message.content.clone(), &markdown_options)
+            .unwrap_or(message.content.clone());
     view! {
         <chat-message data-role=role>
             <div style="display: flex">
                 <chat-message-role>
                     {message
+                        .clone()
                         .prompt_name
                         .map(|name| "@".to_owned() + name.as_str())
                         .unwrap_or(message.role.clone())}
                 </chat-message-role>
+                <chat-message-buttons>
+                    {
+                        let regenerate = regenerate.clone();
+                        let message = message.clone();
+                        move || {
+                            let regenerate = regenerate.clone();
+                            if message.role.clone() == "assistant" {
+                                view! {
+                                    <button
+                                        data-role="text"
+                                        style="margin-left: auto;"
+                                        on:click=move |_| { regenerate(message_index) }
+                                    >
+                                        regenerate
+                                    </button>
+                                }
+                                    .into_any()
+                            } else if message.role.clone() == "user" {
+                                view! {
+                                    <button
+                                        data-role="text"
+                                        style="margin-left: auto;"
+                                        on:click=move |_| {
+                                            set_is_editing(!is_editing());
+                                        }
+                                    >
+                                        edit
+                                    </button>
+                                }
+                                    .into_any()
+                            } else {
+                                ().into_any()
+                            }
+                        }
+                    }
+                </chat-message-buttons>
+            </div>
+            <chat-message-content>
                 {move || {
                     let regenerate = regenerate.clone();
-                    if message.role.clone() == "assistant" {
+                    let message = message.clone();
+                    if is_editing() {
                         view! {
-                            // TODO: use <Show>. The question is how to
-                            // clone `regenerate`
-                            <chat-message-buttons>
+                            <textarea
+                                style="width: 100%"
+                                prop:value=input
+                                on:input:target=move |ev| { set_input(ev.target().value()) }
+                            />
+                            <div style="display:flex; justify-content: flex-end; gap: 4px;">
                                 <button
-                                    data-role="text"
-                                    style="margin-left: auto;"
-                                    on:click=move |_| { regenerate(message_index) }
+                                    data-role="secondary"
+                                    style="margin-left:auto;"
+                                    on:click={
+                                        let message = message.clone();
+                                        move |_| {
+                                            set_input(message.content.clone());
+                                            set_is_editing(false);
+                                        }
+                                    }
                                 >
-                                    regenerate
+                                    Discard
                                 </button>
-                            </chat-message-buttons>
+                                <button on:click=move |_| {
+                                    let message = message.clone();
+                                    set_messages
+                                        .update(|ms| {
+                                            ms[message_index] = Message {
+                                                content: input(),
+                                                ..message
+                                            };
+                                        });
+                                    set_is_editing(false);
+                                    regenerate(message_index + 1);
+                                }>Re-submit</button>
+                            </div>
                         }
                             .into_any()
                     } else {
-                        ().into_any()
+                        let markdown_raw_html = markdown_raw_html.clone();
+                        view! { <div inner_html=markdown_raw_html></div> }.into_any()
                     }
                 }}
-            </div>
-            <chat-message-content>
-                <div inner_html=markdown_raw_html></div>
             </chat-message-content>
         </chat-message>
     }
@@ -413,7 +478,7 @@ fn SystemPromptBar(
                     let selected = selected_prompt_name.clone() == Some(name.clone());
                     view! {
                         <button
-                            data-role="compact"
+                            data-size="compact"
                             class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
                             on:click={
