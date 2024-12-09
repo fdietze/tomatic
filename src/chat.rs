@@ -2,6 +2,7 @@ use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::{html, logging::log, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::llm;
 
@@ -84,68 +85,133 @@ pub fn ChatInterface() -> impl IntoView {
         temperature: None,
     };
 
-    let submit = move || {
-        spawn_local(async move {
-            set_textarea_disabled.set(true);
-            let mut new_messages = messages();
-            let system_message = Message {
-                role: "system".to_string(),
-                content: selected_system_prompt()
-                    .map(|sp| sp.prompt)
-                    .unwrap_or("".to_string()),
-                system_prompt_name: None,
-            };
-            let mut messages_to_submit = vec![system_message];
-            let user_message = Message {
-                role: "user".to_string(),
-                content: input(),
-                system_prompt_name: None,
-            };
-            new_messages.push(user_message);
-            set_messages.set(new_messages.clone());
-            set_loading(true);
-            if let Some(ref_history) = ref_history.get() {
-                log!("scrolling");
-                ref_history.set_scroll_top(ref_history.scroll_height());
-            }
-            messages_to_submit.extend(new_messages.clone());
-            let assistant_content: Result<String, anyhow::Error> = {
-                if api_key().is_empty() {
-                    Err(anyhow::anyhow!(
-                        "No API key provided. Please add one in Settings."
-                    ))
-                } else {
-                    llm::request_message_content(
-                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-                        model,
-                        api_key(),
-                    )
-                    .await
+    let submit = {
+        let model = model.clone();
+        move || {
+            let model = model.clone();
+            spawn_local(async move {
+                set_textarea_disabled.set(true);
+                set_loading(true);
+                let system_message = Message {
+                    role: "system".to_string(),
+                    content: selected_system_prompt()
+                        .map(|sp| sp.prompt)
+                        .unwrap_or("".to_string()),
+                    system_prompt_name: None,
+                };
+                let user_message = Message {
+                    role: "user".to_string(),
+                    content: input(),
+                    system_prompt_name: None,
+                };
+                set_messages.update(|m| m.push(user_message));
+                if let Some(ref_history) = ref_history.get() {
+                    log!("scrolling");
+                    ref_history.set_scroll_top(ref_history.scroll_height());
                 }
-            };
-            match assistant_content {
-                Ok(assistant_content) => {
-                    new_messages.push(Message {
-                        role: "assistant".to_string(),
-                        content: assistant_content,
-                        system_prompt_name: selected_system_prompt_name(),
-                    });
-                    set_input("".to_string());
-                    set_messages.set(new_messages);
+                let assistant_content: Result<String, anyhow::Error> = {
+                    if api_key().is_empty() {
+                        Err(anyhow::anyhow!(
+                            "No API key provided. Please add one in Settings."
+                        ))
+                    } else {
+                        let mut messages_to_submit = vec![system_message];
+                        messages_to_submit.extend(messages());
+                        llm::request_message_content(
+                            messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                            model,
+                            api_key(),
+                        )
+                        .await
+                    }
+                };
+                match assistant_content {
+                    Ok(response_content) => {
+                        let response_message = Message {
+                            role: "assistant".to_string(),
+                            content: response_content,
+                            system_prompt_name: selected_system_prompt_name(),
+                        };
+                        set_input("".to_string());
+                        set_messages.update(|m| m.push(response_message));
+                    }
+                    Err(err) => {
+                        // remove previously added user message
+                        set_messages.update(|m| {
+                            m.pop();
+                        });
+                        set_error.set(Some(err.to_string()));
+                    }
+                };
+                set_loading(false);
+                set_textarea_disabled.set(false);
+                if let Some(ref_input) = ref_input.get() {
+                    // TODO
+                    println!("focus");
+                    let _ = ref_input.focus();
                 }
-                Err(err) => {
-                    // remove previously added user message
-                    new_messages.pop();
-                    set_messages.set(new_messages);
-                    set_error.set(Some(err.to_string()));
-                }
-            };
-            set_loading(false);
-            set_textarea_disabled.set(false);
-            if let Some(ref_input) = ref_input.get() {
-                println!("focus");
-                let _ = ref_input.focus();
-            }
+            })
+        }
+    };
+
+    let regenerate = {
+        let model = model.clone();
+        Arc::new(move |index: usize| {
+            let model = model.clone();
+            spawn_local(async move {
+                set_textarea_disabled.set(true);
+                set_loading(true);
+
+                // remove all messages starting at index
+                set_messages.update(|m| {
+                    m.drain(index..);
+                });
+
+                let system_message = Message {
+                    role: "system".to_string(),
+                    content: selected_system_prompt()
+                        .map(|sp| sp.prompt)
+                        .unwrap_or("".to_string()),
+                    system_prompt_name: None,
+                };
+
+                let assistant_content: Result<String, anyhow::Error> = {
+                    if api_key().is_empty() {
+                        Err(anyhow::anyhow!(
+                            "No API key provided. Please add one in Settings."
+                        ))
+                    } else {
+                        let mut messages_to_submit = vec![system_message];
+                        messages_to_submit.extend(messages());
+                        llm::request_message_content(
+                            messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                            model,
+                            api_key(),
+                        )
+                        .await
+                    }
+                };
+                match assistant_content {
+                    Ok(response_content) => {
+                        let response_message = Message {
+                            role: "assistant".to_string(),
+                            content: response_content,
+                            system_prompt_name: selected_system_prompt_name(),
+                        };
+                        // set_input("".to_string());
+                        set_messages.update(|m| m.push(response_message));
+                    }
+                    Err(err) => {
+                        // remove previously added user message
+                        set_messages.update(|m| {
+                            m.pop();
+                        });
+                        set_error.set(Some(err.to_string()));
+                    }
+                };
+                set_loading(false);
+                set_textarea_disabled.set(false);
+            })
         })
     };
     let submit2 = submit.clone();
@@ -169,7 +235,9 @@ pub fn ChatInterface() -> impl IntoView {
                 {move || {
                     messages()
                         .into_iter()
-                        .map(|message| {
+                        .enumerate()
+                        .map(|(message_index, message)| {
+                            let regenerate = regenerate.clone();
                             let role = message.role.clone();
                             let markdown_options = markdown::Options {
                                 parse: markdown::ParseOptions {
@@ -191,12 +259,35 @@ pub fn ChatInterface() -> impl IntoView {
                                 .unwrap_or(message.content);
                             view! {
                                 <chat-message data-role=role>
-                                    <chat-message-role>
-                                        {message
-                                            .system_prompt_name
-                                            .map(|name| "@".to_owned() + name.as_str())
-                                            .unwrap_or(message.role)}
-                                    </chat-message-role>
+                                    <div style="display: flex">
+                                        <chat-message-role>
+                                            {message
+                                                .system_prompt_name
+                                                .map(|name| "@".to_owned() + name.as_str())
+                                                .unwrap_or(message.role.clone())}
+                                        </chat-message-role>
+                                        {move || {
+                                            let regenerate = regenerate.clone();
+                                            if message.role.clone() == "assistant" {
+                                                view! {
+                                                    // TODO: use <Show>. The question is how to
+                                                    // clone `regenerate`
+                                                    <chat-message-buttons>
+                                                        <button
+                                                            data-role="text"
+                                                            style="margin-left: auto;"
+                                                            on:click=move |_| { regenerate(message_index) }
+                                                        >
+                                                            regenerate
+                                                        </button>
+                                                    </chat-message-buttons>
+                                                }
+                                                    .into_any()
+                                            } else {
+                                                ().into_any()
+                                            }
+                                        }}
+                                    </div>
                                     <chat-message-content>
                                         <div inner_html=markdown_raw_html></div>
                                     </chat-message-content>
@@ -238,7 +329,7 @@ pub fn ChatInterface() -> impl IntoView {
                 </chat-controls-buttons>
                 <form on:submit=move |ev| {
                     ev.prevent_default();
-                    submit.clone()()
+                    submit()
                 }>
                     <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
                         <textarea
@@ -250,7 +341,7 @@ pub fn ChatInterface() -> impl IntoView {
                             on:keydown:target=move |ev| {
                                 if ev.key() == "Enter" && ev.ctrl_key() {
                                     ev.prevent_default();
-                                    submit2.clone()();
+                                    submit2();
                                 }
                             }
                             disabled=textarea_disabled

@@ -80,14 +80,24 @@ textarea:focus, input:focus {
 }
 
 button {
-    background-color: var(--base0D);
-    color: var(--base00);
-    padding: 8px 12px;
-    border-radius: 4px;
-}
+    &:not([data-role]) {
+      background-color: var(--base0D);
+      color: var(--base00);
+      padding: 8px 12px;
+      border-radius: 4px;
+      &:hover {
+        background-color: var(--base0B);
+      }
+    }
 
-button:hover {
-  background-color: var(--base0B);
+    &[data-role="text"] {
+      display: inline;
+      color: var(--base05);
+      text-decoration: underline;
+      &:hover {
+        color: var(--base0D);
+      }
+    }
 }
 
 ul, ol {
@@ -156,6 +166,15 @@ chat-message-role {
   font-size: smaller;
   color: var(--base05);
   font-weight: bold;
+  padding-bottom: 4px;
+}
+
+chat-message-buttons {
+  margin-left: auto;
+  display:flex;
+  font-size: smaller;
+  color: var(--base05);
+  /*font-weight: bold;*/
   padding-bottom: 4px;
 }
 
