@@ -368,13 +368,22 @@ fn SystemPromptBar(
                 .iter()
                 .map(|system_prompt| {
                     let name = system_prompt.name.clone();
-                    let selected = selected_prompt_name == Some(name.clone());
+                    let selected = selected_prompt_name.clone() == Some(name.clone());
                     view! {
                         <button
                             data-role="compact"
                             class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
-                            on:click=move |_| set_selected_prompt_name(Some(name.clone()))
+                            on:click={
+                                let selected_prompt_name = selected_prompt_name.clone();
+                                move |_| {
+                                    if selected_prompt_name == Some(name.clone()) {
+                                        set_selected_prompt_name(None)
+                                    } else {
+                                        set_selected_prompt_name(Some(name.clone()))
+                                    }
+                                }
+                            }
                         >
                             {name.clone()}
                         </button>
