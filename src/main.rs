@@ -9,14 +9,6 @@ use leptos::prelude::*;
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
 
-// TODO: loading indicator
-// TODO: model selection
-// TODO: streaming
-// TODO: math symbols
-// TODO: code syntax highlighting
-// TODO: save past chat histories
-// TODO: delete / edit history items
-
 fn main() {
     console_error_panic_hook::set_once();
     mount_to_body(App);
