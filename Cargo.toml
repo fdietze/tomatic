@@ -13,8 +13,9 @@ codee = "0.2.0"
 console_error_panic_hook = "0.1.7"
 leptos = { version = "0.7.0", features = ["csr", "nightly"] }
 leptos-use = "0.14.0"
-reqwest = { version = "0.12.9", features = ["json"] }
+reqwest = { version = "0.12.9", features = ["json", "stream"] }
 schemars = "0.8.21"
 serde = "1.0.215"
 serde_json = "1.0.133"
 markdown = "1.0.0-alpha.21"
+futures = "0.3.31"

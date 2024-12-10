@@ -1,5 +1,7 @@
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
-use leptos::{html, logging::log, prelude::*, task::spawn_local};
+use futures::{pin_mut, StreamExt};
+use leptos::logging::log;
+use leptos::{html, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -47,7 +49,6 @@ pub fn ChatInterface() -> impl IntoView {
     let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
-    let (loading, set_loading) = signal::<bool>(false);
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (input_disabled, set_input_disabled) = signal(false);
@@ -91,7 +92,6 @@ pub fn ChatInterface() -> impl IntoView {
             let model = model.clone();
             spawn_local(async move {
                 set_input_disabled.set(true);
-                set_loading(true);
                 let system_message = Message {
                     role: "system".to_string(),
                     content: selected_prompt()
@@ -104,47 +104,76 @@ pub fn ChatInterface() -> impl IntoView {
                     content: input(),
                     prompt_name: None,
                 };
-                set_messages.update(|m| m.push(user_message));
+
+                set_input("".to_string());
+                set_messages.update(|m| m.push(user_message.clone()));
+
                 if let Some(ref_history) = ref_history.get() {
                     log!("scrolling");
                     ref_history.set_scroll_top(ref_history.scroll_height());
                 }
-                let assistant_content: Result<String, anyhow::Error> = {
-                    if api_key().is_empty() {
-                        Err(anyhow::anyhow!(
-                            "No API key provided. Please add one in Settings."
-                        ))
-                    } else {
-                        let mut messages_to_submit = vec![system_message];
-                        messages_to_submit.extend(messages());
-                        llm::request_message_content(
-                            messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-                            model,
-                            api_key(),
-                        )
-                        .await
+
+                if api_key().is_empty() {
+                    set_error.set(Some(
+                        "No API key provided. Please add one in Settings.".to_string(),
+                    ));
+                } else {
+                    let mut messages_to_submit = vec![system_message];
+                    messages_to_submit.extend(messages());
+
+                    // Create placeholder response message
+                    let response_message = Message {
+                        role: "assistant".to_string(),
+                        content: String::new(),
+                        prompt_name: selected_prompt_name(),
+                    };
+                    set_messages.update(|m| m.push(response_message));
+
+                    match llm::request_message_content_streamed(
+                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                        model,
+                        api_key(),
+                    )
+                    .await
+                    {
+                        Ok(stream) => {
+                            let mut accumulated_content = String::new();
+                            pin_mut!(stream);
+
+                            while let Some(chunk_result) = stream.next().await {
+                                match chunk_result {
+                                    Ok(content) => {
+                                        accumulated_content.push_str(&content);
+                                        // Update the last message with accumulated content
+                                        set_messages.update(|m| {
+                                            if let Some(last) = m.last_mut() {
+                                                last.content = accumulated_content.clone();
+                                            }
+                                        });
+                                    }
+                                    Err(err) => {
+                                        set_error.set(Some(err.to_string()));
+                                        // Remove the incomplete message
+                                        set_messages.update(|m| {
+                                            m.pop();
+                                        });
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            set_error.set(Some(err.to_string()));
+                            // Remove the incomplete message
+                            set_messages.update(|m| {
+                                m.pop();
+                            });
+                        }
                     }
-                };
-                match assistant_content {
-                    Ok(response_content) => {
-                        let response_message = Message {
-                            role: "assistant".to_string(),
-                            content: response_content,
-                            prompt_name: selected_prompt_name(),
-                        };
-                        set_input("".to_string());
-                        set_messages.update(|m| m.push(response_message));
-                    }
-                    Err(err) => {
-                        // remove previously added user message
-                        set_messages.update(|m| {
-                            m.pop();
-                        });
-                        set_error.set(Some(err.to_string()));
-                    }
-                };
-                set_loading(false);
+                }
+
                 set_input_disabled.set(false);
+
                 if let Some(ref_input) = ref_input.get() {
                     // TODO
                     println!("focus");
@@ -160,7 +189,6 @@ pub fn ChatInterface() -> impl IntoView {
             let model = model.clone();
             spawn_local(async move {
                 set_input_disabled.set(true);
-                set_loading(true);
 
                 // remove all messages starting at index
                 set_messages.update(|m| {
@@ -175,41 +203,63 @@ pub fn ChatInterface() -> impl IntoView {
                     prompt_name: None,
                 };
 
-                let assistant_content: Result<String, anyhow::Error> = {
-                    if api_key().is_empty() {
-                        Err(anyhow::anyhow!(
-                            "No API key provided. Please add one in Settings."
-                        ))
-                    } else {
-                        let mut messages_to_submit = vec![system_message];
-                        messages_to_submit.extend(messages());
-                        llm::request_message_content(
-                            messages_to_submit.iter().map(|m| m.to_llm()).collect(),
-                            model,
-                            api_key(),
-                        )
-                        .await
+                if api_key().is_empty() {
+                    set_error.set(Some(
+                        "No API key provided. Please add one in Settings.".to_string(),
+                    ));
+                } else {
+                    let mut messages_to_submit = vec![system_message];
+                    messages_to_submit.extend(messages());
+
+                    // Create placeholder response message
+                    let response_message = Message {
+                        role: "assistant".to_string(),
+                        content: String::new(),
+                        prompt_name: selected_prompt_name(),
+                    };
+                    set_messages.update(|m| m.push(response_message));
+
+                    // Similar streaming logic as submit
+                    match llm::request_message_content_streamed(
+                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                        model,
+                        api_key(),
+                    )
+                    .await
+                    {
+                        Ok(stream) => {
+                            let mut accumulated_content = String::new();
+                            pin_mut!(stream);
+
+                            while let Some(chunk_result) = stream.next().await {
+                                match chunk_result {
+                                    Ok(content) => {
+                                        accumulated_content.push_str(&content);
+                                        set_messages.update(|m| {
+                                            if let Some(last) = m.last_mut() {
+                                                last.content = accumulated_content.clone();
+                                            }
+                                        });
+                                    }
+                                    Err(err) => {
+                                        set_error.set(Some(err.to_string()));
+                                        set_messages.update(|m| {
+                                            m.pop();
+                                        });
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            set_error.set(Some(err.to_string()));
+                            set_messages.update(|m| {
+                                m.pop();
+                            });
+                        }
                     }
-                };
-                match assistant_content {
-                    Ok(response_content) => {
-                        let response_message = Message {
-                            role: "assistant".to_string(),
-                            content: response_content,
-                            prompt_name: selected_prompt_name(),
-                        };
-                        // set_input("".to_string());
-                        set_messages.update(|m| m.push(response_message));
-                    }
-                    Err(err) => {
-                        // remove previously added user message
-                        set_messages.update(|m| {
-                            m.pop();
-                        });
-                        set_error.set(Some(err.to_string()));
-                    }
-                };
-                set_loading(false);
+                }
+
                 set_input_disabled.set(false);
             })
         })
@@ -257,9 +307,7 @@ pub fn ChatInterface() -> impl IntoView {
                                 </error-box>
                             }
                         })
-                }} <Show when=move || loading()>
-                    <chat-message-loading>"Loading..."</chat-message-loading>
-                </Show>
+                }}
             </chat-history>
             <ChatControls
                 system_prompts=system_prompts
@@ -329,7 +377,9 @@ fn ChatControls(
                         }
                         disabled=input_disabled
                     />
-                    <button style="flex-shrink:0">"Go"</button>
+                    <button style="flex-shrink:0" disabled=input_disabled>
+                        "Go"
+                    </button>
                 </div>
             </form>
         </chat-controls>

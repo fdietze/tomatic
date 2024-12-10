@@ -1,6 +1,7 @@
 use reqwest::Client;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
+use futures::{Stream, StreamExt};
 
 #[derive(Debug, Serialize)]
 pub struct Request {
@@ -260,4 +261,61 @@ pub async fn chain_of_thought<T: for<'de> Deserialize<'de> + JsonSchema>(
     // println!("\n> {step}");
     let structured_output = request::<T>(messages, model, api_key).await?;
     Ok(structured_output)
+}
+
+pub async fn request_message_content_streamed(
+    messages: Vec<Message>,
+    model: Model,
+    api_key: String,
+) -> anyhow::Result<impl Stream<Item = anyhow::Result<String>>> {
+    let url = "https://api.openai.com/v1/chat/completions";
+    let mut request = model.to_request(messages, None, None);
+    request.stream = Some(true);
+
+    let client = Client::new();
+    let response = client
+        .post(url)
+        .bearer_auth(api_key)
+        .json(&request)
+        .send()
+        .await?;
+
+    // Check response status and handle errors
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&error_text) {
+            return Err(anyhow::anyhow!(error_response.error.message));
+        }
+        return Err(anyhow::anyhow!("API request failed: {}", error_text));
+    }
+
+    // Convert the response to a web ReadableStream
+    let stream = response.bytes_stream().map(|chunk_result| {
+        chunk_result
+            .map_err(|e| anyhow::anyhow!(e))
+            .and_then(|chunk| {
+                String::from_utf8(chunk.to_vec())
+                    .map_err(|e| anyhow::anyhow!(e))
+                    .map(|text| {
+                        let mut content = String::new();
+                        for line in text.lines() {
+                            if let Some(json_str) = line.strip_prefix("data: ") {
+                                if json_str.trim() == "[DONE]" {
+                                    continue;
+                                }
+                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str) {
+                                    if let Some(delta_content) = json["choices"][0]["delta"]["content"]
+                                        .as_str()
+                                    {
+                                        content.push_str(delta_content);
+                                    }
+                                }
+                            }
+                        }
+                        content
+                    })
+            })
+    });
+
+    Ok(stream)
 }
