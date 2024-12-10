@@ -72,8 +72,8 @@ pub fn Settings() -> impl IntoView {
                                         style:margin-bottom="4px"
                                     />
                                     <textarea
-                                        prop:value=value.prompt
                                         placeholder="system prompt"
+                                        prop:value=value.prompt
                                         on:input:target=move |ev| {
                                             let input_value = ev.target().value();
                                             on_prompt_change(index, input_value);
