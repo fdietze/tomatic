@@ -277,7 +277,7 @@ pub fn ChatInterface() -> impl IntoView {
                                 <chat-message data-role="system">
                                     <chat-message-role>"system"</chat-message-role>
                                     <chat-message-content>
-                                        {system_prompt.prompt}
+                                        <Markdown markdown_text=system_prompt.prompt />
                                     </chat-message-content>
                                 </chat-message>
                             }
@@ -390,17 +390,7 @@ fn ChatControls(
 }
 
 #[component]
-fn ChatMessage(
-    #[prop(into)] message: Message,
-    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
-    #[prop(into)] message_index: usize,
-    regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
-) -> impl IntoView {
-    let (is_editing, set_is_editing) = signal(false);
-    let (input, set_input) = signal(message.content.clone());
-
-    let regenerate = regenerate.clone();
-    let role = message.role.clone();
+fn Markdown(#[prop(into)] markdown_text: String) -> impl IntoView {
     let markdown_options = markdown::Options {
         parse: markdown::ParseOptions {
             constructs: markdown::Constructs {
@@ -416,8 +406,23 @@ fn ChatMessage(
     };
 
     let markdown_raw_html: String =
-        markdown::to_html_with_options(&message.content.clone(), &markdown_options)
-            .unwrap_or(message.content.clone());
+        markdown::to_html_with_options(&markdown_text.clone(), &markdown_options)
+            .unwrap_or(markdown_text);
+    view! { <div inner_html=markdown_raw_html></div> }
+}
+
+#[component]
+fn ChatMessage(
+    #[prop(into)] message: Message,
+    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
+    #[prop(into)] message_index: usize,
+    regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
+) -> impl IntoView {
+    let (is_editing, set_is_editing) = signal(false);
+    let (input, set_input) = signal(message.content.clone());
+
+    let regenerate = regenerate.clone();
+    let role = message.role.clone();
     view! {
         <chat-message data-role=role>
             <div style="display: flex">
@@ -506,8 +511,7 @@ fn ChatMessage(
                         }
                             .into_any()
                     } else {
-                        let markdown_raw_html = markdown_raw_html.clone();
-                        view! { <div inner_html=markdown_raw_html></div> }.into_any()
+                        view! { <Markdown markdown_text=message.content /> }.into_any()
                     }
                 }}
             </chat-message-content>
