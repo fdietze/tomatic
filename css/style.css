@@ -101,7 +101,7 @@ button {
   }
 
   &[data-role="outline"] {
-    border: 2px solid var(--base04);
+    border: 2px solid var(--base05);
     &:hover {
       border-color: transparent;
       color: var(--base00);
