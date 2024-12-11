@@ -62,4 +62,4 @@ lint:
 ci-test:
   BUILD +check-formatting
   BUILD +lint
-  BUILD +build
+  # BUILD +build, currently only +release is needed
