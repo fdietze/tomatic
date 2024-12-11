@@ -92,6 +92,7 @@ pub fn ChatInterface() -> impl IntoView {
             let model = model.clone();
             spawn_local(async move {
                 set_input_disabled.set(true);
+                set_error(None);
                 let system_message = Message {
                     role: "system".to_string(),
                     content: selected_prompt()
@@ -189,6 +190,7 @@ pub fn ChatInterface() -> impl IntoView {
             let model = model.clone();
             spawn_local(async move {
                 set_input_disabled.set(true);
+                set_error(None);
 
                 // remove all messages starting at index
                 set_messages.update(|m| {
