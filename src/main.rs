@@ -26,8 +26,20 @@ fn App() -> impl IntoView {
     let (page, set_page, _) = use_local_storage::<Page, JsonSerdeCodec>("page");
     view! {
         <header>
-            <button on:click=move |_| set_page.set(Page::Chat)>Chat</button>
-            <button on:click=move |_| set_page.set(Page::Settings)>Settings</button>
+            <button
+                data-role="outline"
+                data-size="compact"
+                on:click=move |_| set_page.set(Page::Chat)
+            >
+                Chat
+            </button>
+            <button
+                data-role="outline"
+                data-size="compact"
+                on:click=move |_| set_page.set(Page::Settings)
+            >
+                Settings
+            </button>
         </header>
         {move || match page.get() {
             Page::Chat => view! { <chat::ChatInterface /> }.into_any(),

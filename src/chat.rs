@@ -348,6 +348,7 @@ fn ChatControls(
                     set_selected_prompt_name=set_selected_prompt_name
                 />
                 <button
+                    data-role="outline"
                     data-size="compact"
                     on:click=move |_| {
                         set_messages(vec![]);
@@ -529,6 +530,7 @@ fn SystemPromptBar(
                     view! {
                         <button
                             data-size="compact"
+                            data-role="outline"
                             class="chat-controls-system-prompt"
                             data-selected=selected.to_string()
                             on:click={
