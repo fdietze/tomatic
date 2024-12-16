@@ -370,10 +370,9 @@ fn ChatControls(
                         prop:value=input
                         on:input:target=move |ev| set_input(ev.target().value())
                         placeholder="Message"
-                        title="ctrl+enter to submit"
                         node_ref=ref_input
                         on:keydown:target=move |ev| {
-                            if ev.key() == "Enter" && ev.ctrl_key() {
+                            if ev.key() == "Enter" && !ev.shift_key() {
                                 ev.prevent_default();
                                 submit2();
                             }
