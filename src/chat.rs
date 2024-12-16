@@ -12,6 +12,7 @@ use crate::llm;
 pub struct SystemPrompt {
     pub name: String,
     pub prompt: String,
+    pub model: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -80,7 +81,9 @@ pub fn ChatInterface() -> impl IntoView {
     });
 
     let model = llm::Model {
-        model: "gpt-4o".to_string(),
+        model: selected_prompt()
+            .and_then(|prompt| prompt.model)
+            .unwrap_or_else(|| "gpt-4o".to_string()),
         seed: None,
         top_p: None,
         temperature: None,

@@ -29,7 +29,7 @@ pub struct ModelListResponse {
     pub data: Vec<ModelListItem>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(unused)]
 pub struct ModelListItem {
     pub id: String,
