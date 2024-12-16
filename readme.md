@@ -33,7 +33,7 @@ Agentic LLM Group Chat UI and maybe more.
    just dev
    ```
 
-1. Point your browser to <http://localhost:8080>
+1. Point your browser to <http://localhost:12345>
 1. List other useful commands by typing
 
    ```bash
