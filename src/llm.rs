@@ -1,7 +1,7 @@
+use futures::{Stream, StreamExt};
 use reqwest::Client;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
-use futures::{Stream, StreamExt};
 
 #[derive(Debug, Serialize)]
 pub struct Request {
@@ -21,6 +21,21 @@ pub struct Response {
     pub created: i32,
     pub model: String,
     pub choices: Vec<Choice>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct ModelListResponse {
+    pub data: Vec<ModelListItem>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(unused)]
+pub struct ModelListItem {
+    pub id: String,
+    pub object: String,
+    pub created: i32,
+    pub owned_by: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -146,6 +161,26 @@ pub async fn request_message_content(
         .message
         .content;
     Ok(content.to_string())
+}
+
+#[allow(unused)]
+pub async fn api_list_models(api_key: String) -> anyhow::Result<ModelListResponse> {
+    let url = "https://api.openai.com/v1/models";
+    let client = Client::new();
+    let response = client.get(url).bearer_auth(api_key).send().await?;
+    let response_text = response.text().await?;
+
+    match serde_json::from_str::<ModelListResponse>(&response_text) {
+        Ok(parsed_response) => Ok(parsed_response),
+        Err(_) => {
+            // If deserialization into Response fails, try to deserialize into ErrorResponse
+            if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&response_text) {
+                Err(anyhow::anyhow!(error_response.error.message))
+            } else {
+                Err(anyhow::anyhow!("Unknown error occurred"))
+            }
+        }
+    }
 }
 
 #[allow(unused)]
@@ -303,9 +338,11 @@ pub async fn request_message_content_streamed(
                                 if json_str.trim() == "[DONE]" {
                                     continue;
                                 }
-                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str) {
-                                    if let Some(delta_content) = json["choices"][0]["delta"]["content"]
-                                        .as_str()
+                                if let Ok(json) =
+                                    serde_json::from_str::<serde_json::Value>(json_str)
+                                {
+                                    if let Some(delta_content) =
+                                        json["choices"][0]["delta"]["content"].as_str()
                                     {
                                         content.push_str(delta_content);
                                     }
