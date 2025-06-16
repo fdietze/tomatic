@@ -1,4 +1,4 @@
-#![feature(async_closure)]
+
 
 mod chat;
 mod llm;

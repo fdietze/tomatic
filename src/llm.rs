@@ -1,7 +1,7 @@
+use futures::{Stream, StreamExt};
 use reqwest::Client;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
-use futures::{Stream, StreamExt};
 
 #[derive(Debug, Serialize)]
 pub struct Request {
@@ -10,7 +10,6 @@ pub struct Request {
     pub response_format: Option<ResponseFormat>,
     pub seed: Option<i64>,
     pub temperature: Option<f64>,
-    pub top_p: Option<f64>,
     pub stream: Option<bool>,
 }
 
@@ -57,7 +56,7 @@ pub struct ResponseFormat {
 }
 
 impl ResponseFormat {
-    pub fn json_schema(schema: schemars::schema::RootSchema) -> Self {
+    pub fn json_schema(schema: schemars::Schema) -> Self {
         ResponseFormat {
             type_: "json_schema".to_string(),
             json_schema: ResponseSchema {
@@ -80,7 +79,6 @@ pub struct ResponseSchema {
 pub struct Model {
     pub model: String,
     pub seed: Option<i64>,
-    pub top_p: Option<f64>,
     pub temperature: Option<f64>,
 }
 
@@ -94,7 +92,6 @@ impl Model {
         Request {
             model: self.model.clone(),
             seed: self.seed,
-            top_p: self.top_p,
             temperature: self.temperature,
             messages,
             response_format,
@@ -303,9 +300,11 @@ pub async fn request_message_content_streamed(
                                 if json_str.trim() == "[DONE]" {
                                     continue;
                                 }
-                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(json_str) {
-                                    if let Some(delta_content) = json["choices"][0]["delta"]["content"]
-                                        .as_str()
+                                if let Ok(json) =
+                                    serde_json::from_str::<serde_json::Value>(json_str)
+                                {
+                                    if let Some(delta_content) =
+                                        json["choices"][0]["delta"]["content"].as_str()
                                     {
                                         content.push_str(delta_content);
                                     }

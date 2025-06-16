@@ -12,6 +12,9 @@ dev:
 ci:
   (git ls-files && git ls-files --others --exclude-standard) | entr -cnr earthly +ci-test
 
+fix:
+  cargo clippy --fix --allow-dirty
+
 # count lines of code in repo
 cloc:
   # ignores generated code

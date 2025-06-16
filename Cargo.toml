@@ -9,12 +9,12 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { version = "1.0.93", features = ["backtrace"] }
-codee = "0.2.0"
+codee = "0.3.0"
 console_error_panic_hook = "0.1.7"
-leptos = { version = "0.7.0", features = ["csr", "nightly"] }
-leptos-use = "0.14.0"
+leptos = { version = "0.8.2", features = ["csr", "nightly"] }
+leptos-use = "0.16.0"
 reqwest = { version = "0.12.9", features = ["json", "stream"] }
-schemars = "0.8.21"
+schemars = "0.9.0"
 serde = "1.0.215"
 serde_json = "1.0.133"
 markdown = "1.0.0-alpha.21"

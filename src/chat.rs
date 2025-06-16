@@ -80,10 +80,9 @@ pub fn ChatInterface() -> impl IntoView {
     });
 
     let model = llm::Model {
-        model: "gpt-4o".to_string(),
+        model: "gpt-4.1".to_string(),
         seed: None,
-        top_p: None,
-        temperature: None,
+        temperature: Some(1.0),
     };
 
     let submit = {
