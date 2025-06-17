@@ -2345,12 +2345,16 @@ dependencies = [
  "codee",
  "console_error_panic_hook",
  "futures",
+ "gloo-timers 0.3.0",
  "leptos",
  "leptos-use",
  "markdown",
  "openrouter_api",
  "serde",
  "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

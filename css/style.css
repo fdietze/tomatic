@@ -112,11 +112,6 @@ button {
     flex-shrink: 0;
     &:not([data-role]) {
         background-color: var(--base01);
-        /* &:hover {
-            background-color: var(--base0B);
-        } */
-
-        /* disabled */
         &[disabled] {
             opacity: 0.5;
             cursor: not-allowed;
@@ -126,11 +121,6 @@ button {
     &[data-role="primary"] {
         background-color: var(--base0D);
         color: var(--base00);
-        /* &:hover {
-            background-color: var(--base0B);
-        } */
-
-        /* disabled */
         &[disabled] {
             opacity: 0.5;
             cursor: not-allowed;
@@ -254,6 +244,18 @@ chat-message-content {
         padding: 8px;
         border-radius: 8px;
         overflow-x: auto;
+        position: relative; /* For positioning the copy button */
+    }
+
+    pre .copy-button {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: system-ui, sans-serif;
+        font-size: 0.8em;
     }
 }
 

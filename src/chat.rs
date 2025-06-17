@@ -3,6 +3,10 @@ use futures::{pin_mut, StreamExt};
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
+use wasm_bindgen::{closure::Closure, JsCast};
+use web_sys::{HtmlButtonElement, HtmlPreElement, Node, Clipboard}; // Removed HtmlElement, Added Clipboard
+use wasm_bindgen_futures::JsFuture;
+use gloo_timers::callback::Timeout;
 use serde::{Deserialize, Serialize};
 
 use crate::llm::DisplayModelInfo;
@@ -507,14 +511,104 @@ fn Markdown(#[prop(into)] markdown_text: String) -> impl IntoView {
             ..markdown::ParseOptions::default()
         },
         compile: markdown::CompileOptions {
+            allow_dangerous_html: true, // Needed if markdown contains HTML
+            allow_dangerous_protocol: true, // Needed for certain links if any
             ..markdown::CompileOptions::default()
         },
     };
 
-    let markdown_raw_html: String =
-        markdown::to_html_with_options(&markdown_text.clone(), &markdown_options)
-            .unwrap_or(markdown_text);
-    view! { <div inner_html=markdown_raw_html></div> }
+    let content_div_ref = NodeRef::<html::Div>::new();
+
+    Effect::new(move |_| {
+        if let Some(div_element) = content_div_ref.get() {
+            let html_output = markdown::to_html_with_options(&markdown_text, &markdown_options)
+                .unwrap_or_else(|_| markdown_text.clone()); // Fallback for safety
+            div_element.set_inner_html(&html_output);
+
+            let document = document();
+            match div_element.query_selector_all("pre") {
+                Ok(pre_elements) => {
+                    for i in 0..pre_elements.length() {
+                        if let Some(node) = pre_elements.item(i) {
+                            if let Ok(pre_el) = node.dyn_into::<HtmlPreElement>() {
+                                if let Ok(button_el_as_element) = document.create_element("button") {
+                                    if let Ok(button_el) = button_el_as_element.dyn_into::<HtmlButtonElement>() {
+                                        button_el.set_class_name("copy-button");
+                                        button_el.set_text_content(Some("Copy"));
+
+                                        let pre_el_clone = pre_el.clone();
+                                        let button_el_clone_for_handler = button_el.clone();
+
+                                        let click_handler = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| {
+                                            let text_to_copy = if let Ok(Some(code_node)) = pre_el_clone.query_selector("code") {
+                                                code_node.text_content().unwrap_or_default()
+                                            } else {
+                                                let mut content = String::new();
+                                                let children = pre_el_clone.child_nodes();
+                                                for idx in 0..children.length() {
+                                                    if let Some(child_node) = children.item(idx) {
+                                                        if let Some(btn_node_ref) = button_el_clone_for_handler.dyn_ref::<Node>() {
+                                                            if child_node.is_same_node(Some(btn_node_ref)) {
+                                                                continue;
+                                                            }
+                                                        }
+                                                        content.push_str(&child_node.text_content().unwrap_or_default());
+                                                    }
+                                                }
+                                                content.trim().to_string()
+                                            };
+
+
+                                            if !text_to_copy.is_empty() {
+                                                let clipboard_opt: Option<Clipboard> = Some(window().navigator().clipboard());
+                                                if let Some(clipboard) = clipboard_opt {
+                                                    let promise = clipboard.write_text(&text_to_copy);
+                                                    let button_for_feedback = button_el_clone_for_handler.clone();
+                                                    spawn_local(async move {
+                                                        match JsFuture::from(promise).await {
+                                                            Ok(_) => {
+                                                                button_for_feedback.set_text_content(Some("Copied!"));
+                                                                let _ = button_for_feedback.class_list().add_1("copied");
+                                                                let timeout_button = button_for_feedback.clone();
+                                                                Timeout::new(1500, move || {
+                                                                    timeout_button.set_text_content(Some("Copy"));
+                                                                    let _ = timeout_button.class_list().remove_1("copied");
+                                                                }).forget();
+                                                            }
+                                                            Err(e) => {
+                                                                log!("Error copying to clipboard: {:?}", e);
+                                                                button_for_feedback.set_text_content(Some("Error"));
+                                                                let timeout_button = button_for_feedback.clone();
+                                                                 Timeout::new(1500, move || {
+                                                                    timeout_button.set_text_content(Some("Copy"));
+                                                                }).forget();
+                                                            }
+                                                        }
+                                                    });
+                                                } else {
+                                                    log!("Clipboard API not available or not in secure context.");
+                                                }
+                                            }
+                                        }) as Box<dyn FnMut(_)>);
+
+                                        if button_el.add_event_listener_with_callback("click", click_handler.as_ref().unchecked_ref()).is_ok() {
+                                            click_handler.forget(); // Leak the closure to keep it alive
+                                            let _ = pre_el.append_child(&button_el);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    log!("Failed to querySelectorAll for pre elements: {:?}", e);
+                }
+            }
+        }
+    });
+
+    view! { <div node_ref=content_div_ref></div> }
 }
 
 #[component]
