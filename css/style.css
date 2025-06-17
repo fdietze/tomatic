@@ -1,305 +1,315 @@
 :root {
-  /* based on */
-  /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/catppuccin-latte.yaml*/
-  /*name: "Catppuccin Latte"*/
-  /*author: "https://github.com/catppuccin/catppuccin"*/
-  --base00: #eff1f5; /* (Background): Main background color of your UI or application. */
-  --base01: #e1e5ef; /* (Cursor): Cursor or other highlight elements. */
-  --base02: #ccd0da; /* (Selection Background): Background for selected elements, such as text or active list items. */
-  --base03: #bcc0cc; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
-  --base04: #acb0be; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
-  --base05: #4c4f69; /* (Default Foreground): Main text color for readability. */
-  --base06: #dc8a78; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
-  --base07: #7287fd; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
-  --base08: #d20f39; /* (Red): Error states, warnings, or destructive actions. */
-  --base09: #fe640b; /* (Orange): Warnings, cautions, or less critical alerts. */
-  --base0A: #df8e1d; /* (Yellow): Alerts and new notifications. */
-  --base0B: #40a02b; /* (Green): Success messages, validations, or active states. */
-  --base0C: #179299; /* (Cyan): Information and neutral notifications. */
-  --base0D: #1e66f5; /* (Blue): Action prompts like buttons or links. */
-  --base0E: #8839ef; /* (Magenta): Call to action elements or highlighting interactive components. */
-  --base0F: #dd7878; /* (Brown): Rarely used, can act as a complementary or accent color. */
+    /* based on */
+    /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/catppuccin-latte.yaml*/
+    /*name: "Catppuccin Latte"*/
+    /*author: "https://github.com/catppuccin/catppuccin"*/
+    --base00: #eff1f5; /* (Background): Main background color of your UI or application. */
+    --base01: #e1e5ef; /* (Cursor): Cursor or other highlight elements. */
+    --base02: #ccd0da; /* (Selection Background): Background for selected elements, such as text or active list items. */
+    --base03: #bcc0cc; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+    --base04: #acb0be; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
+    --base05: #4c4f69; /* (Default Foreground): Main text color for readability. */
+    --base06: #dc8a78; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
+    --base07: #7287fd; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
+    --base08: #d20f39; /* (Red): Error states, warnings, or destructive actions. */
+    --base09: #fe640b; /* (Orange): Warnings, cautions, or less critical alerts. */
+    --base0A: #df8e1d; /* (Yellow): Alerts and new notifications. */
+    --base0B: #40a02b; /* (Green): Success messages, validations, or active states. */
+    --base0C: #179299; /* (Cyan): Information and neutral notifications. */
+    --base0D: #1e66f5; /* (Blue): Action prompts like buttons or links. */
+    --base0E: #8839ef; /* (Magenta): Call to action elements or highlighting interactive components. */
+    --base0F: #dd7878; /* (Brown): Rarely used, can act as a complementary or accent color. */
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* based on */
-    /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/material-palenight.yaml*/
-    /*name: "Material Palenight"*/
-    /*author: "Nate Peterson"*/
-    --base00: #292d3e; /* (Background): Main background color of your UI or application. */
-    --base01: #414866; /* (Cursor): Cursor or other highlight elements. */
-    --base02: #32374d; /* (Selection Background): Background for selected elements, such as text or active list items. */
-    --base03: #676e95; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
-    --base04: #8796b0; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
-    --base05: #959dcb; /* (Default Foreground): Main text color for readability. */
-    --base06: #959dcb; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
-    --base07: #ffffff; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
-    --base08: #f07178; /* (Red): Error states, warnings, or destructive actions. */
-    --base09: #f78c6c; /* (Orange): Warnings, cautions, or less critical alerts. */
-    --base0A: #ffcb6b; /* (Yellow): Alerts and new notifications. */
-    --base0B: #c3e88d; /* (Green): Success messages, validations, or active states. */
-    --base0C: #89ddff; /* (Cyan): Information and neutral notifications. */
-    --base0D: #82aaff; /* (Blue): Action prompts like buttons or links. */
-    --base0E: #c792ea; /* (Magenta): Call to action elements or highlighting interactive components. */
-    --base0F: #ff5370; /* (Brown): Rarely used, can act as a complementary or accent color. */
-  }
+    :root {
+        /* based on */
+        /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/material-palenight.yaml*/
+        /*name: "Material Palenight"*/
+        /*author: "Nate Peterson"*/
+        --base00: #292d3e; /* (Background): Main background color of your UI or application. */
+        --base01: #414866; /* (Cursor): Cursor or other highlight elements. */
+        --base02: #32374d; /* (Selection Background): Background for selected elements, such as text or active list items. */
+        --base03: #676e95; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+        --base04: #8796b0; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
+        --base05: #959dcb; /* (Default Foreground): Main text color for readability. */
+        --base06: #959dcb; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
+        --base07: #ffffff; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
+        --base08: #f07178; /* (Red): Error states, warnings, or destructive actions. */
+        --base09: #f78c6c; /* (Orange): Warnings, cautions, or less critical alerts. */
+        --base0A: #ffcb6b; /* (Yellow): Alerts and new notifications. */
+        --base0B: #c3e88d; /* (Green): Success messages, validations, or active states. */
+        --base0C: #89ddff; /* (Cyan): Information and neutral notifications. */
+        --base0D: #82aaff; /* (Blue): Action prompts like buttons or links. */
+        --base0E: #c792ea; /* (Magenta): Call to action elements or highlighting interactive components. */
+        --base0F: #ff5370; /* (Brown): Rarely used, can act as a complementary or accent color. */
+    }
 }
 
 :root {
-  --chat-width: 50rem;
+    --chat-width: 50rem;
 }
 
 body,
 html {
-  width: 100%;
-  height: 100%;
-  overscroll-behavior-y: contain; /* mobile: disable pull down to reload behavior */
+    width: 100%;
+    height: 100%;
+    overscroll-behavior-y: contain; /* mobile: disable pull down to reload behavior */
 }
 
 body {
-  background-color: var(--base02);
-  color: var(--base05);
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+    background-color: var(--base02);
+    color: var(--base05);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+a {
+    color: var(--base0D);
+    text-decoration: underline;
 }
 
 textarea,
 input {
-  background-color: var(--base00);
-  color: var(--base05);
-  padding: 8px;
-  border-radius: 4px;
-  outline: none;
-  border: 2px solid transparent;
+    background-color: var(--base00);
+    color: var(--base05);
+    padding: 8px;
+    border-radius: 4px;
+    outline: none;
+    border: 2px solid transparent;
 }
 
 textarea:focus,
 input:focus {
-  border: 2px solid var(--base0B);
+    border: 2px solid var(--base0B);
 }
 
 button {
-  &:not([data-role]) {
-    background-color: var(--base0D);
-    color: var(--base00);
-    &:hover {
-      background-color: var(--base0B);
+    &:not([data-role]) {
+        background-color: var(--base0D);
+        color: var(--base00);
+        &:hover {
+            background-color: var(--base0B);
+        }
+
+        /* disabled */
+        &[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     }
 
-    /* disabled */
-    &[disabled] {
-      opacity: 0.5;
-      cursor: not-allowed;
+    &:not([data-size]) {
+        padding: 8px 12px;
+        border-radius: 4px;
     }
-  }
 
-  &:not([data-size]) {
-    padding: 8px 12px;
-    border-radius: 4px;
-  }
-
-  &[data-role="outline"] {
-    border: 2px solid var(--base04);
-    &:hover {
-      border-color: transparent;
-      color: var(--base00);
-      background-color: var(--base0B);
+    &[data-role="outline"] {
+        border: 2px solid var(--base04);
+        &:hover {
+            border-color: transparent;
+            color: var(--base00);
+            background-color: var(--base0B);
+        }
     }
-  }
 
-  &[data-role="secondary"] {
-    background-color: var(--base04);
-    color: var(--base00);
-    &:hover {
-      background-color: var(--base0B);
+    &[data-role="secondary"] {
+        background-color: var(--base04);
+        color: var(--base00);
+        &:hover {
+            background-color: var(--base0B);
+        }
     }
-  }
 
-  &[data-size="compact"] {
-    padding: 4px 8px;
-    border-radius: 4px;
-  }
-
-  &[data-role="text"] {
-    display: inline;
-    padding: 0;
-    color: var(--base05);
-    text-decoration: underline;
-    &:hover {
-      color: var(--base0D);
+    &[data-size="compact"] {
+        padding: 4px 8px;
+        border-radius: 4px;
     }
-  }
+
+    &[data-role="text"] {
+        display: inline;
+        padding: 0;
+        color: var(--base05);
+        text-decoration: underline;
+        &:hover {
+            color: var(--base0D);
+        }
+    }
+}
+
+hr {
+    margin: 2em 0;
+    opacity: 50%;
 }
 
 ul,
 ol {
-  margin: 1em 0;
-  padding-left: 1.5em;
-  list-style-position: outside;
+    margin: 1em 0;
+    padding-left: 1.5em;
+    list-style-position: outside;
 }
 
 ul {
-  list-style-type: disc;
+    list-style-type: disc;
 }
 
 ol {
-  list-style-type: decimal;
+    list-style-type: decimal;
 }
 
 ul li::marker,
 ol li::marker {
-  color: var(--base05);
+    color: var(--base05);
 }
 
 /* Nested lists */
 ul ul,
 ol ol {
-  list-style-type: circle;
-  padding-left: 1.5em;
+    list-style-type: circle;
+    padding-left: 1.5em;
 }
 
 li {
-  margin-bottom: 0.5em;
-  line-height: 1.5;
+    margin-bottom: 0.5em;
+    line-height: 1.5;
 }
 
 header {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  margin: 4px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin: 4px;
 }
 
 chat-interface {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
 }
 
 chat-message {
-  background-color: var(--base00);
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  margin: 4px;
-  border-radius: 8px;
-  &[data-role="user"],
-  &[data-role="system"] {
-    background-color: var(--base01);
-  }
+    background-color: var(--base00);
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    margin: 4px;
+    border-radius: 8px;
+    &[data-role="user"],
+    &[data-role="system"] {
+        background-color: var(--base01);
+    }
 }
 
 chat-message-loading {
-  background-color: var(--base00);
-  padding: 12px;
-  margin: 4px;
-  border-radius: 8px;
+    background-color: var(--base00);
+    padding: 12px;
+    margin: 4px;
+    border-radius: 8px;
 }
 
 chat-message-role {
-  font-size: smaller;
-  color: var(--base05);
-  font-weight: bold;
-  padding-bottom: 4px;
+    font-size: smaller;
+    color: var(--base05);
+    font-weight: bold;
+    padding-bottom: 4px;
 }
 
 chat-message-buttons {
-  margin-left: auto;
-  display: flex;
-  font-size: smaller;
-  color: var(--base05);
-  /*font-weight: bold;*/
-  padding-bottom: 4px;
+    margin-left: auto;
+    display: flex;
+    font-size: smaller;
+    color: var(--base05);
+    /*font-weight: bold;*/
+    padding-bottom: 4px;
 }
 
 chat-message-content {
-  word-wrap: break-word;
-  pre {
-    margin: 8px 0;
-    background-color: var(--base02);
-    padding: 8px;
-    border-radius: 8px;
-    overflow-x: auto;
-  }
+    word-wrap: break-word;
+    pre {
+        margin: 8px 0;
+        background-color: var(--base02);
+        padding: 8px;
+        border-radius: 8px;
+        overflow-x: auto;
+    }
 }
 
 chat-history {
-  width: 100%;
-  max-width: var(--chat-width);
-  margin-left: auto;
-  margin-right: auto;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
+    width: 100%;
+    max-width: var(--chat-width);
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 chat-controls {
-  width: 100%;
-  max-width: var(--chat-width);
-  margin-left: auto;
-  margin-right: auto;
-  form {
-    textarea {
-      width: 100%;
-      resize: none;
-      height: 60px;
+    width: 100%;
+    max-width: var(--chat-width);
+    margin-left: auto;
+    margin-right: auto;
+    form {
+        textarea {
+            width: 100%;
+            resize: none;
+            height: 60px;
+        }
+        flex-wrap: wrap;
     }
-    flex-wrap: wrap;
-  }
 }
 
 chat-controls-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  row-gap: 4px;
-  padding: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    row-gap: 4px;
+    padding: 4px;
 }
 
 button.chat-controls-system-prompt {
-  &[data-selected="true"] {
-    color: var(--base00);
-    border-color: transparent;
-    background-color: var(--base0B);
-  }
+    &[data-selected="true"] {
+        color: var(--base00);
+        border-color: transparent;
+        background-color: var(--base0B);
+    }
 }
 
 settings-section {
-  display: block;
-  margin: 12px;
-  margin-bottom: 20px;
+    display: block;
+    margin: 12px;
+    margin-bottom: 20px;
 
-  input,
-  textarea {
-    width: 100%;
-  }
+    input,
+    textarea {
+        width: 100%;
+    }
 
-  textarea {
-    height: 120px;
-  }
+    textarea {
+        height: 120px;
+    }
 }
 
 settings-label {
-  font-size: smaller;
-  display: block;
-  margin-bottom: 4px;
+    font-size: smaller;
+    display: block;
+    margin-bottom: 4px;
 }
 
 settings-system-prompt {
-  display: block;
-  margin-bottom: 20px;
+    display: block;
+    margin-bottom: 20px;
 }
 
 error-box {
-  background-color: var(--base00);
-  color: var(--base08);
-  padding: 12px;
-  margin: 4px;
-  white-space: break-spaces;
-  border-radius: 8px;
+    background-color: var(--base00);
+    color: var(--base08);
+    padding: 12px;
+    margin: 4px;
+    white-space: break-spaces;
+    border-radius: 8px;
 }
