@@ -77,12 +77,10 @@ pub fn Settings() -> impl IntoView {
                     match fetched_models_result.get() {
                         Some(Ok(models)) => {
                             view! {
-                                <select
-                                    on:change=move |ev| {
-                                        let new_value = event_target_value(&ev);
-                                        set_model_name.set(new_value);
-                                    }
-                                >
+                                <select on:change=move |ev| {
+                                    let new_value = event_target_value(&ev);
+                                    set_model_name.set(new_value);
+                                }>
                                     <option
                                         value=""
                                         selected=model_name.get().is_empty()
@@ -106,14 +104,18 @@ pub fn Settings() -> impl IntoView {
                                 .into_any()
                         }
                         Some(Err(e)) => {
-                            view! { <p style="color: red;">"Error loading models: " {e.to_string()}</p> }.into_any()
+                            view! {
+                                <p style="color: red;">"Error loading models: " {e.to_string()}</p>
+                            }
+                                .into_any()
                         }
                         None => {
                             // This state occurs if API key is present, not loading, but no results yet (e.g. initial state before first load completes)
                             // Or if the API key was just entered and the effect is about to trigger loading.
                             // An explicit "Loading..." or empty view might be fine here.
                             // Given models_loading handles explicit loading, this can be a quiet "no data" or placeholder.
-                            view! { <p>"No models loaded or available."</p> }.into_any()
+                            view! { <p>"No models loaded or available."</p> }
+                                .into_any()
                         }
                     }
                 }
