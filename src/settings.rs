@@ -4,7 +4,7 @@ use leptos::task::spawn_local;
 use leptos_use::storage::use_local_storage;
 
 use crate::chat::SystemPrompt;
-use crate::llm;
+use crate::llm::{self, DisplayModelInfo};
 
 #[component]
 pub fn Settings() -> impl IntoView {
@@ -16,7 +16,7 @@ pub fn Settings() -> impl IntoView {
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
 
     let (fetched_models_result, set_fetched_models_result) =
-        signal::<Option<Result<Vec<String>, String>>>(None);
+        signal::<Option<Result<Vec<DisplayModelInfo>, String>>>(None);
     let (models_loading, set_models_loading) = signal(false);
 
     Effect::new(move |_| {
@@ -90,11 +90,27 @@ pub fn Settings() -> impl IntoView {
                                     </option>
                                     {models
                                         .into_iter()
-                                        .map(|id| {
-                                            let is_selected = model_name.get() == id;
+                                        .map(|model_info| {
+                                            let is_selected = model_name.get() == model_info.id;
+                                            let display_text = if let (
+                                                Some(prompt_cost),
+                                                Some(completion_cost),
+                                            ) = (
+                                                model_info.prompt_cost_usd_pm,
+                                                model_info.completion_cost_usd_pm,
+                                            ) {
+                                                format!(
+                                                    "{} (P: ${:.2}/MTok C: ${:.2}/MTok)",
+                                                    model_info.name,
+                                                    prompt_cost,
+                                                    completion_cost,
+                                                )
+                                            } else {
+                                                model_info.name.clone()
+                                            };
                                             view! {
-                                                <option value=id.clone() selected=is_selected>
-                                                    {id.clone()}
+                                                <option value=model_info.id.clone() selected=is_selected>
+                                                    {display_text}
                                                 </option>
                                             }
                                         })

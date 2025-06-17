@@ -90,8 +90,8 @@ select:focus {
 /* Custom arrow for select elements */
 select {
     -webkit-appearance: none; /* Remove default arrow for Safari/Chrome */
-    -moz-appearance: none;    /* Remove default arrow for Firefox */
-    appearance: none;         /* Remove default arrow */
+    -moz-appearance: none; /* Remove default arrow for Firefox */
+    appearance: none; /* Remove default arrow */
 
     /* Add custom arrow using SVG with currentColor for theming */
     /* SVG: down-pointing triangle */
@@ -109,6 +109,7 @@ select {
 }
 
 button {
+    flex-shrink: 0;
     &:not([data-role]) {
         background-color: var(--base01);
         /* &:hover {
@@ -141,7 +142,6 @@ button {
         border-radius: 4px;
     }
 
-
     &[data-size="compact"] {
         padding: 4px 8px;
         border-radius: 4px;
@@ -159,7 +159,6 @@ button {
 }
 
 hr {
-    margin-top
     margin: 2em 0;
     opacity: 50%;
 }

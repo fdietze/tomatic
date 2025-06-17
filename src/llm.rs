@@ -2,6 +2,7 @@ use futures::{Stream, StreamExt};
 use openrouter_api::{
     types::chat::{ChatCompletionRequest, Message as OpenRouterMessage},
     OpenRouterClient,
+    // types::models::Model as OpenRouterApiModel, // Removed problematic import
 };
 use serde::{Deserialize, Serialize};
 // schemars might not be needed if we only implement streaming for now.
@@ -102,7 +103,20 @@ pub async fn request_message_content_streamed(
     Ok(output_stream)
 }
 
-pub async fn list_available_models(api_key: String) -> anyhow::Result<Vec<String>> {
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct DisplayModelInfo {
+    pub id: String,
+    pub name: String,
+    pub prompt_cost_usd_pm: Option<f64>, // Cost per million prompt tokens
+    pub completion_cost_usd_pm: Option<f64>, // Cost per million completion tokens
+}
+
+// Helper function to parse price string and convert to per million tokens
+fn parse_price_to_per_million(price_str: &str) -> Option<f64> {
+    price_str.parse::<f64>().ok().map(|p| p * 1_000_000.0)
+}
+
+pub async fn list_available_models(api_key: String) -> anyhow::Result<Vec<DisplayModelInfo>> {
     if api_key.is_empty() {
         return Err(anyhow::anyhow!("OpenRouter API key is missing."));
     }
@@ -113,10 +127,20 @@ pub async fn list_available_models(api_key: String) -> anyhow::Result<Vec<String
         .with_api_key(api_key)?;
 
     let models_api = client.models()?;
-    let model_list = models_api.list_models(None).await?;
+    let open_router_model_list = models_api.list_models(None).await?;
 
-    let model_ids: Vec<String> = model_list.data.into_iter().map(|m| m.id).collect();
-    Ok(model_ids)
+    let model_infos: Vec<DisplayModelInfo> = open_router_model_list
+        .data
+        .into_iter()
+        .map(|m: openrouter_api::types::models::ModelInfo| DisplayModelInfo { // Use the correct ModelInfo from the library
+            id: m.id,
+            name: m.name, // m.name is String, not Option<String>
+            prompt_cost_usd_pm: parse_price_to_per_million(&m.pricing.prompt),
+            completion_cost_usd_pm: parse_price_to_per_million(&m.pricing.completion),
+        })
+        .collect();
+
+    Ok(model_infos)
 }
 
 // --- Old OpenAI specific code commented out for reference or later porting ---
