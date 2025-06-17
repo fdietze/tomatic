@@ -4,6 +4,7 @@ mod chat;
 mod llm;
 mod settings;
 
+use crate::chat::{Message, SystemPrompt, SystemPromptBar};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::use_local_storage;
@@ -24,12 +25,38 @@ enum Page {
 #[component]
 fn App() -> impl IntoView {
     let (page, set_page, _) = use_local_storage::<Page, JsonSerdeCodec>("page");
+
+    // State lifted from ChatInterface or needed for new header items
+    let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
+    let (system_prompts, _, _) =
+        use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
+    let (selected_prompt_name, set_selected_prompt_name, _) =
+        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_prompt_name");
+    let (error, set_error) = signal::<Option<String>>(None);
+
     view! {
         <header>
+            <SystemPromptBar
+                system_prompts=system_prompts
+                selected_prompt_name=selected_prompt_name
+                set_selected_prompt_name=set_selected_prompt_name
+            />
+            <button
+                data-role="outline"
+                data-size="compact"
+                on:click=move |_| {
+                    set_messages(vec![]);
+                    set_error(None);
+                }
+                style:margin-left="auto" // Adjust styling as needed, this was from the original button
+            >
+                "New Chat"
+            </button>
             <button
                 data-role="outline"
                 data-size="compact"
                 on:click=move |_| set_page.set(Page::Chat)
+                style:margin-left="4px" // Add some spacing
             >
                 Chat
             </button>
@@ -42,7 +69,20 @@ fn App() -> impl IntoView {
             </button>
         </header>
         {move || match page.get() {
-            Page::Chat => view! { <chat::ChatInterface /> }.into_any(),
+            Page::Chat => {
+                view! {
+                    <chat::ChatInterface
+                        messages=messages
+                        set_messages=set_messages
+                        system_prompts=system_prompts
+                        selected_prompt_name=selected_prompt_name
+                        set_selected_prompt_name=set_selected_prompt_name
+                        error=error
+                        set_error=set_error
+                    />
+                }
+                    .into_any()
+            }
             Page::Settings => view! { <settings::Settings /> }.into_any(),
         }}
     }

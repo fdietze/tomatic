@@ -1,4 +1,4 @@
-use codee::string::{FromToStringCodec, JsonSerdeCodec};
+use codee::string::FromToStringCodec;
 use futures::{pin_mut, StreamExt};
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
@@ -45,18 +45,20 @@ fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Opt
 }
 
 #[component]
-pub fn ChatInterface() -> impl IntoView {
-    let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
+pub fn ChatInterface(
+    #[prop(into)] messages: Signal<Vec<Message>>,
+    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
+    #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
+    #[prop(into)] selected_prompt_name: Signal<Option<String>>,
+    #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
+    #[prop(into)] error: Signal<Option<String>>,
+    #[prop(into)] set_error: WriteSignal<Option<String>>,
+) -> impl IntoView {
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
     let (model_name_storage, _, _) =
         use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
-    let (system_prompts, _, _) =
-        use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (input_disabled, set_input_disabled) = signal(false);
-    let (error, set_error) = signal::<Option<String>>(None);
-    let (selected_prompt_name, set_selected_prompt_name, _) =
-        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_prompt_name");
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let prompt_name: Option<String> = selected_prompt_name();
@@ -329,11 +331,6 @@ pub fn ChatInterface() -> impl IntoView {
                 }}
             </chat-history>
             <ChatControls
-                system_prompts=system_prompts
-                selected_prompt_name=selected_prompt_name
-                set_selected_prompt_name=set_selected_prompt_name
-                set_messages=set_messages
-                set_error=set_error
                 input=input
                 set_input=set_input
                 input_disabled=input_disabled
@@ -346,11 +343,6 @@ pub fn ChatInterface() -> impl IntoView {
 
 #[component]
 fn ChatControls(
-    #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
-    #[prop(into)] selected_prompt_name: Signal<Option<String>>,
-    #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
-    #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
-    #[prop(into)] set_error: WriteSignal<Option<String>>,
     #[prop(into)] input: Signal<String>,
     #[prop(into)] set_input: WriteSignal<String>,
     #[prop(into)] input_disabled: Signal<bool>,
@@ -360,24 +352,6 @@ fn ChatControls(
     let submit2 = submit.clone();
     view! {
         <chat-controls>
-            <chat-controls-buttons>
-                <SystemPromptBar
-                    system_prompts=system_prompts
-                    selected_prompt_name=selected_prompt_name
-                    set_selected_prompt_name=set_selected_prompt_name
-                />
-                <button
-                    data-role="outline"
-                    data-size="compact"
-                    on:click=move |_| {
-                        set_messages(vec![]);
-                        set_error(None);
-                    }
-                    style:margin-left="auto"
-                >
-                    "New Chat"
-                </button>
-            </chat-controls-buttons>
             <form on:submit=move |ev| {
                 ev.prevent_default();
                 submit()
@@ -536,7 +510,7 @@ fn ChatMessage(
 }
 
 #[component]
-fn SystemPromptBar(
+pub fn SystemPromptBar(
     #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
     #[prop(into)] selected_prompt_name: Signal<Option<String>>,
     #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
