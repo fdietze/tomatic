@@ -1,12 +1,133 @@
 use futures::{Stream, StreamExt};
+use openrouter_api::{
+    types::chat::{ChatCompletionRequest, Message as OpenRouterMessage},
+    OpenRouterClient,
+};
+use serde::{Deserialize, Serialize};
+// schemars might not be needed if we only implement streaming for now.
+// use schemars::JsonSchema;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
+    // Add prompt_name if you need to pass it for your internal logic,
+    // but OpenRouter's Message struct doesn't have it directly.
+    // prompt_name: Option<String>,
+}
+
+impl Message {
+    /// Converts this application's Message to OpenRouter's Message type.
+    fn to_openrouter_message(&self) -> OpenRouterMessage {
+        OpenRouterMessage {
+            role: self.role.clone(),
+            content: self.content.clone(),
+            name: None,        // OpenRouter's Message has a name field, default to None
+            tool_calls: None,  // Not used in basic chat
+            tool_call_id: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Model {
+    pub model: String,        // e.g., "openai/gpt-4o"
+    pub seed: Option<i64>,    // OpenRouter might not directly support seed for all models in the same way
+    pub temperature: Option<f64>,
+}
+
+pub async fn request_message_content_streamed(
+    messages: Vec<Message>,
+    model_config: Model,
+    api_key: String,
+) -> anyhow::Result<impl Stream<Item = anyhow::Result<String>>> {
+    if api_key.is_empty() {
+        return Err(anyhow::anyhow!("OpenRouter API key is missing."));
+    }
+
+    let client = OpenRouterClient::new()
+        .with_base_url("https://openrouter.ai/api/v1/")?
+        .with_timeout_secs(60) // Configure timeout before setting API key
+        .with_api_key(api_key.clone())?; // API key is the final step to get a Ready client
+
+    let openrouter_messages: Vec<OpenRouterMessage> = messages
+        .into_iter()
+        .map(|m| m.to_openrouter_message())
+        .collect();
+
+    let request = ChatCompletionRequest {
+        model: model_config.model,
+        messages: openrouter_messages,
+        stream: Some(true),
+        // Explicitly set other optional fields to None as ChatCompletionRequest doesn't implement Default
+        response_format: None,
+        tools: None,
+        provider: None,
+        models: None,
+        transforms: None,
+        // Temperature, seed, and other specific OpenAI parameters are not direct top-level fields
+        // in this version of the openrouter_api ChatCompletionRequest.
+        // They might be configurable via the model string (e.g., "model_name@temperature=0.7")
+        // or through other mechanisms depending on the crate's API for advanced features.
+        // For now, we rely on OpenRouter's defaults for these if not specified in the model string.
+        };
+
+        let chat_api = client.chat()?;
+    let mut stream = chat_api.chat_completion_stream(request);
+
+    let output_stream = async_stream::stream! {
+        while let Some(chunk_result) = stream.next().await {
+            match chunk_result {
+                Ok(chunk) => {
+                    // Process the chunk
+                    // A chunk can have multiple choices, but for typical streaming, we expect one.
+                    if let Some(choice) = chunk.choices.first() {
+                        if let Some(content) = &choice.delta.content {
+                            yield Ok(content.clone());
+                        }
+                    }
+                    // You might also want to handle other parts of the chunk, e.g., finish_reason or usage.
+                    // For now, we only care about content.
+                }
+                Err(e) => {
+                    // Log the error or handle it as appropriate
+                    eprintln!("[DEBUG] llm.rs stream error: {e:?}");
+                    yield Err(anyhow::anyhow!("Error from OpenRouter stream: {}", e));
+                    break; // Stop streaming on error
+                }
+            }
+        }
+    };
+
+    Ok(output_stream)
+}
+
+pub async fn list_available_models(api_key: String) -> anyhow::Result<Vec<String>> {
+    if api_key.is_empty() {
+        return Err(anyhow::anyhow!("OpenRouter API key is missing."));
+    }
+
+    let client = OpenRouterClient::new()
+        .with_base_url("https://openrouter.ai/api/v1/")?
+        .with_timeout_secs(60)
+        .with_api_key(api_key)?;
+
+    let models_api = client.models()?;
+    let model_list = models_api.list_models(None).await?;
+
+    let model_ids: Vec<String> = model_list.data.into_iter().map(|m| m.id).collect();
+    Ok(model_ids)
+}
+
+// --- Old OpenAI specific code commented out for reference or later porting ---
+/*
 use reqwest::Client;
 use schemars::{schema_for, JsonSchema};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
-pub struct Request {
+pub struct OpenAIRequest {
     pub model: String,
-    pub messages: Vec<Message>,
+    pub messages: Vec<Message>, // Assuming your Message struct is compatible or mapped
     pub response_format: Option<ResponseFormat>,
     pub seed: Option<i64>,
     pub temperature: Option<f64>,
@@ -15,23 +136,18 @@ pub struct Request {
 
 #[derive(Debug, Deserialize)]
 #[allow(unused)]
-pub struct Response {
+pub struct OpenAIResponse {
     pub id: String,
     pub created: i32,
     pub model: String,
-    pub choices: Vec<Choice>,
+    pub choices: Vec<OpenAIChoice>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Choice {
-    pub message: Message,
+pub struct OpenAIChoice {
+    pub message: Message, // Assuming your Message struct is compatible
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
-}
 
 #[derive(Debug, Deserialize)]
 struct ErrorResponse {
@@ -75,21 +191,15 @@ pub struct ResponseSchema {
     pub strict: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Model {
-    pub model: String,
-    pub seed: Option<i64>,
-    pub temperature: Option<f64>,
-}
 
 impl Model {
-    pub fn to_request(
+    pub fn to_openai_request(
         &self,
         messages: Vec<Message>,
         response_format: Option<ResponseFormat>,
         stream: Option<bool>,
-    ) -> Request {
-        Request {
+    ) -> OpenAIRequest {
+        OpenAIRequest {
             model: self.model.clone(),
             seed: self.seed,
             temperature: self.temperature,
@@ -107,16 +217,12 @@ pub async fn request<T: for<'de> Deserialize<'de> + JsonSchema>(
     api_key: String,
 ) -> anyhow::Result<T> {
     let url = "https://api.openai.com/v1/chat/completions";
-    let request = model.to_request(
+    let request_payload = model.to_openai_request(
         messages,
         Some(ResponseFormat::json_schema(schema_for!(T))),
         None,
     );
-    // println!(
-    //     "schema: {}",
-    //     serde_json::to_string_pretty(&schema_for!(T)).unwrap()
-    // );
-    let response = api_chat_completions(request, api_key).await?;
+    let response = api_chat_completions(request_payload, api_key).await?;
     let content = &response
         .choices
         .first()
@@ -128,14 +234,14 @@ pub async fn request<T: for<'de> Deserialize<'de> + JsonSchema>(
 }
 
 #[allow(unused)]
-pub async fn request_message_content(
+pub async fn request_message_content_openai( // Renamed to avoid conflict if testing both
     messages: Vec<Message>,
     model: Model,
     api_key: String,
 ) -> anyhow::Result<String> {
     let url = "https://api.openai.com/v1/chat/completions";
-    let request = model.to_request(messages, None, None);
-    let response = api_chat_completions(request, api_key).await?;
+    let request_payload = model.to_openai_request(messages, None, None);
+    let response = api_chat_completions(request_payload, api_key).await?;
     let content = &response
         .choices
         .first()
@@ -146,7 +252,7 @@ pub async fn request_message_content(
 }
 
 #[allow(unused)]
-pub async fn api_chat_completions(request: Request, api_key: String) -> anyhow::Result<Response> {
+pub async fn api_chat_completions(request: OpenAIRequest, api_key: String) -> anyhow::Result<OpenAIResponse> {
     let url = "https://api.openai.com/v1/chat/completions";
     let client = Client::new();
     let response = client
@@ -157,164 +263,18 @@ pub async fn api_chat_completions(request: Request, api_key: String) -> anyhow::
         .await?;
     let response_text = response.text().await?;
 
-    match serde_json::from_str::<Response>(&response_text) {
+    match serde_json::from_str::<OpenAIResponse>(&response_text) {
         Ok(parsed_response) => Ok(parsed_response),
         Err(_) => {
-            // If deserialization into Response fails, try to deserialize into ErrorResponse
             if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&response_text) {
                 Err(anyhow::anyhow!(error_response.error.message))
             } else {
-                Err(anyhow::anyhow!("Unknown error occurred"))
+                Err(anyhow::anyhow!("Unknown error occurred: {}", response_text))
             }
         }
     }
 }
 
-#[allow(unused)]
-pub async fn single_shot_str(
-    prompt: String,
-    model: Model,
-    api_key: String,
-) -> anyhow::Result<String> {
-    request_message_content(
-        vec![Message {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        model,
-        api_key,
-    )
-    .await
-}
-
-#[allow(unused)]
-pub async fn single_shot<T: for<'de> Deserialize<'de> + JsonSchema>(
-    prompt: String,
-    model: Model,
-    api_key: String,
-) -> anyhow::Result<T> {
-    request(
-        vec![Message {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        model,
-        api_key,
-    )
-    .await
-}
-
-#[allow(unused)]
-pub async fn chain_of_thought_str(
-    steps: Vec<String>,
-    model: Model,
-    api_key: String,
-) -> anyhow::Result<Vec<Message>> {
-    let mut messages: Vec<Message> = vec![];
-    for step in steps {
-        messages.push(Message {
-            role: "user".to_string(),
-            content: step.to_string(),
-        });
-        // println!("\n> {step}");
-        let result =
-            request_message_content(messages.clone(), model.clone(), api_key.clone()).await?;
-        println!("\n{result}\n---\n");
-        messages.push(Message {
-            role: "assistant".to_string(),
-            content: result.to_string(),
-        });
-    }
-    Ok(messages)
-}
-
-#[allow(unused)]
-pub async fn chain_of_thought<T: for<'de> Deserialize<'de> + JsonSchema>(
-    steps: Vec<String>,
-    model: Model,
-    api_key: String,
-) -> anyhow::Result<T> {
-    let mut messages: Vec<Message> = vec![];
-    for step in &steps[..steps.len() - 1] {
-        messages.push(Message {
-            role: "user".to_string(),
-            content: step.to_string(),
-        });
-        // println!("\n> {step}");
-        let result =
-            request_message_content(messages.clone(), model.clone(), api_key.clone()).await?;
-        println!("\n{result}");
-        messages.push(Message {
-            role: "assistant".to_string(),
-            content: result.to_string(),
-        });
-    }
-    let step = steps.last().unwrap();
-    // last step has  structured output
-    messages.push(Message {
-        role: "user".to_string(),
-        content: step.to_string(),
-    });
-    // println!("\n> {step}");
-    let structured_output = request::<T>(messages, model, api_key).await?;
-    Ok(structured_output)
-}
-
-pub async fn request_message_content_streamed(
-    messages: Vec<Message>,
-    model: Model,
-    api_key: String,
-) -> anyhow::Result<impl Stream<Item = anyhow::Result<String>>> {
-    let url = "https://api.openai.com/v1/chat/completions";
-    let mut request = model.to_request(messages, None, None);
-    request.stream = Some(true);
-
-    let client = Client::new();
-    let response = client
-        .post(url)
-        .bearer_auth(api_key)
-        .json(&request)
-        .send()
-        .await?;
-
-    // Check response status and handle errors
-    if !response.status().is_success() {
-        let error_text = response.text().await?;
-        if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&error_text) {
-            return Err(anyhow::anyhow!(error_response.error.message));
-        }
-        return Err(anyhow::anyhow!("API request failed: {}", error_text));
-    }
-
-    // Convert the response to a web ReadableStream
-    let stream = response.bytes_stream().map(|chunk_result| {
-        chunk_result
-            .map_err(|e| anyhow::anyhow!(e))
-            .and_then(|chunk| {
-                String::from_utf8(chunk.to_vec())
-                    .map_err(|e| anyhow::anyhow!(e))
-                    .map(|text| {
-                        let mut content = String::new();
-                        for line in text.lines() {
-                            if let Some(json_str) = line.strip_prefix("data: ") {
-                                if json_str.trim() == "[DONE]" {
-                                    continue;
-                                }
-                                if let Ok(json) =
-                                    serde_json::from_str::<serde_json::Value>(json_str)
-                                {
-                                    if let Some(delta_content) =
-                                        json["choices"][0]["delta"]["content"].as_str()
-                                    {
-                                        content.push_str(delta_content);
-                                    }
-                                }
-                            }
-                        }
-                        content
-                    })
-            })
-    });
-
-    Ok(stream)
-}
+// ... other old functions like single_shot_str, single_shot, chain_of_thought_str, chain_of_thought ...
+// These would need similar rewrites if they are to be kept.
+*/

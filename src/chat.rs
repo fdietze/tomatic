@@ -48,7 +48,9 @@ fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Opt
 pub fn ChatInterface() -> impl IntoView {
     let (messages, set_messages, _) = use_local_storage::<Vec<Message>, JsonSerdeCodec>("messages");
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
-    let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENAI_API_KEY");
+    let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
+    let (model_name_storage, _, _) =
+        use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
     let (system_prompts, _, _) =
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (input_disabled, set_input_disabled) = signal(false);
@@ -79,26 +81,29 @@ pub fn ChatInterface() -> impl IntoView {
         }
     });
 
-    let model = llm::Model {
-        model: "gpt-4.1".to_string(),
-        seed: None,
-        temperature: Some(1.0),
-    };
+    let current_model_name = Memo::new(move |_| {
+        let name = model_name_storage();
+        if name.is_empty() {
+            "openai/gpt-4o".to_string()
+        } else {
+            name
+        }
+    });
 
     let submit = {
-        let model = model.clone();
         move || {
-            let model = model.clone();
+            let model = llm::Model {
+                model: current_model_name(),
+                seed: None,
+                temperature: Some(1.0),
+            };
             spawn_local(async move {
                 set_input_disabled.set(true);
                 set_error(None);
-                let system_message = Message {
-                    role: "system".to_string(),
-                    content: selected_prompt()
-                        .map(|sp| sp.prompt)
-                        .unwrap_or("".to_string()),
-                    prompt_name: None,
-                };
+                let system_prompt_content = selected_prompt()
+                    .map(|sp| sp.prompt)
+                    .unwrap_or("".to_string());
+
                 let user_message = Message {
                     role: "user".to_string(),
                     content: input(),
@@ -118,7 +123,14 @@ pub fn ChatInterface() -> impl IntoView {
                         "No API key provided. Please add one in Settings.".to_string(),
                     ));
                 } else {
-                    let mut messages_to_submit = vec![system_message];
+                    let mut messages_to_submit = Vec::new();
+                    if !system_prompt_content.is_empty() {
+                        messages_to_submit.push(Message {
+                            role: "system".to_string(),
+                            content: system_prompt_content,
+                            prompt_name: None,
+                        });
+                    }
                     messages_to_submit.extend(messages());
 
                     // Create placeholder response message
@@ -184,9 +196,12 @@ pub fn ChatInterface() -> impl IntoView {
     };
 
     let regenerate = {
-        let model = model.clone();
         Arc::new(move |index: usize| {
-            let model = model.clone();
+            let model = llm::Model {
+                model: current_model_name(),
+                seed: None,
+                temperature: Some(1.0),
+            };
             spawn_local(async move {
                 set_input_disabled.set(true);
                 set_error(None);
@@ -196,20 +211,23 @@ pub fn ChatInterface() -> impl IntoView {
                     m.drain(index..);
                 });
 
-                let system_message = Message {
-                    role: "system".to_string(),
-                    content: selected_prompt()
-                        .map(|sp| sp.prompt)
-                        .unwrap_or("".to_string()),
-                    prompt_name: None,
-                };
+                let system_prompt_content = selected_prompt()
+                    .map(|sp| sp.prompt)
+                    .unwrap_or("".to_string());
 
                 if api_key().is_empty() {
                     set_error.set(Some(
                         "No API key provided. Please add one in Settings.".to_string(),
                     ));
                 } else {
-                    let mut messages_to_submit = vec![system_message];
+                    let mut messages_to_submit = Vec::new();
+                    if !system_prompt_content.is_empty() {
+                        messages_to_submit.push(Message {
+                            role: "system".to_string(),
+                            content: system_prompt_content,
+                            prompt_name: None,
+                        });
+                    }
                     messages_to_submit.extend(messages());
 
                     // Create placeholder response message

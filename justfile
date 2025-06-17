@@ -8,15 +8,20 @@ _default:
 dev:
   trunk serve --port 12345 --locked --no-error-reporting --skip-version-check
 
+check:
+  cargo clippy --all-targets --profile check-tmp
+  cargo test --workspace --all-targets --profile check-tmp
+  trunk build
+
+fix:
+  cargo clippy --fix --allow-dirty --allow-staged --all-targets
+
 # run ci checks locally
 ci:
   (git ls-files && git ls-files --others --exclude-standard) | entr -cnr earthly +ci-test
 
-fix:
-  cargo clippy --fix --allow-dirty
 
 # count lines of code in repo
 cloc:
   # ignores generated code
   cloc --vcs=git --fullpath .
-
