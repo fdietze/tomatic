@@ -45,6 +45,7 @@ fn App() -> impl IntoView {
                 on:click=move |_| {
                     set_messages(vec![]);
                     set_error(None);
+                    set_page.set(Page::Chat);
                 }
                 // Adjust styling as needed, this was from the original button
                 style:margin-left="auto"
