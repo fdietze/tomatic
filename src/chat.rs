@@ -4,6 +4,8 @@ use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
+
+use crate::llm::DisplayModelInfo;
 use std::sync::Arc;
 
 use crate::llm;
@@ -56,8 +58,12 @@ pub fn ChatInterface(
 ) -> impl IntoView {
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
-    let (model_name_storage, _, _) = use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
+    let (model_name_storage, set_model_name_storage, _) =
+        use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
     let (input_disabled, set_input_disabled) = signal(false);
+    let (fetched_models_result, set_fetched_models_result) =
+        signal::<Option<Result<Vec<DisplayModelInfo>, String>>>(None);
+    let (models_loading, set_models_loading) = signal(false);
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let prompt_name: Option<String> = selected_prompt_name();
@@ -80,6 +86,24 @@ pub fn ChatInterface(
         if let Some(ref_input) = ref_input.get() {
             let _ = ref_input.focus();
         }
+    });
+
+    Effect::new(move |_| {
+        let current_api_key = api_key();
+        if current_api_key.is_empty() {
+            set_fetched_models_result(None);
+            set_models_loading(false);
+            return;
+        }
+
+        set_models_loading(true);
+        spawn_local(async move {
+            let result = crate::llm::list_available_models(current_api_key)
+                .await
+                .map_err(|e| e.to_string());
+            set_fetched_models_result(Some(result));
+            set_models_loading(false);
+        });
     });
 
     let current_model_name = Memo::new(move |_| {
@@ -288,6 +312,99 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
+                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color);">
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 5px;">
+                        {move || {
+                            if api_key.get().is_empty() {
+                                view! {
+                                    <p style="margin:0; font-size: 0.9em;">
+                                        "Enter API key in Settings to load models."
+                                    </p>
+                                }
+                                    .into_any()
+                            } else if models_loading.get() {
+                                view! {
+                                    <p style="margin:0; font-size: 0.9em;">"Loading models..."</p>
+                                }
+                                    .into_any()
+                            } else {
+                                match fetched_models_result.get() {
+                                    Some(Ok(models)) => {
+                                        view! {
+                                            <select
+                                                id="model-select"
+                                                style="flex-grow: 1; min-width: 150px;"
+                                                on:change=move |ev| {
+                                                    let new_value = event_target_value(&ev);
+                                                    set_model_name_storage.set(new_value);
+                                                }
+                                            >
+                                                <option
+                                                    value=""
+                                                    selected=model_name_storage.get().is_empty()
+                                                    disabled=true
+                                                >
+                                                    "Select a model"
+                                                </option>
+                                                {models
+                                                    .into_iter()
+                                                    .map(|model_info| {
+                                                        let is_selected = model_name_storage.get() == model_info.id;
+                                                        let display_text = if let (
+                                                            Some(prompt_cost),
+                                                            Some(completion_cost),
+                                                        ) = (
+                                                            model_info.prompt_cost_usd_pm,
+                                                            model_info.completion_cost_usd_pm,
+                                                        ) {
+                                                            format!(
+                                                                "{} (P: ${:.2}/MTok C: ${:.2}/MTok)",
+                                                                model_info.name,
+                                                                prompt_cost,
+                                                                completion_cost,
+                                                            )
+                                                        } else {
+                                                            model_info.name.clone()
+                                                        };
+                                                        view! {
+                                                            <option value=model_info.id.clone() selected=is_selected>
+                                                                {display_text}
+                                                            </option>
+                                                        }
+                                                    })
+                                                    .collect_view()}
+                                            </select>
+                                        }
+                                            .into_any()
+                                    }
+                                    Some(Err(e)) => {
+                                        view! {
+                                            <p style="color: red; margin:0; font-size: 0.9em;">
+                                                "Error loading models: " {e.to_string()}
+                                            </p>
+                                        }
+                                            .into_any()
+                                    }
+                                    None => {
+                                        view! {
+                                            <p style="margin:0; font-size: 0.9em;">
+                                                "No models loaded or API key might be invalid."
+                                            </p>
+                                        }
+                                            .into_any()
+                                    }
+                                }
+                            }
+                        }}
+                    </div>
+                    <input
+                        type="text"
+                        style="width: 100%; padding: 8px; border: 1px solid var(--border-color);"
+                        prop:value=move || model_name_storage.get()
+                        on:input:target=move |ev| set_model_name_storage.set(ev.target().value())
+                        placeholder="Or enter model manually (e.g., openai/gpt-4o)"
+                    />
+                </div>
                 {move || {
                     selected_prompt()
                         .map(|system_prompt| {
