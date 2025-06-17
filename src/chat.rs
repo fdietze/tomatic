@@ -369,11 +369,7 @@ fn ChatControls(
                         }
                         disabled=input_disabled
                     />
-                    <button
-                        data-role="primary"
-                        style="flex-shrink:0"
-                        disabled=input_disabled
-                    >
+                    <button data-role="primary" style="flex-shrink:0" disabled=input_disabled>
                         "Go"
                     </button>
                 </div>

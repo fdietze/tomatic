@@ -60,8 +60,7 @@ fn App() -> impl IntoView {
             >
                 Chat
             </button>
-            <button
-            data-size="compact" on:click=move |_| set_page.set(Page::Settings)>
+            <button data-size="compact" on:click=move |_| set_page.set(Page::Settings)>
                 Settings
             </button>
         </header>
