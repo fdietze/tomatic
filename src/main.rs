@@ -1,5 +1,3 @@
-
-
 mod chat;
 mod llm;
 mod settings;
@@ -42,29 +40,27 @@ fn App() -> impl IntoView {
                 set_selected_prompt_name=set_selected_prompt_name
             />
             <button
-                data-role="outline"
+                data-role="primary"
                 data-size="compact"
                 on:click=move |_| {
                     set_messages(vec![]);
                     set_error(None);
                 }
-                style:margin-left="auto" // Adjust styling as needed, this was from the original button
+                // Adjust styling as needed, this was from the original button
+                style:margin-left="auto"
             >
                 "New Chat"
             </button>
             <button
-                data-role="outline"
                 data-size="compact"
                 on:click=move |_| set_page.set(Page::Chat)
-                style:margin-left="4px" // Add some spacing
+                // Add some spacing
+                style:margin-left="4px"
             >
                 Chat
             </button>
             <button
-                data-role="outline"
-                data-size="compact"
-                on:click=move |_| set_page.set(Page::Settings)
-            >
+            data-size="compact" on:click=move |_| set_page.set(Page::Settings)>
                 Settings
             </button>
         </header>

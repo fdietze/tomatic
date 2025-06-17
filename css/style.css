@@ -71,7 +71,8 @@ a {
 }
 
 textarea,
-input {
+input,
+select {
     background-color: var(--base00);
     color: var(--base05);
     padding: 8px;
@@ -81,17 +82,52 @@ input {
 }
 
 textarea:focus,
-input:focus {
+input:focus,
+select:focus {
     border: 2px solid var(--base0B);
+}
+
+/* Custom arrow for select elements */
+select {
+    -webkit-appearance: none; /* Remove default arrow for Safari/Chrome */
+    -moz-appearance: none;    /* Remove default arrow for Firefox */
+    appearance: none;         /* Remove default arrow */
+
+    /* Add custom arrow using SVG with currentColor for theming */
+    /* SVG: down-pointing triangle */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='currentColor' d='M2 5h12l-6 6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center; /* Position arrow: 8px from the right edge, vertically centered */
+    background-size: 12px; /* Set the size of the arrow */
+
+    /* Adjust padding-right to make space for the arrow. */
+    /* The general rule `textarea, input, select` sets `padding: 8px;`. */
+    /* We need to ensure text doesn't overlap the arrow. */
+    /* Arrow is 12px wide, positioned 8px from right. So space needed > 20px. */
+    /* Let's set it to 30px for some comfortable spacing. */
+    padding-right: 30px;
 }
 
 button {
     &:not([data-role]) {
+        background-color: var(--base01);
+        /* &:hover {
+            background-color: var(--base0B);
+        } */
+
+        /* disabled */
+        &[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    &[data-role="primary"] {
         background-color: var(--base0D);
         color: var(--base00);
-        &:hover {
+        /* &:hover {
             background-color: var(--base0B);
-        }
+        } */
 
         /* disabled */
         &[disabled] {
@@ -105,22 +141,6 @@ button {
         border-radius: 4px;
     }
 
-    &[data-role="outline"] {
-        border: 2px solid var(--base04);
-        &:hover {
-            border-color: transparent;
-            color: var(--base00);
-            background-color: var(--base0B);
-        }
-    }
-
-    &[data-role="secondary"] {
-        background-color: var(--base04);
-        color: var(--base00);
-        &:hover {
-            background-color: var(--base0B);
-        }
-    }
 
     &[data-size="compact"] {
         padding: 4px 8px;
@@ -139,6 +159,7 @@ button {
 }
 
 hr {
+    margin-top
     margin: 2em 0;
     opacity: 50%;
 }
@@ -285,7 +306,8 @@ settings-section {
     margin-bottom: 20px;
 
     input,
-    textarea {
+    textarea,
+    select {
         width: 100%;
     }
 

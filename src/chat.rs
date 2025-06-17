@@ -56,8 +56,7 @@ pub fn ChatInterface(
 ) -> impl IntoView {
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
     let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
-    let (model_name_storage, _, _) =
-        use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
+    let (model_name_storage, _, _) = use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
     let (input_disabled, set_input_disabled) = signal(false);
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
@@ -370,7 +369,11 @@ fn ChatControls(
                         }
                         disabled=input_disabled
                     />
-                    <button style="flex-shrink:0" disabled=input_disabled>
+                    <button
+                        data-role="primary"
+                        style="flex-shrink:0"
+                        disabled=input_disabled
+                    >
                         "Go"
                     </button>
                 </div>
