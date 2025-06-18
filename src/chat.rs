@@ -354,11 +354,14 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
-                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;"> // Added z-index for combobox dropdown
+                // Added z-index for combobox dropdown
+                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
                     <Combobox
                         items=combobox_items
                         selected_id=model_name_storage
-                        on_select=Callback::new(move |id_str: String| set_model_name_storage.set(id_str))
+                        on_select=Callback::new(move |id_str: String| {
+                            set_model_name_storage.set(id_str)
+                        })
                         placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
                         loading=models_loading
                         error_message=combobox_external_error

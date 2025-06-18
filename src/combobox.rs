@@ -216,7 +216,7 @@ pub fn Combobox(
 
     view! {
         <div class="combobox-wrapper" node_ref=combobox_wrapper_ref id=id_prop>
-            {label.map(|l| view! { <label class="combobox-label">{l}</label>})}
+            {label.map(|l| view! { <label class="combobox-label">{l}</label> })}
             <input
                 type="text"
                 class=move || {
@@ -224,7 +224,7 @@ pub fn Combobox(
                         "{} {} {}",
                         base_input_class,
                         if disabled.get() { disabled_class } else { "" },
-                        if loading.get() { loading_class } else { "" }
+                        if loading.get() { loading_class } else { "" },
                     )
                 }
                 node_ref=input_ref
@@ -236,51 +236,66 @@ pub fn Combobox(
                 disabled=move || disabled.get()
                 aria-autocomplete="list"
                 aria-expanded=move || show_suggestions.get().to_string()
-                aria-controls="combobox-suggestions-list" // Ensure this ID matches the list's ID
-                // aria-activedescendant: Would need to set IDs on list items
+                // Ensure this ID matches the list's ID
+                aria-controls="combobox-suggestions-list"
             />
+            // aria-activedescendant: Would need to set IDs on list items
 
-            {move || if loading.get() {
-                view! { <div class="combobox-loading-indicator">"Loading..."</div> }.into_any()
-            } else if let Some(err_msg) = error_message.get() {
-                view! { <div class="combobox-error-message">{err_msg}</div> }.into_any()
-            } else if show_suggestions.get() && !filtered_items.get().is_empty() {
-                view! {
-                    <ul class="combobox-suggestions" id="combobox-suggestions-list" role="listbox" node_ref=suggestions_list_ref>
-                        <For
-                            each=move || filtered_items.get().into_iter().enumerate()
-                            key=|(_, item)| item.id.clone()
-                            children=move |(idx, item)| {
-                                let item_clone = item.clone();
-                                let item_clone_for_click = item.clone();
-                                let is_highlighted = Memo::new(move |_| highlighted_index.get() == Some(idx));
-                                view! {
-                                    <li
-                                        class="combobox-item"
-                                        class:combobox-item-highlighted=is_highlighted
-                                        role="option"
-                                        aria-selected=move || is_highlighted.get().to_string()
-                                        // id=format!("combobox-item-{}", item.id) // For aria-activedescendant
-                                        on:mousedown=move |ev| { // Mousedown fires before input blur
-                                            ev.prevent_default(); // Prevent input from losing focus immediately
-                                            handle_select_item(item_clone_for_click.clone());
-                                        }
-                                    >
-                                        // Display text could be different from ID
-                                        // For model selection, item.id is what we want in the input.
-                                        // item.display_text could show "Model Name (ID: actual_id)"
-                                        {item_clone.display_text}
-                                    </li>
+            {move || {
+                if loading.get() {
+                    view! { <div class="combobox-loading-indicator">"Loading..."</div> }.into_any()
+                } else if let Some(err_msg) = error_message.get() {
+                    view! { <div class="combobox-error-message">{err_msg}</div> }.into_any()
+                } else if show_suggestions.get() && !filtered_items.get().is_empty() {
+                    view! {
+                        <ul
+                            class="combobox-suggestions"
+                            id="combobox-suggestions-list"
+                            role="listbox"
+                            node_ref=suggestions_list_ref
+                        >
+                            <For
+                                each=move || filtered_items.get().into_iter().enumerate()
+                                key=|(_, item)| item.id.clone()
+                                children=move |(idx, item)| {
+                                    let item_clone = item.clone();
+                                    let item_clone_for_click = item.clone();
+                                    let is_highlighted = Memo::new(move |_| {
+                                        highlighted_index.get() == Some(idx)
+                                    });
+                                    view! {
+                                        <li
+                                            class="combobox-item"
+                                            class:combobox-item-highlighted=is_highlighted
+                                            role="option"
+                                            aria-selected=move || is_highlighted.get().to_string()
+                                            // id=format!("combobox-item-{}", item.id) // For aria-activedescendant
+                                            // Mousedown fires before input blur
+                                            on:mousedown=move |ev| {
+                                                ev.prevent_default();
+                                                handle_select_item(item_clone_for_click.clone());
+                                            }
+                                        >
+                                            // Display text could be different from ID
+                                            // For model selection, item.id is what we want in the input.
+                                            // item.display_text could show "Model Name (ID: actual_id)"
+                                            {item_clone.display_text}
+                                        </li>
+                                    }
                                 }
-                            }
-                        />
-                    </ul>
-                }.into_any()
-            } else if show_suggestions.get() && !search_query.get().is_empty() && filtered_items.get().is_empty() {
-                 view!{ <div class="combobox-no-results">"No results found"</div>}.into_any()
-            } else {
-                let _: () = view! { <></> }; // Empty fragment for no suggestions/error/loading
-                ().into_any()
+                            />
+                        </ul>
+                    }
+                        .into_any()
+                } else if show_suggestions.get() && !search_query.get().is_empty()
+                    && filtered_items.get().is_empty()
+                {
+                    view! { <div class="combobox-no-results">"No results found"</div> }.into_any()
+                } else {
+                    let _: () = // Empty fragment for no suggestions/error/loading
+                    view! { <></> };
+                    ().into_any()
+                }
             }}
         </div>
     }
