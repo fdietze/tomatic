@@ -1,0 +1,3 @@
+- automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps. To automatically fix some linter errors (clippy), run `just fix` (will internally run cargo clippy --fix).
+- add dependencies by running `cargo add`. Before adding dependencies, read `Cargo.toml` if it is already present.
+- always stay on the happy path and propagate the error on failure.
