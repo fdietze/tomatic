@@ -1,4 +1,6 @@
 mod chat;
+mod copy_button;
+mod dom_utils;
 mod llm;
 mod settings;
 

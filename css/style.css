@@ -109,9 +109,12 @@ select {
 }
 
 button {
+    cursor: pointer;
+    font-family: system-ui, sans-serif;
     flex-shrink: 0;
+
     &:not([data-role]) {
-        background-color: var(--base01);
+        background-color: var(--base02);
         &[disabled] {
             opacity: 0.5;
             cursor: not-allowed;
@@ -135,6 +138,7 @@ button {
     &[data-size="compact"] {
         padding: 4px 8px;
         border-radius: 4px;
+        font-size: smaller;
     }
 
     &[data-role="text"] {
@@ -230,10 +234,8 @@ chat-message-role {
 chat-message-buttons {
     margin-left: auto;
     display: flex;
-    font-size: smaller;
-    color: var(--base05);
-    /*font-weight: bold;*/
     padding-bottom: 4px;
+    gap: 0.5em;
 }
 
 chat-message-content {
@@ -247,15 +249,10 @@ chat-message-content {
         position: relative; /* For positioning the copy button */
     }
 
-    pre .copy-button {
+    pre > button.copy-button {
         position: absolute;
         top: 4px;
         right: 4px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-family: system-ui, sans-serif;
-        font-size: 0.8em;
     }
 }
 

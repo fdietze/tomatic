@@ -242,8 +242,8 @@
       }
     },
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "last_modified": "2025-06-13T00:58:23Z",
-      "resolved": "github:NixOS/nixpkgs/6e7721e37bf00fa7ea44ac3cfc9d2411284ec3ef?lastModified=1749776303&narHash=sha256-OHibOvVwKqO1qvRg0r3agtd1EagW4THBcoWT7QGgcNo%3D"
+      "last_modified": "2025-06-17T18:11:34Z",
+      "resolved": "github:NixOS/nixpkgs/f45e75fc63fc8a7ffc3da382b2f6b681c5b71875?lastModified=1750183894&narHash=sha256-ZtOgEt70keBVB4YJc%2Bz7m0h7J1BOlv%2FGjHE1YC6KxeA%3D"
     },
     "just@latest": {
       "last_modified": "2025-06-05T08:10:37Z",
@@ -426,8 +426,8 @@
       }
     },
     "openssl@latest": {
-      "last_modified": "2025-06-11T05:21:29Z",
-      "resolved": "github:NixOS/nixpkgs/f72be405a10668b8b00937b452f2145244103ebc#openssl",
+      "last_modified": "2025-06-14T12:19:57Z",
+      "resolved": "github:NixOS/nixpkgs/41da1e3ea8e23e094e5e3eeb1e6b830468a7399e#openssl",
       "source": "devbox-search",
       "version": "3.4.1",
       "systems": {
@@ -444,16 +444,16 @@
               "default": true
             },
             {
+              "name": "dev",
+              "path": "/nix/store/kbs1gz7p2j7qd1lixqzkladkjdxs8nj7-openssl-3.4.1-dev"
+            },
+            {
               "name": "doc",
               "path": "/nix/store/sjmrjajggy3648nkn0ipz8axhj34qqn5-openssl-3.4.1-doc"
             },
             {
               "name": "out",
               "path": "/nix/store/z2js30ib9b11hhcy1zy6x4nzdg75bpxf-openssl-3.4.1"
-            },
-            {
-              "name": "dev",
-              "path": "/nix/store/kbs1gz7p2j7qd1lixqzkladkjdxs8nj7-openssl-3.4.1-dev"
             }
           ],
           "store_path": "/nix/store/bx0b6gvphv01s2px3j1h1ajy036h8bgb-openssl-3.4.1-bin"
@@ -502,16 +502,16 @@
               "default": true
             },
             {
-              "name": "dev",
-              "path": "/nix/store/58m9pn9yksg7xjl6kl7qmmp2dwj9gjg2-openssl-3.4.1-dev"
-            },
-            {
               "name": "doc",
               "path": "/nix/store/iskcy65i66j6x2b8q1y40x0qlmppnk48-openssl-3.4.1-doc"
             },
             {
               "name": "out",
               "path": "/nix/store/gf7l76id9931pnshsvvv8izg00hbgaxw-openssl-3.4.1"
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/58m9pn9yksg7xjl6kl7qmmp2dwj9gjg2-openssl-3.4.1-dev"
             }
           ],
           "store_path": "/nix/store/liqdyh2xc61v6g9lhhydijsd79p0ghgq-openssl-3.4.1-bin"
@@ -529,10 +529,6 @@
               "default": true
             },
             {
-              "name": "debug",
-              "path": "/nix/store/yk2g2gfcj2fy1ffyi1g91q7jmp4h8pxa-openssl-3.4.1-debug"
-            },
-            {
               "name": "dev",
               "path": "/nix/store/kcgqglb4iax0zh5jlrxmjdik93wlgsrq-openssl-3.4.1-dev"
             },
@@ -543,6 +539,10 @@
             {
               "name": "out",
               "path": "/nix/store/8pviily4fgsl02ijm65binz236717wfs-openssl-3.4.1"
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/yk2g2gfcj2fy1ffyi1g91q7jmp4h8pxa-openssl-3.4.1-debug"
             }
           ],
           "store_path": "/nix/store/rjzx8v679rwd6dsb6s08iy3j2rrax72s-openssl-3.4.1-bin"
