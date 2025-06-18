@@ -14,7 +14,6 @@
     "just":         "latest",
     "trunk":        "latest",
     "leptosfmt":    "latest",
-    "earthly":      "latest",
     "cargo-chef":   "latest",
     "bacon":        "latest",
     "ollama":       "latest",
