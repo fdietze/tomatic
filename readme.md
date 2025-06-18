@@ -13,7 +13,7 @@
 </div>
 
 <h1>Tomatic</h1>
-Agentic LLM Group Chat UI and maybe more.
+Openrouter based AI Chat Interface.
 
 ## Getting Started
 
@@ -39,5 +39,3 @@ Agentic LLM Group Chat UI and maybe more.
    ```bash
    just
    ```
-
-1. To learn how the production build works, check out the [Earthfile](Earthfile).
