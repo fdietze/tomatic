@@ -18,6 +18,10 @@ lint:
   @echo "Running linter..."
   cargo clippy --all-targets --all-features -- -D warnings
 
+check:
+  cargo clippy --all-targets
+  cargo test --workspace --all-targets
+
 # Run Tests
 test-all:
   @echo "Running tests..."
