@@ -1,4 +1,5 @@
 mod chat;
+mod combobox;
 mod copy_button;
 mod dom_utils;
 mod llm;

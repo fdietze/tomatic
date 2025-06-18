@@ -15,6 +15,7 @@ use crate::copy_button::CopyButton;
 use crate::dom_utils;
 use crate::llm;
 use crate::llm::DisplayModelInfo;
+use crate::combobox::{Combobox, ComboboxItem};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SystemPrompt {
@@ -87,6 +88,41 @@ pub fn ChatInterface(
 
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
     let ref_history: NodeRef<html::Custom<&str>> = NodeRef::new();
+
+    let combobox_items = Memo::new(move |_| match fetched_models_result.get() {
+        Some(Ok(models)) => models
+            .into_iter()
+            .map(|model_info| {
+                let display_text =
+                    if let (Some(prompt_cost), Some(completion_cost)) =
+                        (model_info.prompt_cost_usd_pm, model_info.completion_cost_usd_pm)
+                    {
+                        format!(
+                            "{} (ID: {}) (P: ${:.2}/MTok C: ${:.2}/MTok)",
+                            model_info.name, model_info.id, prompt_cost, completion_cost,
+                        )
+                    } else {
+                        format!("{} (ID: {})", model_info.name, model_info.id)
+                    };
+                ComboboxItem { id: model_info.id.clone(), display_text }
+            })
+            .collect::<Vec<ComboboxItem>>(),
+        _ => Vec::new(),
+    });
+
+    let combobox_external_error = Memo::new(move |_| {
+        if api_key.get().is_empty() {
+            Some("API key required in Settings to use models.".to_string())
+        } else {
+            match fetched_models_result.get() {
+                Some(Err(e)) => Some(format!("Failed to load models: {e}")),
+                Some(Ok(models)) if models.is_empty() && !models_loading.get() => {
+                    Some("No models found from API.".to_string())
+                }
+                _ => None,
+            }
+        }
+    });
 
     Effect::new(move |_| {
         if let Some(ref_input) = ref_input.get() {
@@ -318,97 +354,15 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
-                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color);">
-                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 5px;">
-                        {move || {
-                            if api_key.get().is_empty() {
-                                view! {
-                                    <p style="margin:0; font-size: 0.9em;">
-                                        "Enter API key in Settings to load models."
-                                    </p>
-                                }
-                                    .into_any()
-                            } else if models_loading.get() {
-                                view! {
-                                    <p style="margin:0; font-size: 0.9em;">"Loading models..."</p>
-                                }
-                                    .into_any()
-                            } else {
-                                match fetched_models_result.get() {
-                                    Some(Ok(models)) => {
-                                        view! {
-                                            <select
-                                                id="model-select"
-                                                style="flex-grow: 1; min-width: 150px;"
-                                                on:change=move |ev| {
-                                                    let new_value = event_target_value(&ev);
-                                                    set_model_name_storage.set(new_value);
-                                                }
-                                            >
-                                                <option
-                                                    value=""
-                                                    selected=model_name_storage.get().is_empty()
-                                                    disabled=true
-                                                >
-                                                    "Select a model"
-                                                </option>
-                                                {models
-                                                    .into_iter()
-                                                    .map(|model_info| {
-                                                        let is_selected = model_name_storage.get() == model_info.id;
-                                                        let display_text = if let (
-                                                            Some(prompt_cost),
-                                                            Some(completion_cost),
-                                                        ) = (
-                                                            model_info.prompt_cost_usd_pm,
-                                                            model_info.completion_cost_usd_pm,
-                                                        ) {
-                                                            format!(
-                                                                "{} (P: ${:.2}/MTok C: ${:.2}/MTok)",
-                                                                model_info.name,
-                                                                prompt_cost,
-                                                                completion_cost,
-                                                            )
-                                                        } else {
-                                                            model_info.name.clone()
-                                                        };
-                                                        view! {
-                                                            <option value=model_info.id.clone() selected=is_selected>
-                                                                {display_text}
-                                                            </option>
-                                                        }
-                                                    })
-                                                    .collect_view()}
-                                            </select>
-                                        }
-                                            .into_any()
-                                    }
-                                    Some(Err(e)) => {
-                                        view! {
-                                            <p style="color: red; margin:0; font-size: 0.9em;">
-                                                "Error loading models: " {e.to_string()}
-                                            </p>
-                                        }
-                                            .into_any()
-                                    }
-                                    None => {
-                                        view! {
-                                            <p style="margin:0; font-size: 0.9em;">
-                                                "No models loaded or API key might be invalid."
-                                            </p>
-                                        }
-                                            .into_any()
-                                    }
-                                }
-                            }
-                        }}
-                    </div>
-                    <input
-                        type="text"
-                        style="width: 100%; padding: 8px; border: 1px solid var(--border-color);"
-                        prop:value=move || model_name_storage.get()
-                        on:input:target=move |ev| set_model_name_storage.set(ev.target().value())
-                        placeholder="Or enter model manually (e.g., openai/gpt-4o)"
+                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;"> // Added z-index for combobox dropdown
+                    <Combobox
+                        items=combobox_items
+                        selected_id=model_name_storage
+                        on_select=Callback::new(move |id_str: String| set_model_name_storage.set(id_str))
+                        placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
+                        loading=models_loading
+                        error_message=combobox_external_error
+                        disabled=Signal::derive(move || api_key.get().is_empty())
                     />
                 </div>
                 {move || {

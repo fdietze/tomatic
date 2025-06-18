@@ -334,3 +334,93 @@ error-box {
     white-space: break-spaces;
     border-radius: 8px;
 }
+
+/* Combobox Styles */
+.combobox-wrapper {
+    position: relative; /* For positioning the suggestions list */
+    width: 100%;
+}
+
+.combobox-label {
+    font-size: smaller;
+    display: block;
+    margin-bottom: 4px;
+    color: var(--base04);
+}
+
+.combobox-input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: var(--base00);
+    color: var(--base05);
+    border: 2px solid transparent;
+    outline: none;
+    box-sizing: border-box; /* Ensure padding and border don't increase total width */
+}
+
+.combobox-input:focus {
+    border: 2px solid var(--base0B);
+}
+
+.combobox-input-disabled {
+    background-color: var(--base01);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.combobox-input-loading {
+    /* Add specific styles for loading state if needed, e.g., a spinner background */
+}
+
+.combobox-suggestions {
+    position: absolute;
+    top: 100%; /* Position below the input */
+    left: 0;
+    right: 0;
+    background-color: var(--base00);
+    border: 1px solid var(--base02);
+    border-top: none; /* Avoid double border with input */
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000; /* Ensure it's above other content */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.combobox-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--base05);
+    font-size: 0.9em;
+}
+
+.combobox-item:hover,
+.combobox-item-highlighted {
+    background-color: var(--base01);
+    color: var(--base07); /* Or a more prominent color like base0D */
+}
+
+.combobox-loading-indicator,
+.combobox-error-message,
+.combobox-no-results {
+    padding: 8px 12px;
+    font-size: 0.9em;
+    color: var(--base04);
+    background-color: var(--base00); /* Match suggestions background */
+    border: 1px solid var(--base02);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.combobox-error-message {
+    color: var(--base08);
+}
