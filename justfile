@@ -19,8 +19,7 @@ lint:
   cargo clippy --all-targets --all-features -- -D warnings
 
 check:
-  cargo clippy --all-targets
-  cargo test --workspace --all-targets
+  cargo test --workspace --all-targets && cargo clippy --all-targets
 
 # Run Tests
 test-all:
