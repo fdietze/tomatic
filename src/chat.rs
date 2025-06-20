@@ -144,7 +144,7 @@ pub fn ChatInterface(
                     {
                         // New format: compact, fixed-width, showing both prices.
                         // Using width 6 for numbers up to 999.99
-                        let price_display = format!("in: {: >6.2}$ out: {: >6.2}$/MTok", prompt_cost, completion_cost);
+                        let price_display = format!("in: {prompt_cost: >6.2}$ out: {completion_cost: >6.2}$/MTok");
 
                         let text = format!(
                             "{} {}",
