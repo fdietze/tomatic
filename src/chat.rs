@@ -4,11 +4,11 @@ use leptos::{html, prelude::*, task::spawn_local};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::combobox::{Combobox, ComboboxItem};
 use crate::copy_button::CopyButton;
 use crate::dom_utils;
 use crate::llm;
 use crate::llm::DisplayModelInfo;
-use crate::combobox::{Combobox, ComboboxItem};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SystemPrompt {
@@ -68,7 +68,9 @@ pub fn ChatInterface(
     #[prop(into)] cached_models: Signal<Vec<DisplayModelInfo>>,
     #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
 ) -> impl IntoView {
-    leptos::logging::log!("[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky.");
+    leptos::logging::log!(
+        "[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky."
+    );
     on_cleanup(|| {
         leptos::logging::log!("[LOG] [ChatInterface] Component cleaned up. If a panic about disposed values follows, it's because a hook from here (like the old `use_local_storage` for input) is being called after cleanup.");
     });
@@ -136,18 +138,31 @@ pub fn ChatInterface(
             .get()
             .into_iter()
             .map(|model_info| {
-                let display_text =
+                let (display_text, display_html) =
                     if let (Some(prompt_cost), Some(completion_cost)) =
                         (model_info.prompt_cost_usd_pm, model_info.completion_cost_usd_pm)
                     {
-                        format!(
-                            "{} (ID: {}) (P: ${:.2}/MTok C: ${:.2}/MTok)",
-                            model_info.name, model_info.id, prompt_cost, completion_cost,
-                        )
+                        // New format: compact, fixed-width, showing both prices.
+                        // Using width 6 for numbers up to 999.99
+                        let price_display = format!("in: {: >6.2}$ out: {: >6.2}$/MTok", prompt_cost, completion_cost);
+
+                        let text = format!(
+                            "{} {}",
+                            model_info.name, price_display
+                        );
+                        let html = format!(
+                            "<div style='display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1em;'>\
+                                <span style='text-overflow: ellipsis; white-space: nowrap; overflow: hidden;'>{}</span>\
+                                <span class='model-price' style='flex-shrink: 0; white-space: pre'>{}</span>\
+                            </div>",
+                            model_info.name, &price_display
+                        );
+                        (text, Some(html))
                     } else {
-                        format!("{} (ID: {})", model_info.name, model_info.id)
+                        let text = format!("{} (ID: {})", model_info.name, model_info.id);
+                        (text, None)
                     };
-                ComboboxItem { id: model_info.id.clone(), display_text }
+                ComboboxItem { id: model_info.id.clone(), display_text, display_html }
             })
             .collect::<Vec<ComboboxItem>>()
     });
@@ -220,7 +235,9 @@ pub fn ChatInterface(
                             role: "system".to_string(),
                             content: system_prompt_content,
                             prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                            system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                            system_prompt_content: selected_prompt
+                                .get()
+                                .map(|sp| sp.prompt.clone()),
                             model_name: Some(current_model_name()),
                         });
                     }
@@ -258,7 +275,9 @@ pub fn ChatInterface(
                                     }
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
-                                        set_messages.update(|m| { m.pop(); });
+                                        set_messages.update(|m| {
+                                            m.pop();
+                                        });
                                         break;
                                     }
                                 }
@@ -266,7 +285,9 @@ pub fn ChatInterface(
                         }
                         Err(err) => {
                             set_error.set(Some(err.to_string()));
-                            set_messages.update(|m| { m.pop(); });
+                            set_messages.update(|m| {
+                                m.pop();
+                            });
                         }
                     }
                 }
@@ -292,7 +313,9 @@ pub fn ChatInterface(
                 set_input_disabled.set(true);
                 set_error(None);
 
-                set_messages.update(|m| { m.drain(index..); });
+                set_messages.update(|m| {
+                    m.drain(index..);
+                });
 
                 let system_prompt_content = selected_prompt()
                     .map(|sp| sp.prompt)
@@ -309,7 +332,9 @@ pub fn ChatInterface(
                             role: "system".to_string(),
                             content: system_prompt_content,
                             prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                            system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                            system_prompt_content: selected_prompt
+                                .get()
+                                .map(|sp| sp.prompt.clone()),
                             model_name: Some(current_model_name()),
                         });
                     }
@@ -347,7 +372,9 @@ pub fn ChatInterface(
                                     }
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
-                                        set_messages.update(|m| { m.pop(); });
+                                        set_messages.update(|m| {
+                                            m.pop();
+                                        });
                                         break;
                                     }
                                 }
@@ -355,7 +382,9 @@ pub fn ChatInterface(
                         }
                         Err(err) => {
                             set_error.set(Some(err.to_string()));
-                            set_messages.update(|m| { m.pop(); });
+                            set_messages.update(|m| {
+                                m.pop();
+                            });
                         }
                     }
                 }
@@ -373,7 +402,9 @@ pub fn ChatInterface(
                         <Combobox
                             items=combobox_items
                             selected_id=model_name
-                            on_select=Callback::new(move |id_str: String| set_model_name.set(id_str))
+                            on_select=Callback::new(move |id_str: String| {
+                                set_model_name.set(id_str)
+                            })
                             placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
                             loading=models_loading
                             error_message=combobox_external_error
@@ -386,7 +417,7 @@ pub fn ChatInterface(
                         disabled=models_loading
                         title="Reload model list"
                     >
-                        "Reload"
+                        "reload"
                     </button>
                 </div>
                 {move || {

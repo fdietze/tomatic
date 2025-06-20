@@ -341,7 +341,6 @@ error-box {
 }
 
 .combobox-label {
-    font-size: smaller;
     display: block;
     margin-bottom: 4px;
     color: var(--base04);
@@ -394,7 +393,6 @@ error-box {
     padding: 8px 12px;
     cursor: pointer;
     color: var(--base05);
-    font-size: 0.9em;
 }
 
 .combobox-item:hover,
@@ -407,7 +405,6 @@ error-box {
 .combobox-error-message,
 .combobox-no-results {
     padding: 8px 12px;
-    font-size: 0.9em;
     color: var(--base04);
     background-color: var(--base00); /* Match suggestions background */
     border: 1px solid var(--base02);
@@ -422,4 +419,8 @@ error-box {
 
 .combobox-error-message {
     color: var(--base08);
+}
+
+.model-price {
+    font-family: monospace;
 }

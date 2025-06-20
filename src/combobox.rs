@@ -10,7 +10,8 @@ const MIN_QUERY_LENGTH: usize = 1;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ComboboxItem {
     pub id: String,
-    pub display_text: String, // Text to show in the dropdown, can be different from id
+    pub display_text: String, // Text to show in the dropdown, for searching
+    pub display_html: Option<String>, // Optional HTML for rich rendering
 }
 
 #[component]
@@ -276,10 +277,16 @@ pub fn Combobox(
                                                 handle_select_item(item_clone_for_click.clone());
                                             }
                                         >
-                                            // Display text could be different from ID
-                                            // For model selection, item.id is what we want in the input.
-                                            // item.display_text could show "Model Name (ID: actual_id)"
-                                            {item_clone.display_text}
+                                            {
+                                                let item = item_clone.clone();
+                                                move || {
+                                                    if let Some(html) = item.display_html.clone() {
+                                                        view! { <div inner_html=html></div> }.into_any()
+                                                    } else {
+                                                        item.display_text.clone().into_any()
+                                                    }
+                                                }
+                                            }
                                         </li>
                                     }
                                 }
