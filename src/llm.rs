@@ -103,7 +103,7 @@ pub async fn request_message_content_streamed(
     Ok(output_stream)
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct DisplayModelInfo {
     pub id: String,
     pub name: String,

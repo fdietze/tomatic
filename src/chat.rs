@@ -64,6 +64,9 @@ pub fn ChatInterface(
     // LIFTED from this component to App to fix panic
     #[prop(into)] input: Signal<String>,
     #[prop(into)] set_input: WriteSignal<String>,
+    // New props for cached models
+    #[prop(into)] cached_models: Signal<Vec<DisplayModelInfo>>,
+    #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
 ) -> impl IntoView {
     leptos::logging::log!("[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky.");
     on_cleanup(|| {
@@ -71,9 +74,9 @@ pub fn ChatInterface(
     });
 
     let (input_disabled, set_input_disabled) = signal(false);
-    let (fetched_models_result, set_fetched_models_result) =
-        signal::<Option<Result<Vec<DisplayModelInfo>, String>>>(None);
     let (models_loading, set_models_loading) = signal(false);
+    let (models_error, set_models_error) = signal::<Option<String>>(None);
+
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let prompt_name: Option<String> = selected_prompt_name();
@@ -92,8 +95,45 @@ pub fn ChatInterface(
     let ref_input: NodeRef<html::Textarea> = NodeRef::new();
     let ref_history: NodeRef<html::Custom<&str>> = NodeRef::new();
 
-    let combobox_items = Memo::new(move |_| match fetched_models_result.get() {
-        Some(Ok(models)) => models
+    let fetch_models = StoredValue::new(move || {
+        let current_api_key = api_key.get_untracked();
+        if current_api_key.is_empty() {
+            return;
+        }
+
+        set_models_loading(true);
+        set_models_error(None);
+        spawn_local(async move {
+            match crate::llm::list_available_models(current_api_key).await {
+                Ok(models) => {
+                    set_cached_models.set(models);
+                }
+                Err(e) => {
+                    set_models_error(Some(e.to_string()));
+                }
+            }
+            set_models_loading(false);
+        });
+    });
+
+    // Effect to fetch models if cache is empty and api key is present
+    Effect::new(move |_| {
+        if cached_models.get().is_empty() && !api_key.get().is_empty() {
+            fetch_models.get_value()();
+        }
+    });
+
+    // Effect to clear models if API key is removed
+    Effect::new(move |_| {
+        if api_key.get().is_empty() {
+            set_cached_models.set(vec![]);
+            set_models_error(None); // Clear any previous errors
+        }
+    });
+
+    let combobox_items = Memo::new(move |_| {
+        cached_models
+            .get()
             .into_iter()
             .map(|model_info| {
                 let display_text =
@@ -109,21 +149,18 @@ pub fn ChatInterface(
                     };
                 ComboboxItem { id: model_info.id.clone(), display_text }
             })
-            .collect::<Vec<ComboboxItem>>(),
-        _ => Vec::new(),
+            .collect::<Vec<ComboboxItem>>()
     });
 
     let combobox_external_error = Memo::new(move |_| {
         if api_key.get().is_empty() {
             Some("API key required in Settings to use models.".to_string())
+        } else if let Some(e) = models_error.get() {
+            Some(format!("Failed to load models: {e}"))
+        } else if cached_models.get().is_empty() && !models_loading.get() {
+            Some("No models found. Try reloading.".to_string())
         } else {
-            match fetched_models_result.get() {
-                Some(Err(e)) => Some(format!("Failed to load models: {e}")),
-                Some(Ok(models)) if models.is_empty() && !models_loading.get() => {
-                    Some("No models found from API.".to_string())
-                }
-                _ => None,
-            }
+            None
         }
     });
 
@@ -131,24 +168,6 @@ pub fn ChatInterface(
         if let Some(ref_input) = ref_input.get() {
             let _ = ref_input.focus();
         }
-    });
-
-    Effect::new(move |_| {
-        let current_api_key = api_key();
-        if current_api_key.is_empty() {
-            set_fetched_models_result(None);
-            set_models_loading(false);
-            return;
-        }
-
-        set_models_loading(true);
-        spawn_local(async move {
-            let result = crate::llm::list_available_models(current_api_key)
-                .await
-                .map_err(|e| e.to_string());
-            set_fetched_models_result(Some(result));
-            set_models_loading(false);
-        });
     });
 
     let current_model_name = Memo::new(move |_| {
@@ -349,16 +368,26 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
-                <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
-                    <Combobox
-                        items=combobox_items
-                        selected_id=model_name
-                        on_select=Callback::new(move |id_str: String| set_model_name.set(id_str))
-                        placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
-                        loading=models_loading
-                        error_message=combobox_external_error
-                        disabled=Signal::derive(move || api_key.get().is_empty())
-                    />
+                <div style="display: flex; align-items: center; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
+                    <div style="flex-grow: 1;">
+                        <Combobox
+                            items=combobox_items
+                            selected_id=model_name
+                            on_select=Callback::new(move |id_str: String| set_model_name.set(id_str))
+                            placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
+                            loading=models_loading
+                            error_message=combobox_external_error
+                            disabled=Signal::derive(move || api_key.get().is_empty())
+                        />
+                    </div>
+                    <button
+                        data-size="compact"
+                        on:click=move |_| fetch_models.get_value()()
+                        disabled=models_loading
+                        title="Reload model list"
+                    >
+                        "Reload"
+                    </button>
                 </div>
                 {move || {
                     selected_prompt()

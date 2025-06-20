@@ -7,13 +7,13 @@ mod settings;
 mod persistence;
 
 use crate::chat::{Message, SystemPrompt, SystemPromptBar, ChatInterface};
+use crate::llm::DisplayModelInfo;
 use crate::persistence::ChatSession;
 use crate::settings::Settings;
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::ev::MouseEvent;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use leptos_reactive::SignalUpdateUntracked;
 use leptos_use::storage::use_local_storage;
 use leptos_use::use_debounce_fn_with_arg;
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,8 @@ fn App() -> impl IntoView {
         use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
     let (model_name_storage, set_model_name_storage, _) =
         use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
+    let (cached_models, set_cached_models, _) =
+        use_local_storage::<Vec<DisplayModelInfo>, JsonSerdeCodec>("cached_models");
     // LIFTED STATE FOR CHAT INPUT to fix panic
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
 
@@ -70,7 +72,7 @@ fn App() -> impl IntoView {
                 }
                 Err(e) => {
                     leptos::logging::log!("[ERROR] [App] Failed to load session list: {:?}", e);
-                    error.set(Some(format!("Failed to load session list: {}", e)));
+                    error.set(Some(format!("Failed to load session list: {e}")));
                 }
             }
         })
@@ -97,12 +99,12 @@ fn App() -> impl IntoView {
                     set_page.set(Page::Chat);
                 }
                 Ok(None) => {
-                    let msg = format!("Session {} not found.", session_id_to_load);
+                    let msg = format!("Session {session_id_to_load} not found.");
                     leptos::logging::log!("[ERROR] [App] Tried to load session but failed: {}", msg);
                     error.set(Some(msg));
                 }
                 Err(e) => {
-                    let msg = format!("Error loading session: {}", e);
+                    let msg = format!("Error loading session: {e}");
                     leptos::logging::log!("[ERROR] [App] {}", msg);
                     error.set(Some(msg));
                 }
@@ -300,6 +302,8 @@ fn App() -> impl IntoView {
                             set_model_name=set_model_name_storage
                             input=input
                             set_input=set_input
+                            cached_models=cached_models
+                            set_cached_models=set_cached_models
                         />
                     }
                         .into_any()
