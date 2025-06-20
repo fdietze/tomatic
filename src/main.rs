@@ -254,15 +254,23 @@ fn App() -> impl IntoView {
                                         created_at_ms: created_at,
                                         updated_at_ms: Date::now(),
                                     };
-                                    if let Err(e) = persistence::save_session(&session_to_save).await {
-                                        leptos::logging::log!("[ERROR] [App] Error saving old session {}: {:?}", old_session_id, e);
+                                    if let Err(e) = persistence::save_session(&session_to_save)
+                                        .await
+                                    {
+                                        leptos::logging::log!(
+                                            "[ERROR] [App] Error saving old session {}: {:?}", old_session_id, e
+                                        );
                                     } else {
-                                        leptos::logging::log!("[App] Old session {} saved successfully.", old_session_id);
+                                        leptos::logging::log!(
+                                            "[App] Old session {} saved successfully.", old_session_id
+                                        );
                                         load_session_list.get_value()();
                                     }
                                 }
                                 Err(e) => {
-                                     leptos::logging::log!("[ERROR] [App] Error loading old session {} before saving: {:?}", old_session_id, e);
+                                    leptos::logging::log!(
+                                        "[ERROR] [App] Error loading old session {} before saving: {:?}", old_session_id, e
+                                    );
                                 }
                             }
                         });

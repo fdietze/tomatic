@@ -48,6 +48,7 @@ ci-watch:
 
 fix:
   cargo clippy --fix --allow-dirty --allow-staged --all-targets
+  leptosfmt src
 
 # count lines of code in repo
 cloc:
