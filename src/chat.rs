@@ -23,11 +23,13 @@ pub struct SystemPrompt {
     pub prompt: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     prompt_name: Option<String>,
     role: String,
     content: String,
+    model_name: Option<String>, // Added to store the model used for this message
+    system_prompt_content: Option<String>, // Added to store the full system prompt content
 }
 
 impl Message {
@@ -175,6 +177,8 @@ pub fn ChatInterface(
                     role: "user".to_string(),
                     content: input(),
                     prompt_name: None,
+                    system_prompt_content: None,
+                    model_name: None,
                 };
 
                 set_input("".to_string());
@@ -195,7 +199,9 @@ pub fn ChatInterface(
                         messages_to_submit.push(Message {
                             role: "system".to_string(),
                             content: system_prompt_content,
-                            prompt_name: None,
+                            prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                            system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                            model_name: Some(current_model_name()), // Added
                         });
                     }
                     messages_to_submit.extend(messages());
@@ -204,7 +210,9 @@ pub fn ChatInterface(
                     let response_message = Message {
                         role: "assistant".to_string(),
                         content: String::new(),
-                        prompt_name: selected_prompt_name(),
+                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                        model_name: Some(current_model_name()),
                     };
                     set_messages.update(|m| m.push(response_message));
 
@@ -292,7 +300,9 @@ pub fn ChatInterface(
                         messages_to_submit.push(Message {
                             role: "system".to_string(),
                             content: system_prompt_content,
-                            prompt_name: None,
+                            prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                            system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                            model_name: Some(current_model_name()), // Added
                         });
                     }
                     messages_to_submit.extend(messages());
@@ -301,7 +311,9 @@ pub fn ChatInterface(
                     let response_message = Message {
                         role: "assistant".to_string(),
                         content: String::new(),
-                        prompt_name: selected_prompt_name(),
+                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                        model_name: Some(current_model_name()),
                     };
                     set_messages.update(|m| m.push(response_message));
 
