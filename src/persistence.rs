@@ -20,7 +20,7 @@ pub struct ChatSession {
 }
 
 use anyhow::{anyhow, Result};
-use idb::{Database, event::VersionChangeEvent, Error as IdbError, Factory, IndexParams, KeyPath, ObjectStoreParams, Query, TransactionMode, DatabaseEvent, Event, Request};
+use idb::{Database, event::VersionChangeEvent, Error as IdbError, Factory, IndexParams, KeyPath, ObjectStoreParams, TransactionMode, DatabaseEvent, Event, Request, CursorDirection};
 use wasm_bindgen::JsValue;
 
 // --- Database Interaction Functions ---
@@ -138,7 +138,7 @@ pub async fn load_session(session_id: &str) -> Result<Option<ChatSession>> {
 
     let key_js_value = JsValue::from_str(session_id);
     let js_value_opt: Option<JsValue> = store
-        .get(Query::from(key_js_value)) // Query::from takes ownership, or use Query::key()
+        .get(idb::Query::from(key_js_value)) // Query::from takes ownership, or use Query::key()
         .map_err(|e| anyhow!("[DB] Load: Failed to initiate get op for id '{}' (sync): {}", session_id, e.to_string()))?
         .await
         .map_err(|e| anyhow!("[DB] Load: Failed to get JsValue for id '{}' (async): {}", session_id, e.to_string()))?;
@@ -162,6 +162,51 @@ pub async fn load_session(session_id: &str) -> Result<Option<ChatSession>> {
     Ok(session_opt)
 }
 
+/// Loads all session keys (IDs) from IndexedDB, sorted by `updated_at_ms` in descending order (newest first).
+pub async fn get_all_session_keys_sorted_by_update() -> Result<Vec<String>> {
+    let db = get_db().await.map_err(|e| anyhow!("[DB] ListKeys: DB open error: {}", e.to_string()))?;
+    let tx = db
+        .transaction(&[SESSIONS_STORE_NAME], TransactionMode::ReadOnly)
+        .map_err(|e| anyhow!("[DB] ListKeys: Failed to start transaction: {}", e.to_string()))?;
+    let store = tx
+        .object_store(SESSIONS_STORE_NAME)
+        .map_err(|e| anyhow!("[DB] ListKeys: Failed to get object store: {}", e.to_string()))?;
+    let index = store
+        .index(UPDATED_AT_INDEX)
+        .map_err(|e| anyhow!("[DB] ListKeys: Failed to get index: {}", e.to_string()))?;
+
+    let mut cursor = index
+        .open_cursor(None, Some(CursorDirection::Prev))
+        .map_err(|e| anyhow!("[DB] ListKeys: Failed to open cursor (sync): {}", e.to_string()))?
+        .await
+        .map_err(|e| anyhow!("[DB] ListKeys: Failed to open cursor (async): {}", e.to_string()))?;
+
+    let mut keys = Vec::new();
+    while let Some(c) = cursor {
+        match c.primary_key() {
+            Ok(primary_key_js) => {
+                if let Some(key_str) = primary_key_js.as_string() {
+                    keys.push(key_str);
+                } else {
+                    leptos::logging::log!("[WARN] [DB] ListKeys: Cursor found a record with a non-string or null primary key.");
+                }
+            }
+            Err(e) => leptos::logging::log!("[WARN] [DB] ListKeys: Error getting primary key from cursor: {:?}", e),
+        }
+        cursor = c.next(None)
+            .map_err(|e| anyhow!("[DB] ListKeys: Failed to initiate next (sync): {}", e.to_string()))?
+            .await
+            .map_err(|e| anyhow!("[DB] ListKeys: Error advancing cursor (async): {}", e.to_string()))?;
+    }
+
+    tx.await
+        .map_err(|e| anyhow!("[DB] ListKeys: Transaction completion error: {}", e.to_string()))?;
+
+    leptos::logging::log!("[DEBUG] [DB] Fetched {} session keys sorted by update time.", keys.len());
+    Ok(keys)
+}
+
+
 /// Deletes a chat session from IndexedDB by its ID. (For future use)
 #[allow(dead_code)]
 pub async fn delete_session(session_id: &str) -> Result<()> {
@@ -175,7 +220,7 @@ pub async fn delete_session(session_id: &str) -> Result<()> {
 
     let key_js_value = JsValue::from_str(session_id);
     store
-        .delete(Query::from(key_js_value))
+        .delete(idb::Query::from(key_js_value))
         .map_err(|e| anyhow!("[DB] Delete: Failed to initiate delete for id '{}' (sync): {}", session_id, e.to_string()))?
         .await
         .map_err(|e| anyhow!("[DB] Delete: Failed to complete delete for id '{}' (async): {}", session_id, e.to_string()))?;

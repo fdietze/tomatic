@@ -1,16 +1,14 @@
-use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::prelude::*;
-use leptos_use::storage::use_local_storage;
 
 use crate::chat::SystemPrompt;
 
 #[component]
-pub fn Settings() -> impl IntoView {
-    let (api_key, set_api_key, _) =
-        use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
-    let (system_prompts, set_system_prompts, _) =
-        use_local_storage::<Vec<SystemPrompt>, JsonSerdeCodec>("system_prompts");
-
+pub fn Settings(
+    #[prop(into)] api_key: Signal<String>,
+    #[prop(into)] set_api_key: WriteSignal<String>,
+    #[prop(into)] system_prompts: Signal<Vec<SystemPrompt>>,
+    #[prop(into)] set_system_prompts: WriteSignal<Vec<SystemPrompt>>,
+) -> impl IntoView {
     let on_name_change = move |index: usize, new_value: String| {
         set_system_prompts.update(|items| {
             if let Some(item) = items.get_mut(index) {

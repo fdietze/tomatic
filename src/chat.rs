@@ -1,15 +1,8 @@
-use codee::string::FromToStringCodec;
 use futures::{pin_mut, StreamExt};
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
-use leptos_use::storage::use_local_storage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-// Imports moved to dom_utils.rs as they are no longer directly used here
-// use wasm_bindgen::{closure::Closure, JsCast};
-// use web_sys::{HtmlButtonElement, HtmlPreElement, Node};
-// use wasm_bindgen_futures::JsFuture;
-// use gloo_timers::callback::Timeout;
 
 use crate::copy_button::CopyButton;
 use crate::dom_utils;
@@ -28,8 +21,8 @@ pub struct Message {
     prompt_name: Option<String>,
     role: String,
     content: String,
-    model_name: Option<String>, // Added to store the model used for this message
-    system_prompt_content: Option<String>, // Added to store the full system prompt content
+    model_name: Option<String>,
+    system_prompt_content: Option<String>,
 }
 
 impl Message {
@@ -64,11 +57,19 @@ pub fn ChatInterface(
     #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
     #[prop(into)] error: Signal<Option<String>>,
     #[prop(into)] set_error: WriteSignal<Option<String>>,
+    // Props for lifted state
+    #[prop(into)] api_key: Signal<String>,
+    #[prop(into)] model_name: Signal<String>,
+    #[prop(into)] set_model_name: WriteSignal<String>,
+    // LIFTED from this component to App to fix panic
+    #[prop(into)] input: Signal<String>,
+    #[prop(into)] set_input: WriteSignal<String>,
 ) -> impl IntoView {
-    let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
-    let (api_key, _, _) = use_local_storage::<String, FromToStringCodec>("OPENROUTER_API_KEY");
-    let (model_name_storage, set_model_name_storage, _) =
-        use_local_storage::<String, FromToStringCodec>("MODEL_NAME");
+    leptos::logging::log!("[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky.");
+    on_cleanup(|| {
+        leptos::logging::log!("[LOG] [ChatInterface] Component cleaned up. If a panic about disposed values follows, it's because a hook from here (like the old `use_local_storage` for input) is being called after cleanup.");
+    });
+
     let (input_disabled, set_input_disabled) = signal(false);
     let (fetched_models_result, set_fetched_models_result) =
         signal::<Option<Result<Vec<DisplayModelInfo>, String>>>(None);
@@ -151,7 +152,7 @@ pub fn ChatInterface(
     });
 
     let current_model_name = Memo::new(move |_| {
-        let name = model_name_storage();
+        let name = model_name();
         if name.is_empty() {
             "openai/gpt-4o".to_string()
         } else {
@@ -201,12 +202,11 @@ pub fn ChatInterface(
                             content: system_prompt_content,
                             prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
                             system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                            model_name: Some(current_model_name()), // Added
+                            model_name: Some(current_model_name()),
                         });
                     }
                     messages_to_submit.extend(messages());
 
-                    // Create placeholder response message
                     let response_message = Message {
                         role: "assistant".to_string(),
                         content: String::new(),
@@ -231,7 +231,6 @@ pub fn ChatInterface(
                                 match chunk_result {
                                     Ok(content) => {
                                         accumulated_content.push_str(&content);
-                                        // Update the last message with accumulated content
                                         set_messages.update(|m| {
                                             if let Some(last) = m.last_mut() {
                                                 last.content = accumulated_content.clone();
@@ -240,10 +239,7 @@ pub fn ChatInterface(
                                     }
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
-                                        // Remove the incomplete message
-                                        set_messages.update(|m| {
-                                            m.pop();
-                                        });
+                                        set_messages.update(|m| { m.pop(); });
                                         break;
                                     }
                                 }
@@ -251,10 +247,7 @@ pub fn ChatInterface(
                         }
                         Err(err) => {
                             set_error.set(Some(err.to_string()));
-                            // Remove the incomplete message
-                            set_messages.update(|m| {
-                                m.pop();
-                            });
+                            set_messages.update(|m| { m.pop(); });
                         }
                     }
                 }
@@ -262,7 +255,6 @@ pub fn ChatInterface(
                 set_input_disabled.set(false);
 
                 if let Some(ref_input) = ref_input.get() {
-                    // TODO
                     println!("focus");
                     let _ = ref_input.focus();
                 }
@@ -281,10 +273,7 @@ pub fn ChatInterface(
                 set_input_disabled.set(true);
                 set_error(None);
 
-                // remove all messages starting at index
-                set_messages.update(|m| {
-                    m.drain(index..);
-                });
+                set_messages.update(|m| { m.drain(index..); });
 
                 let system_prompt_content = selected_prompt()
                     .map(|sp| sp.prompt)
@@ -302,12 +291,11 @@ pub fn ChatInterface(
                             content: system_prompt_content,
                             prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
                             system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                            model_name: Some(current_model_name()), // Added
+                            model_name: Some(current_model_name()),
                         });
                     }
                     messages_to_submit.extend(messages());
 
-                    // Create placeholder response message
                     let response_message = Message {
                         role: "assistant".to_string(),
                         content: String::new(),
@@ -317,7 +305,6 @@ pub fn ChatInterface(
                     };
                     set_messages.update(|m| m.push(response_message));
 
-                    // Similar streaming logic as submit
                     match llm::request_message_content_streamed(
                         messages_to_submit.iter().map(|m| m.to_llm()).collect(),
                         model,
@@ -341,9 +328,7 @@ pub fn ChatInterface(
                                     }
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
-                                        set_messages.update(|m| {
-                                            m.pop();
-                                        });
+                                        set_messages.update(|m| { m.pop(); });
                                         break;
                                     }
                                 }
@@ -351,9 +336,7 @@ pub fn ChatInterface(
                         }
                         Err(err) => {
                             set_error.set(Some(err.to_string()));
-                            set_messages.update(|m| {
-                                m.pop();
-                            });
+                            set_messages.update(|m| { m.pop(); });
                         }
                     }
                 }
@@ -366,14 +349,11 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
-                // Added z-index for combobox dropdown
                 <div style="padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
                     <Combobox
                         items=combobox_items
-                        selected_id=model_name_storage
-                        on_select=Callback::new(move |id_str: String| {
-                            set_model_name_storage.set(id_str)
-                        })
+                        selected_id=model_name
+                        on_select=Callback::new(move |id_str: String| set_model_name.set(id_str))
                         placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
                         loading=models_loading
                         error_message=combobox_external_error
@@ -414,7 +394,7 @@ pub fn ChatInterface(
                         .map(|error| {
                             view! {
                                 <error-box>
-                                    <div style="font-weight: bold">error</div>
+                                    <div style="font-weight: bold">"error"</div>
                                     {error}
                                 </error-box>
                             }
@@ -482,8 +462,8 @@ fn Markdown(#[prop(into)] markdown_text: String) -> impl IntoView {
             ..markdown::ParseOptions::default()
         },
         compile: markdown::CompileOptions {
-            allow_dangerous_html: true,     // Needed if markdown contains HTML
-            allow_dangerous_protocol: true, // Needed for certain links if any
+            allow_dangerous_html: true,
+            allow_dangerous_protocol: true,
             ..markdown::CompileOptions::default()
         },
     };
@@ -493,9 +473,8 @@ fn Markdown(#[prop(into)] markdown_text: String) -> impl IntoView {
     Effect::new(move |_| {
         if let Some(div_element) = content_div_ref.get() {
             let html_output = markdown::to_html_with_options(&markdown_text, &markdown_options)
-                .unwrap_or_else(|_| markdown_text.clone()); // Fallback for safety
+                .unwrap_or_else(|_| markdown_text.clone());
 
-            // Use the helper function to set HTML and add copy buttons
             dom_utils::set_html_content_with_copy_buttons(&div_element, &html_output);
         }
     });
@@ -546,7 +525,7 @@ fn ChatMessage(
                                         data-size="compact"
                                         on:click=move |_| { regenerate(message_index) }
                                     >
-                                        regenerate
+                                        "regenerate"
                                     </button>
                                 }
                                     .into_any()
@@ -558,7 +537,7 @@ fn ChatMessage(
                                             set_is_editing(!is_editing());
                                         }
                                     >
-                                        edit
+                                        "edit"
                                     </button>
                                 }
                                     .into_any()
@@ -592,7 +571,7 @@ fn ChatMessage(
                                         }
                                     }
                                 >
-                                    Discard
+                                    "Discard"
                                 </button>
                                 <button on:click=move |_| {
                                     let message = message.clone();
@@ -605,7 +584,7 @@ fn ChatMessage(
                                         });
                                     set_is_editing(false);
                                     regenerate(message_index + 1);
-                                }>Re-submit</button>
+                                }>"Re-submit"</button>
                             </div>
                         }
                             .into_any()

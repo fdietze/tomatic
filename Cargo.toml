@@ -29,6 +29,7 @@ wasm-bindgen = "0.2.100"
 serde-wasm-bindgen = "0.6.5"
 idb = "0.6.4"
 uuid = { version = "1.17.0", features = ["v4", "js"] }
+leptos_reactive = "0.6.15"
 
 [profile.check-tmp]
 inherits = "dev"
