@@ -8,8 +8,6 @@
 
 <a href="https://tomatic.app">https://tomatic.app</a>
 
-![GitHub](https://img.shields.io/github/license/fdietze/tomatic?style=flat-square)
-
 </div>
 
 <h1>Tomatic</h1>
