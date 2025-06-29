@@ -22,7 +22,7 @@ futures = "0.3.31"
 async-stream = "0.3.5"
 # openrouter_api = "0.1.6"
 openrouter_api = { git = "https://github.com/fdietze/openrouter_api", branch = "improvements" }
-web-sys = { version = "0.3.77", features = ["Clipboard", "Navigator", "HtmlElement", "DomParser", "XmlSerializer", "NodeList", "Node", "Element", "Window", "Document", "HtmlCollection", "HtmlButtonElement", "Event", "MouseEvent", "HtmlPreElement", "Text"] }
+web-sys = { version = "0.3.77", features = ["Clipboard", "Navigator", "HtmlElement", "DomParser", "XmlSerializer", "NodeList", "Node", "Element", "Window", "Document", "HtmlCollection", "HtmlButtonElement", "Event", "MouseEvent", "HtmlPreElement", "Text", "Performance"] }
 wasm-bindgen-futures = "0.4.50"
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 wasm-bindgen = "0.2.100"

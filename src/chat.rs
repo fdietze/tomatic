@@ -85,18 +85,47 @@ async fn handle_llm_request(
             let mut accumulated_content = String::new();
             pin_mut!(stream);
 
+            let mut buffer = String::new();
+            // Using Option to handle the first update immediately.
+            let mut last_update_time: Option<f64> = None;
+            const THROTTLE_MS: f64 = 200.0;
+            let performance = window().performance().expect("performance should be available");
+
             while let Some(chunk_result) = stream.next().await {
                 match chunk_result {
                     Ok(streamed_message) => match streamed_message {
                         StreamedMessage::Content(content) => {
-                            accumulated_content.push_str(&content);
-                            set_messages.update(|m| {
-                                if let Some(last) = m.last_mut() {
-                                    last.content = accumulated_content.clone();
-                                }
-                            });
+                            buffer.push_str(&content);
+                            let now = performance.now();
+                            let should_update = if let Some(last_time) = last_update_time {
+                                now - last_time > THROTTLE_MS
+                            } else {
+                                true // First chunk, update immediately
+                            };
+
+                            if should_update {
+                                accumulated_content.push_str(&buffer);
+                                buffer.clear();
+                                set_messages.update(|m| {
+                                    if let Some(last) = m.last_mut() {
+                                        last.content = accumulated_content.clone();
+                                    }
+                                });
+                                last_update_time = Some(now);
+                            }
                         }
                         StreamedMessage::Usage(usage) => {
+                            // Flush any remaining content before processing usage
+                            if !buffer.is_empty() {
+                                accumulated_content.push_str(&buffer);
+                                buffer.clear();
+                                set_messages.update(|m| {
+                                    if let Some(last) = m.last_mut() {
+                                        last.content = accumulated_content.clone();
+                                    }
+                                });
+                            }
+
                             let model_info = cached_models
                                 .get()
                                 .into_iter()
@@ -130,6 +159,16 @@ async fn handle_llm_request(
                         break;
                     }
                 }
+            }
+
+            // After the loop, flush any remaining content in the buffer.
+            if !buffer.is_empty() {
+                accumulated_content.push_str(&buffer);
+                set_messages.update(|m| {
+                    if let Some(last) = m.last_mut() {
+                        last.content = accumulated_content.clone();
+                    }
+                });
             }
         }
         Err(err) => {
