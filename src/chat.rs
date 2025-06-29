@@ -54,6 +54,93 @@ fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Opt
         .next()
 }
 
+async fn handle_llm_request(
+    messages_to_submit: Vec<Message>,
+    model: llm::Model,
+    api_key: String,
+    set_messages: WriteSignal<Vec<Message>>,
+    set_error: WriteSignal<Option<String>>,
+    cached_models: Signal<Vec<DisplayModelInfo>>,
+    current_model_name: String,
+    selected_prompt: Memo<Option<SystemPrompt>>,
+) {
+    let response_message = Message {
+        role: "assistant".to_string(),
+        content: String::new(),
+        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+        model_name: Some(current_model_name.clone()),
+        cost: None,
+    };
+    set_messages.update(|m| m.push(response_message));
+
+    match llm::request_message_content_streamed(
+        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+        model,
+        api_key,
+    )
+    .await
+    {
+        Ok(stream) => {
+            let mut accumulated_content = String::new();
+            pin_mut!(stream);
+
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    Ok(streamed_message) => match streamed_message {
+                        StreamedMessage::Content(content) => {
+                            accumulated_content.push_str(&content);
+                            set_messages.update(|m| {
+                                if let Some(last) = m.last_mut() {
+                                    last.content = accumulated_content.clone();
+                                }
+                            });
+                        }
+                        StreamedMessage::Usage(usage) => {
+                            let model_info = cached_models
+                                .get()
+                                .into_iter()
+                                .find(|m| m.id == current_model_name);
+                            if let Some(model_info) = model_info {
+                                let prompt_cost =
+                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
+                                        * usage.prompt_tokens as f64
+                                        / 1_000_000.0;
+                                let completion_cost = model_info
+                                    .completion_cost_usd_pm
+                                    .unwrap_or(0.0)
+                                    * usage.completion_tokens as f64
+                                    / 1_000_000.0;
+                                set_messages.update(|m| {
+                                    if let Some(last) = m.last_mut() {
+                                        last.cost = Some(MessageCost {
+                                            prompt: prompt_cost,
+                                            completion: completion_cost,
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        set_error.set(Some(err.to_string()));
+                        set_messages.update(|m| {
+                            m.pop();
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        Err(err) => {
+            set_error.set(Some(err.to_string()));
+            set_messages.update(|m| {
+                m.pop();
+            });
+        }
+    }
+}
+
 #[component]
 pub fn ChatInterface(
     #[prop(into)] messages: Signal<Vec<Message>>,
@@ -248,81 +335,17 @@ pub fn ChatInterface(
                     }
                     messages_to_submit.extend(messages());
 
-                    let response_message = Message {
-                        role: "assistant".to_string(),
-                        content: String::new(),
-                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                        model_name: Some(current_model_name()),
-                        cost: None,
-                    };
-                    set_messages.update(|m| m.push(response_message));
-
-                    match llm::request_message_content_streamed(
-                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                    handle_llm_request(
+                        messages_to_submit,
                         model,
                         api_key(),
+                        set_messages,
+                        set_error,
+                        cached_models,
+                        current_model_name(),
+                        selected_prompt,
                     )
-                    .await
-                    {
-                        Ok(stream) => {
-                            let mut accumulated_content = String::new();
-                            pin_mut!(stream);
-
-                            while let Some(chunk_result) = stream.next().await {
-                                match chunk_result {
-                                    Ok(streamed_message) => match streamed_message {
-                                        StreamedMessage::Content(content) => {
-                                            accumulated_content.push_str(&content);
-                                            set_messages.update(|m| {
-                                                if let Some(last) = m.last_mut() {
-                                                    last.content = accumulated_content.clone();
-                                                }
-                                            });
-                                        }
-                                        StreamedMessage::Usage(usage) => {
-                                            let model_info = cached_models
-                                                .get()
-                                                .into_iter()
-                                                .find(|m| m.id == current_model_name());
-                                            if let Some(model_info) = model_info {
-                                                let prompt_cost =
-                                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
-                                                        * usage.prompt_tokens as f64
-                                                        / 1_000_000.0;
-                                                let completion_cost = model_info
-                                                    .completion_cost_usd_pm
-                                                    .unwrap_or(0.0)
-                                                    * usage.completion_tokens as f64
-                                                    / 1_000_000.0;
-                                                set_messages.update(|m| {
-                                                    if let Some(last) = m.last_mut() {
-                                                        last.cost = Some(MessageCost {
-                                                            prompt: prompt_cost,
-                                                            completion: completion_cost,
-                                                        });
-                                                    }
-                                                });
-                                            }
-                                        }
-                                    },
-                                    Err(err) => {
-                                        set_error.set(Some(err.to_string()));
-                                        set_messages.update(|m| {
-                                            m.pop();
-                                        });
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            set_error.set(Some(err.to_string()));
-                            set_messages.update(|m| {
-                                m.pop();
-                            });
-                        }
-                    }
+                    .await;
                 }
 
                 set_input_disabled.set(false);
@@ -374,81 +397,17 @@ pub fn ChatInterface(
                     }
                     messages_to_submit.extend(messages());
 
-                    let response_message = Message {
-                        role: "assistant".to_string(),
-                        content: String::new(),
-                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                        model_name: Some(current_model_name()),
-                        cost: None,
-                    };
-                    set_messages.update(|m| m.push(response_message));
-
-                    match llm::request_message_content_streamed(
-                        messages_to_submit.iter().map(|m| m.to_llm()).collect(),
+                    handle_llm_request(
+                        messages_to_submit,
                         model,
                         api_key(),
+                        set_messages,
+                        set_error,
+                        cached_models,
+                        current_model_name(),
+                        selected_prompt,
                     )
-                    .await
-                    {
-                        Ok(stream) => {
-                            let mut accumulated_content = String::new();
-                            pin_mut!(stream);
-
-                            while let Some(chunk_result) = stream.next().await {
-                                match chunk_result {
-                                    Ok(streamed_message) => match streamed_message {
-                                        StreamedMessage::Content(content) => {
-                                            accumulated_content.push_str(&content);
-                                            set_messages.update(|m| {
-                                                if let Some(last) = m.last_mut() {
-                                                    last.content = accumulated_content.clone();
-                                                }
-                                            });
-                                        }
-                                        StreamedMessage::Usage(usage) => {
-                                            let model_info = cached_models
-                                                .get()
-                                                .into_iter()
-                                                .find(|m| m.id == current_model_name());
-                                            if let Some(model_info) = model_info {
-                                                let prompt_cost =
-                                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
-                                                        * usage.prompt_tokens as f64
-                                                        / 1_000_000.0;
-                                                let completion_cost = model_info
-                                                    .completion_cost_usd_pm
-                                                    .unwrap_or(0.0)
-                                                    * usage.completion_tokens as f64
-                                                    / 1_000_000.0;
-                                                set_messages.update(|m| {
-                                                    if let Some(last) = m.last_mut() {
-                                                        last.cost = Some(MessageCost {
-                                                            prompt: prompt_cost,
-                                                            completion: completion_cost,
-                                                        });
-                                                    }
-                                                });
-                                            }
-                                        }
-                                    },
-                                    Err(err) => {
-                                        set_error.set(Some(err.to_string()));
-                                        set_messages.update(|m| {
-                                            m.pop();
-                                        });
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            set_error.set(Some(err.to_string()));
-                            set_messages.update(|m| {
-                                m.pop();
-                            });
-                        }
-                    }
+                    .await;
                 }
 
                 set_input_disabled.set(false);
@@ -604,6 +563,8 @@ fn Markdown(#[prop(into)] markdown_text: String) -> impl IntoView {
     view! { <div node_ref=content_div_ref></div> }
 }
 
+use leptos::ev::KeyboardEvent;
+
 #[component]
 fn ChatMessage(
     #[prop(into)] message: Message,
@@ -613,6 +574,21 @@ fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+
+    let handle_resubmit = {
+        let regenerate = regenerate.clone();
+        let message = message.clone();
+        move || {
+            set_messages.update(|ms| {
+                ms[message_index] = Message {
+                    content: input.get(),
+                    ..message.clone()
+                };
+            });
+            set_is_editing(false);
+            regenerate(message_index + 1);
+        }
+    };
 
     let regenerate = regenerate.clone();
     let m_clone_for_copy = message.clone();
@@ -681,14 +657,20 @@ fn ChatMessage(
             </div>
             <chat-message-content>
                 {move || {
-                    let regenerate = regenerate.clone();
-                    let message = message.clone();
                     if is_editing() {
+                        let handle_resubmit_for_textarea = handle_resubmit.clone();
+                        let handle_resubmit_for_button = handle_resubmit.clone();
                         view! {
                             <textarea
                                 style="width: 100%"
                                 prop:value=input
                                 on:input:target=move |ev| { set_input(ev.target().value()) }
+                                on:keydown=move |ev: KeyboardEvent| {
+                                    if ev.key() == "Enter" && !ev.shift_key() {
+                                        ev.prevent_default();
+                                        handle_resubmit_for_textarea();
+                                    }
+                                }
                             />
                             <div style="display:flex; justify-content: flex-end; gap: 4px;">
                                 <button
@@ -705,22 +687,14 @@ fn ChatMessage(
                                     "Discard"
                                 </button>
                                 <button on:click=move |_| {
-                                    let message = message.clone();
-                                    set_messages
-                                        .update(|ms| {
-                                            ms[message_index] = Message {
-                                                content: input(),
-                                                ..message
-                                            };
-                                        });
-                                    set_is_editing(false);
-                                    regenerate(message_index + 1);
+                                    handle_resubmit_for_button()
                                 }>"Re-submit"</button>
                             </div>
                         }
                             .into_any()
                     } else {
-                        view! { <Markdown markdown_text=message.content /> }.into_any()
+                        let content = message.content.clone();
+                        view! { <Markdown markdown_text=content /> }.into_any()
                     }
                 }}
             </chat-message-content>
