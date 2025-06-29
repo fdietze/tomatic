@@ -33,3 +33,6 @@ leptos_reactive = "0.6.15"
 
 [profile.check-tmp]
 inherits = "dev"
+
+[lints.clippy]
+too_many_arguments = "allow"
