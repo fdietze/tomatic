@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt};
 use openrouter_api::{
-    types::chat::{ChatCompletionRequest, Message as OpenRouterMessage},
+    types::chat::{ChatCompletionRequest, Message as OpenRouterMessage, Usage},
     OpenRouterClient,
     // types::models::Model as OpenRouterApiModel, // Removed problematic import
 };
@@ -37,11 +37,17 @@ pub struct Model {
     pub temperature: Option<f64>,
 }
 
+#[derive(Debug)]
+pub enum StreamedMessage {
+    Content(String),
+    Usage(Usage),
+}
+
 pub async fn request_message_content_streamed(
     messages: Vec<Message>,
     model_config: Model,
     api_key: String,
-) -> anyhow::Result<impl Stream<Item = anyhow::Result<String>>> {
+) -> anyhow::Result<impl Stream<Item = anyhow::Result<StreamedMessage>>> {
     if api_key.is_empty() {
         return Err(anyhow::anyhow!("OpenRouter API key is missing."));
     }
@@ -80,11 +86,14 @@ pub async fn request_message_content_streamed(
         while let Some(chunk_result) = stream.next().await {
             match chunk_result {
                 Ok(chunk) => {
+                    if let Some(usage) = chunk.usage {
+                        yield Ok(StreamedMessage::Usage(usage));
+                    }
                     // Process the chunk
                     // A chunk can have multiple choices, but for typical streaming, we expect one.
                     if let Some(choice) = chunk.choices.first() {
                         if let Some(content) = &choice.delta.content {
-                            yield Ok(content.clone());
+                            yield Ok(StreamedMessage::Content(content.clone()));
                         }
                     }
                     // You might also want to handle other parts of the chunk, e.g., finish_reason or usage.

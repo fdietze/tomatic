@@ -7,13 +7,18 @@ use std::sync::Arc;
 use crate::combobox::{Combobox, ComboboxItem};
 use crate::copy_button::CopyButton;
 use crate::dom_utils;
-use crate::llm;
-use crate::llm::DisplayModelInfo;
+use crate::llm::{self, DisplayModelInfo, StreamedMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SystemPrompt {
     pub name: String,
     pub prompt: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct MessageCost {
+    pub prompt: f64,
+    pub completion: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -23,6 +28,7 @@ pub struct Message {
     content: String,
     model_name: Option<String>,
     system_prompt_content: Option<String>,
+    cost: Option<MessageCost>,
 }
 
 impl Message {
@@ -151,10 +157,7 @@ pub fn ChatInterface(
                             model_info.name, price_display
                         );
                         let html = format!(
-                            "<div style='display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1em;'>\
-                                <span style='text-overflow: ellipsis; white-space: nowrap; overflow: hidden;'>{}</span>\
-                                <span class='model-price' style='flex-shrink: 0; white-space: pre'>{}</span>\
-                            </div>",
+                            "<div style='display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1em;'>\n                                <span style='text-overflow: ellipsis; white-space: nowrap; overflow: hidden;'>{}</span>\n                                <span class='model-price' style='flex-shrink: 0; white-space: pre'>{}</span>\n                            </div>",
                             model_info.name, &price_display
                         );
                         (text, Some(html))
@@ -214,6 +217,7 @@ pub fn ChatInterface(
                     prompt_name: None,
                     system_prompt_content: None,
                     model_name: None,
+                    cost: None,
                 };
 
                 set_input("".to_string());
@@ -239,6 +243,7 @@ pub fn ChatInterface(
                                 .get()
                                 .map(|sp| sp.prompt.clone()),
                             model_name: Some(current_model_name()),
+                            cost: None,
                         });
                     }
                     messages_to_submit.extend(messages());
@@ -249,6 +254,7 @@ pub fn ChatInterface(
                         prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
                         system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
                         model_name: Some(current_model_name()),
+                        cost: None,
                     };
                     set_messages.update(|m| m.push(response_message));
 
@@ -265,14 +271,41 @@ pub fn ChatInterface(
 
                             while let Some(chunk_result) = stream.next().await {
                                 match chunk_result {
-                                    Ok(content) => {
-                                        accumulated_content.push_str(&content);
-                                        set_messages.update(|m| {
-                                            if let Some(last) = m.last_mut() {
-                                                last.content = accumulated_content.clone();
+                                    Ok(streamed_message) => match streamed_message {
+                                        StreamedMessage::Content(content) => {
+                                            accumulated_content.push_str(&content);
+                                            set_messages.update(|m| {
+                                                if let Some(last) = m.last_mut() {
+                                                    last.content = accumulated_content.clone();
+                                                }
+                                            });
+                                        }
+                                        StreamedMessage::Usage(usage) => {
+                                            let model_info = cached_models
+                                                .get()
+                                                .into_iter()
+                                                .find(|m| m.id == current_model_name());
+                                            if let Some(model_info) = model_info {
+                                                let prompt_cost =
+                                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
+                                                        * usage.prompt_tokens as f64
+                                                        / 1_000_000.0;
+                                                let completion_cost = model_info
+                                                    .completion_cost_usd_pm
+                                                    .unwrap_or(0.0)
+                                                    * usage.completion_tokens as f64
+                                                    / 1_000_000.0;
+                                                set_messages.update(|m| {
+                                                    if let Some(last) = m.last_mut() {
+                                                        last.cost = Some(MessageCost {
+                                                            prompt: prompt_cost,
+                                                            completion: completion_cost,
+                                                        });
+                                                    }
+                                                });
                                             }
-                                        });
-                                    }
+                                        }
+                                    },
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
                                         set_messages.update(|m| {
@@ -336,6 +369,7 @@ pub fn ChatInterface(
                                 .get()
                                 .map(|sp| sp.prompt.clone()),
                             model_name: Some(current_model_name()),
+                            cost: None,
                         });
                     }
                     messages_to_submit.extend(messages());
@@ -346,6 +380,7 @@ pub fn ChatInterface(
                         prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
                         system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
                         model_name: Some(current_model_name()),
+                        cost: None,
                     };
                     set_messages.update(|m| m.push(response_message));
 
@@ -362,14 +397,41 @@ pub fn ChatInterface(
 
                             while let Some(chunk_result) = stream.next().await {
                                 match chunk_result {
-                                    Ok(content) => {
-                                        accumulated_content.push_str(&content);
-                                        set_messages.update(|m| {
-                                            if let Some(last) = m.last_mut() {
-                                                last.content = accumulated_content.clone();
+                                    Ok(streamed_message) => match streamed_message {
+                                        StreamedMessage::Content(content) => {
+                                            accumulated_content.push_str(&content);
+                                            set_messages.update(|m| {
+                                                if let Some(last) = m.last_mut() {
+                                                    last.content = accumulated_content.clone();
+                                                }
+                                            });
+                                        }
+                                        StreamedMessage::Usage(usage) => {
+                                            let model_info = cached_models
+                                                .get()
+                                                .into_iter()
+                                                .find(|m| m.id == current_model_name());
+                                            if let Some(model_info) = model_info {
+                                                let prompt_cost =
+                                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
+                                                        * usage.prompt_tokens as f64
+                                                        / 1_000_000.0;
+                                                let completion_cost = model_info
+                                                    .completion_cost_usd_pm
+                                                    .unwrap_or(0.0)
+                                                    * usage.completion_tokens as f64
+                                                    / 1_000_000.0;
+                                                set_messages.update(|m| {
+                                                    if let Some(last) = m.last_mut() {
+                                                        last.cost = Some(MessageCost {
+                                                            prompt: prompt_cost,
+                                                            completion: completion_cost,
+                                                        });
+                                                    }
+                                                });
                                             }
-                                        });
-                                    }
+                                        }
+                                    },
                                     Err(err) => {
                                         set_error.set(Some(err.to_string()));
                                         set_messages.update(|m| {
@@ -562,15 +624,24 @@ fn ChatMessage(
         }
     });
     let role = message.role.clone();
+    let message_for_cost = message.clone();
     view! {
         <chat-message data-role=role>
             <div style="display: flex">
                 <chat-message-role>
-                    {message
-                        .clone()
-                        .prompt_name
-                        .map(|name| "@".to_owned() + name.as_str())
-                        .unwrap_or(message.role.clone())}
+                    {if message.role == "assistant" {
+                        if let Some(model) = &message.model_name {
+                            format!("assistant ({model})")
+                        } else {
+                            "assistant".to_string()
+                        }
+                    } else {
+                        message
+                            .clone()
+                            .prompt_name
+                            .map(|name| "@".to_owned() + name.as_str())
+                            .unwrap_or(message.role.clone())
+                    }}
                 </chat-message-role>
                 <chat-message-buttons>
                     <CopyButton text_to_copy=text_for_copy_button />
@@ -653,6 +724,22 @@ fn ChatMessage(
                     }
                 }}
             </chat-message-content>
+            {move || {
+                message_for_cost
+                    .cost
+                    .map(|cost| {
+                        view! {
+                            <chat-message-cost style="text-align: right; font-size: 0.8em; opacity: 0.6; margin-top: 4px;">
+                                {format!(
+                                    "prompt: ${:.6}, completion: ${:.6}, total: ${:.6}",
+                                    cost.prompt,
+                                    cost.completion,
+                                    cost.prompt + cost.completion,
+                                )}
+                            </chat-message-cost>
+                        }
+                    })
+            }}
         </chat-message>
     }
 }
