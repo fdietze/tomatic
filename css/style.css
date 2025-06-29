@@ -129,6 +129,15 @@ button {
         }
     }
 
+    &[data-role="destructive"] {
+        background-color: var(--base08);
+        color: var(--base00);
+        &[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
     &:not([data-size]) {
         padding: 8px 12px;
         border-radius: 4px;
@@ -423,4 +432,21 @@ error-box {
 
 .model-price {
     font-family: monospace;
+}
+
+
+.spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+    border: 0.15em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border .75s linear infinite;
+    margin-right: 0.5em;
+}
+
+@keyframes spinner-border {
+    to { transform: rotate(360deg); }
 }

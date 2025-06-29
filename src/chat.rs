@@ -1,4 +1,5 @@
-use futures::{pin_mut, StreamExt};
+use futures::{pin_mut, select, FutureExt, StreamExt};
+use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use serde::{Deserialize, Serialize};
@@ -63,6 +64,7 @@ async fn handle_llm_request(
     cached_models: Signal<Vec<DisplayModelInfo>>,
     current_model_name: String,
     selected_prompt: Memo<Option<SystemPrompt>>,
+    mut cancel_receiver: oneshot::Receiver<()>, 
 ) {
     let response_message = Message {
         role: "assistant".to_string(),
@@ -86,82 +88,95 @@ async fn handle_llm_request(
             pin_mut!(stream);
 
             let mut buffer = String::new();
-            // Using Option to handle the first update immediately.
             let mut last_update_time: Option<f64> = None;
             const THROTTLE_MS: f64 = 200.0;
             let performance = window().performance().expect("performance should be available");
 
-            while let Some(chunk_result) = stream.next().await {
-                match chunk_result {
-                    Ok(streamed_message) => match streamed_message {
-                        StreamedMessage::Content(content) => {
-                            buffer.push_str(&content);
-                            let now = performance.now();
-                            let should_update = if let Some(last_time) = last_update_time {
-                                now - last_time > THROTTLE_MS
-                            } else {
-                                true // First chunk, update immediately
-                            };
-
-                            if should_update {
-                                accumulated_content.push_str(&buffer);
-                                buffer.clear();
-                                set_messages.update(|m| {
-                                    if let Some(last) = m.last_mut() {
-                                        last.content = accumulated_content.clone();
-                                    }
-                                });
-                                last_update_time = Some(now);
-                            }
-                        }
-                        StreamedMessage::Usage(usage) => {
-                            // Flush any remaining content before processing usage
-                            if !buffer.is_empty() {
-                                accumulated_content.push_str(&buffer);
-                                buffer.clear();
-                                set_messages.update(|m| {
-                                    if let Some(last) = m.last_mut() {
-                                        last.content = accumulated_content.clone();
-                                    }
-                                });
-                            }
-
-                            let model_info = cached_models
-                                .get()
-                                .into_iter()
-                                .find(|m| m.id == current_model_name);
-                            if let Some(model_info) = model_info {
-                                let prompt_cost =
-                                    model_info.prompt_cost_usd_pm.unwrap_or(0.0)
-                                        * usage.prompt_tokens as f64
-                                        / 1_000_000.0;
-                                let completion_cost = model_info
-                                    .completion_cost_usd_pm
-                                    .unwrap_or(0.0)
-                                    * usage.completion_tokens as f64
-                                    / 1_000_000.0;
-                                set_messages.update(|m| {
-                                    if let Some(last) = m.last_mut() {
-                                        last.cost = Some(MessageCost {
-                                            prompt: prompt_cost,
-                                            completion: completion_cost,
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    },
-                    Err(err) => {
-                        set_error.set(Some(err.to_string()));
+            loop {
+                select! {
+                    _ = cancel_receiver => {
+                        log!("[INFO] LLM request cancelled by user.");
                         set_messages.update(|m| {
-                            m.pop();
+                            m.pop(); // Remove the empty/partial assistant message
                         });
-                        break;
+                        return;
+                    },
+                    chunk_result = stream.next().fuse() => {
+                        if let Some(chunk_result) = chunk_result {
+                             match chunk_result {
+                                Ok(streamed_message) => match streamed_message {
+                                    StreamedMessage::Content(content) => {
+                                        buffer.push_str(&content);
+                                        let now = performance.now();
+                                        let should_update = if let Some(last_time) = last_update_time {
+                                            now - last_time > THROTTLE_MS
+                                        } else {
+                                            true // First chunk, update immediately
+                                        };
+
+                                        if should_update {
+                                            accumulated_content.push_str(&buffer);
+                                            buffer.clear();
+                                            set_messages.update(|m| {
+                                                if let Some(last) = m.last_mut() {
+                                                    last.content = accumulated_content.clone();
+                                                }
+                                            });
+                                            last_update_time = Some(now);
+                                        }
+                                    }
+                                    StreamedMessage::Usage(usage) => {
+                                        if !buffer.is_empty() {
+                                            accumulated_content.push_str(&buffer);
+                                            buffer.clear();
+                                            set_messages.update(|m| {
+                                                if let Some(last) = m.last_mut() {
+                                                    last.content = accumulated_content.clone();
+                                                }
+                                            });
+                                        }
+
+                                        let model_info = cached_models
+                                            .get()
+                                            .into_iter()
+                                            .find(|m| m.id == current_model_name);
+                                        if let Some(model_info) = model_info {
+                                            let prompt_cost =
+                                                model_info.prompt_cost_usd_pm.unwrap_or(0.0)
+                                                    * usage.prompt_tokens as f64
+                                                    / 1_000_000.0;
+                                            let completion_cost = model_info
+                                                .completion_cost_usd_pm
+                                                .unwrap_or(0.0)
+                                                * usage.completion_tokens as f64
+                                                / 1_000_000.0;
+                                            set_messages.update(|m| {
+                                                if let Some(last) = m.last_mut() {
+                                                    last.cost = Some(MessageCost {
+                                                        prompt: prompt_cost,
+                                                        completion: completion_cost,
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    }
+                                },
+                                Err(err) => {
+                                    set_error.set(Some(err.to_string()));
+                                    set_messages.update(|m| {
+                                        m.pop();
+                                    });
+                                    return;
+                                }
+                            }
+                        } else {
+                            // Stream finished
+                            break;
+                        }
                     }
                 }
             }
 
-            // After the loop, flush any remaining content in the buffer.
             if !buffer.is_empty() {
                 accumulated_content.push_str(&buffer);
                 set_messages.update(|m| {
@@ -189,14 +204,11 @@ pub fn ChatInterface(
     #[prop(into)] set_selected_prompt_name: WriteSignal<Option<String>>,
     #[prop(into)] error: Signal<Option<String>>,
     #[prop(into)] set_error: WriteSignal<Option<String>>,
-    // Props for lifted state
     #[prop(into)] api_key: Signal<String>,
     #[prop(into)] model_name: Signal<String>,
     #[prop(into)] set_model_name: WriteSignal<String>,
-    // LIFTED from this component to App to fix panic
     #[prop(into)] input: Signal<String>,
     #[prop(into)] set_input: WriteSignal<String>,
-    // New props for cached models
     #[prop(into)] cached_models: Signal<Vec<DisplayModelInfo>>,
     #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
 ) -> impl IntoView {
@@ -210,6 +222,8 @@ pub fn ChatInterface(
     let (input_disabled, set_input_disabled) = signal(false);
     let (models_loading, set_models_loading) = signal(false);
     let (models_error, set_models_error) = signal::<Option<String>>(None);
+    let (_cancel_sender, set_cancel_sender) =
+        signal::<Option<oneshot::Sender<()>>>(None);
 
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
@@ -250,18 +264,16 @@ pub fn ChatInterface(
         });
     });
 
-    // Effect to fetch models if cache is empty and api key is present
     Effect::new(move |_| {
         if cached_models.get().is_empty() && !api_key.get().is_empty() {
             fetch_models.get_value()();
         }
     });
 
-    // Effect to clear models if API key is removed
     Effect::new(move |_| {
         if api_key.get().is_empty() {
             set_cached_models.set(vec![]);
-            set_models_error(None); // Clear any previous errors
+            set_models_error(None);
         }
     });
 
@@ -274,8 +286,6 @@ pub fn ChatInterface(
                     if let (Some(prompt_cost), Some(completion_cost)) =
                         (model_info.prompt_cost_usd_pm, model_info.completion_cost_usd_pm)
                     {
-                        // New format: compact, fixed-width, showing both prices.
-                        // Using width 6 for numbers up to 999.99
                         let price_display = format!("in: {prompt_cost: >6.2}$ out: {completion_cost: >6.2}$/MTok");
 
                         let text = format!(
@@ -331,6 +341,8 @@ pub fn ChatInterface(
                 temperature: Some(1.0),
             };
             spawn_local(async move {
+                let (tx, rx) = oneshot::channel();
+                set_cancel_sender.set(Some(tx));
                 set_input_disabled.set(true);
                 set_error(None);
                 let system_prompt_content = selected_prompt()
@@ -383,11 +395,13 @@ pub fn ChatInterface(
                         cached_models,
                         current_model_name(),
                         selected_prompt,
+                        rx,
                     )
                     .await;
                 }
 
                 set_input_disabled.set(false);
+                set_cancel_sender.set(None);
 
                 if let Some(ref_input) = ref_input.get() {
                     println!("focus");
@@ -405,6 +419,8 @@ pub fn ChatInterface(
                 temperature: Some(1.0),
             };
             spawn_local(async move {
+                let (tx, rx) = oneshot::channel();
+                set_cancel_sender.set(Some(tx));
                 set_input_disabled.set(true);
                 set_error(None);
 
@@ -445,14 +461,24 @@ pub fn ChatInterface(
                         cached_models,
                         current_model_name(),
                         selected_prompt,
+                        rx,
                     )
                     .await;
                 }
 
                 set_input_disabled.set(false);
+                set_cancel_sender.set(None);
             })
         })
     };
+
+    let cancel_action = Callback::new(move |_| {
+        set_cancel_sender.update(|sender_opt| {
+            if let Some(sender) = sender_opt.take() {
+                let _ = sender.send(());
+            }
+        });
+    });
 
     view! {
         <chat-interface>
@@ -527,6 +553,7 @@ pub fn ChatInterface(
                 input_disabled=input_disabled
                 ref_input=ref_input
                 submit=submit
+                cancel_action=cancel_action
             />
         </chat-interface>
     }
@@ -539,13 +566,16 @@ fn ChatControls(
     #[prop(into)] input_disabled: Signal<bool>,
     #[prop(into)] ref_input: NodeRef<html::Textarea>,
     #[prop(into)] submit: Arc<impl Fn() + std::marker::Send + std::marker::Sync + 'static>,
+    #[prop(into)] cancel_action: Callback<()>,
 ) -> impl IntoView {
     let submit2 = submit.clone();
     view! {
         <chat-controls>
             <form on:submit=move |ev| {
                 ev.prevent_default();
-                submit()
+                if !input_disabled.get() {
+                    submit()
+                }
             }>
                 <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
                     <textarea
@@ -554,16 +584,41 @@ fn ChatControls(
                         placeholder="Message"
                         node_ref=ref_input
                         on:keydown:target=move |ev| {
-                            if ev.key() == "Enter" && !ev.shift_key() {
+                            if ev.key() == "Enter" && !ev.shift_key() && !input_disabled.get() {
                                 ev.prevent_default();
                                 submit2();
                             }
                         }
                         disabled=input_disabled
                     />
-                    <button data-role="primary" style="flex-shrink:0" disabled=input_disabled>
-                        "Go"
-                    </button>
+                    {move || {
+                        if input_disabled.get() {
+                            view! {
+                                <button
+                                    type="button"
+                                    data-role="destructive"
+                                    style="flex-shrink:0"
+                                    on:click=move |_| cancel_action.run(())
+                                >
+                                    <span class="spinner"></span>
+                                    "Cancel"
+                                </button>
+                            }
+                                .into_any()
+                        } else {
+                            view! {
+                                <button
+                                    type="submit"
+                                    data-role="primary"
+                                    style="flex-shrink:0"
+                                    disabled=input_disabled
+                                >
+                                    "Go"
+                                </button>
+                            }
+                                .into_any()
+                        }
+                    }}
                 </div>
             </form>
         </chat-controls>

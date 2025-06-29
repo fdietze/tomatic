@@ -2417,6 +2417,7 @@ dependencies = [
  "codee",
  "console_error_panic_hook",
  "futures",
+ "futures-channel",
  "gloo-timers 0.3.0",
  "idb",
  "leptos",
