@@ -4,11 +4,13 @@ use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::combobox::{Combobox, ComboboxItem};
 use crate::copy_button::CopyButton;
 use crate::dom_utils;
 use crate::llm::{self, DisplayModelInfo, StreamedMessage};
+use crate::GlobalState;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SystemPrompt {
@@ -212,6 +214,7 @@ pub fn ChatInterface(
     #[prop(into)] cached_models: Signal<Vec<DisplayModelInfo>>,
     #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
 ) -> impl IntoView {
+    let state = use_context::<GlobalState>().expect("GlobalState context not found");
     leptos::logging::log!(
         "[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky."
     );
@@ -341,6 +344,13 @@ pub fn ChatInterface(
                 temperature: Some(1.0),
             };
             spawn_local(async move {
+                // If this is a new chat, generate a new ID and navigate
+                if state.current_session_id.get().is_none() {
+                    let new_id = Uuid::new_v4().to_string();
+                    state.current_session_id.set(Some(new_id.clone()));
+                    state.navigation_request.set(Some(format!("/chat/{new_id}")));
+                }
+
                 let (tx, rx) = oneshot::channel();
                 set_cancel_sender.set(Some(tx));
                 set_input_disabled.set(true);

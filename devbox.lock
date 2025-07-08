@@ -145,6 +145,54 @@
         }
       }
     },
+    "cargo-udeps@latest": {
+      "last_modified": "2025-07-07T01:36:15Z",
+      "resolved": "github:NixOS/nixpkgs/2defa37146df235ef62f566cde69930a86f14df1#cargo-udeps",
+      "source": "devbox-search",
+      "version": "0.1.57",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/dmlqk32392ilkxg9dxb4l0rbsyg445bh-cargo-udeps-0.1.57",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/dmlqk32392ilkxg9dxb4l0rbsyg445bh-cargo-udeps-0.1.57"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/k63gjs239g9r9l8mqgmb482780s5ysn7-cargo-udeps-0.1.57",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/k63gjs239g9r9l8mqgmb482780s5ysn7-cargo-udeps-0.1.57"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/m5jn973q5yv89z356ji74vxzffdnnkw3-cargo-udeps-0.1.57",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/m5jn973q5yv89z356ji74vxzffdnnkw3-cargo-udeps-0.1.57"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/ky3fqs9rrxdgr7d0pw39k3iyw4h3qkc8-cargo-udeps-0.1.57",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/ky3fqs9rrxdgr7d0pw39k3iyw4h3qkc8-cargo-udeps-0.1.57"
+        }
+      }
+    },
     "cargo-watch@latest": {
       "last_modified": "2025-05-16T20:19:48Z",
       "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#cargo-watch",

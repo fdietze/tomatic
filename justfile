@@ -6,7 +6,7 @@ _default:
 
 # start development environment
 dev:
-  trunk serve --port 12345 --locked --no-error-reporting --skip-version-check --public-url /
+  RUSTFLAGS="--cfg erase_components" trunk serve --port 12345 --locked --no-error-reporting --skip-version-check --public-url /
 
 # Check Formatting
 check-format:
@@ -16,15 +16,15 @@ check-format:
 # Lint Code
 lint:
   @echo "Running linter..."
-  cargo clippy --all-targets --all-features -- -D warnings
+  RUSTFLAGS="--cfg erase_components" cargo clippy --all-targets --all-features -- -D warnings
 
 check:
-  cargo test --workspace --all-targets && cargo clippy --all-targets
+  RUSTFLAGS="--cfg erase_components" cargo test --workspace --all-targets && cargo clippy --all-targets
 
 # Run Tests
 test-all:
   @echo "Running tests..."
-  cargo test --workspace --all-targets
+  RUSTFLAGS="--cfg erase_components" cargo test --workspace --all-targets
 
 # Build (Debug mode - for PR checks)
 build-debug:
