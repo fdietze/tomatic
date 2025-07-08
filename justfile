@@ -29,12 +29,14 @@ test-all:
 # Build (Debug mode - for PR checks)
 build-debug:
   @echo "Running debug build..."
-  trunk build --locked --skip-version-check
+  trunk build --locked --skip-version-check --public-url /
+  cp dist/index.html dist/404.html # github pages hack to serve SPA under any sub-path
 
 # Build (Release mode - for deployment)
 build-release:
   @echo "Running release build..."
-  trunk build --locked --release --minify --skip-version-check
+  trunk build --locked --release --minify --skip-version-check --public-url /
+  cp dist/index.html dist/404.html # github pages hack to serve SPA under any sub-path
   ls -lh dist
 
 # ---- Composite "CI Steps" ----
