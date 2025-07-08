@@ -213,6 +213,7 @@ pub fn ChatInterface(
     #[prop(into)] set_input: WriteSignal<String>,
     #[prop(into)] cached_models: Signal<Vec<DisplayModelInfo>>,
     #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
+    #[prop(into)] initial_chat_prompt: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
     leptos::logging::log!(
@@ -336,90 +337,95 @@ pub fn ChatInterface(
         }
     });
 
-    let submit = {
-        move || {
-            let model = llm::Model {
-                model: current_model_name(),
-                seed: None,
-                temperature: Some(1.0),
-            };
-            spawn_local(async move {
-                // If this is a new chat, generate a new ID and navigate
-                if state.current_session_id.get().is_none() {
-                    let new_id = Uuid::new_v4().to_string();
-                    state.current_session_id.set(Some(new_id.clone()));
-                    state.navigation_request.set(Some(format!("/chat/{new_id}")));
-                }
-
-                let (tx, rx) = oneshot::channel();
-                set_cancel_sender.set(Some(tx));
-                set_input_disabled.set(true);
-                set_error(None);
-                let system_prompt_content = selected_prompt()
-                    .map(|sp| sp.prompt)
-                    .unwrap_or("".to_string());
-
-                let user_message = Message {
-                    role: "user".to_string(),
-                    content: input(),
-                    prompt_name: None,
-                    system_prompt_content: None,
-                    model_name: None,
-                    cost: None,
-                };
-
-                set_input("".to_string());
-                set_messages.update(|m| m.push(user_message.clone()));
-
-                if let Some(ref_history) = ref_history.get() {
-                    log!("scrolling");
-                    ref_history.set_scroll_top(ref_history.scroll_height());
-                }
-
-                if api_key().is_empty() {
-                    set_error.set(Some(
-                        "No API key provided. Please add one in Settings.".to_string(),
-                    ));
-                } else {
-                    let mut messages_to_submit = Vec::new();
-                    if !system_prompt_content.is_empty() {
-                        messages_to_submit.push(Message {
-                            role: "system".to_string(),
-                            content: system_prompt_content,
-                            prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                            system_prompt_content: selected_prompt
-                                .get()
-                                .map(|sp| sp.prompt.clone()),
-                            model_name: Some(current_model_name()),
-                            cost: None,
-                        });
-                    }
-                    messages_to_submit.extend(messages());
-
-                    handle_llm_request(
-                        messages_to_submit,
-                        model,
-                        api_key(),
-                        set_messages,
-                        set_error,
-                        cached_models,
-                        current_model_name(),
-                        selected_prompt,
-                        rx,
-                    )
-                    .await;
-                }
-
-                set_input_disabled.set(false);
-                set_cancel_sender.set(None);
-
-                if let Some(ref_input) = ref_input.get() {
-                    println!("focus");
-                    let _ = ref_input.focus();
-                }
-            })
+    let submit = Callback::new(move |prompt_override: Option<String>| {
+        let content = prompt_override.unwrap_or_else(|| input.get());
+        if content.is_empty() {
+            return;
         }
-    };
+
+        let model = llm::Model {
+            model: current_model_name.get(),
+            seed: None,
+            temperature: Some(1.0),
+        };
+        let state = state.clone();
+        spawn_local(async move {
+            // If this is a new chat, generate a new ID and navigate
+            if state.current_session_id.get().is_none() {
+                let new_id = Uuid::new_v4().to_string();
+                state.current_session_id.set(Some(new_id.clone()));
+                state
+                    .navigation_request
+                    .set(Some(format!("/chat/{new_id}")));
+            }
+
+            let (tx, rx) = oneshot::channel();
+            set_cancel_sender.set(Some(tx));
+            set_input_disabled.set(true);
+            set_error.set(None);
+            let system_prompt_content = selected_prompt
+                .get()
+                .map(|sp| sp.prompt)
+                .unwrap_or("".to_string());
+
+            let user_message = Message {
+                role: "user".to_string(),
+                content,
+                prompt_name: None,
+                system_prompt_content: None,
+                model_name: None,
+                cost: None,
+            };
+
+            set_input.set("".to_string());
+            set_messages.update(|m| m.push(user_message.clone()));
+
+            if let Some(ref_history) = ref_history.get() {
+                log!("scrolling");
+                ref_history.set_scroll_top(ref_history.scroll_height());
+            }
+
+            if api_key.get().is_empty() {
+                set_error.set(Some(
+                    "No API key provided. Please add one in Settings.".to_string(),
+                ));
+            } else {
+                let mut messages_to_submit = Vec::new();
+                if !system_prompt_content.is_empty() {
+                    messages_to_submit.push(Message {
+                        role: "system".to_string(),
+                        content: system_prompt_content,
+                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+                        model_name: Some(current_model_name.get()),
+                        cost: None,
+                    });
+                }
+                messages_to_submit.extend(messages.get());
+
+                handle_llm_request(
+                    messages_to_submit,
+                    model,
+                    api_key.get(),
+                    set_messages,
+                    set_error,
+                    cached_models,
+                    current_model_name.get(),
+                    selected_prompt,
+                    rx,
+                )
+                .await;
+            }
+
+            set_input_disabled.set(false);
+            set_cancel_sender.set(None);
+
+            if let Some(ref_input) = ref_input.get() {
+                println!("focus");
+                let _ = ref_input.focus();
+            }
+        })
+    });
 
     let regenerate = {
         Arc::new(move |index: usize| {
@@ -488,6 +494,17 @@ pub fn ChatInterface(
                 let _ = sender.send(());
             }
         });
+    });
+
+    let submit_for_effect = submit;
+    Effect::new(move |_| {
+        if let Some(prompt) = initial_chat_prompt.get() {
+            if messages.get().is_empty() && !input_disabled.get() {
+                set_input.set(prompt.clone());
+                submit_for_effect.run(Some(prompt));
+                initial_chat_prompt.set(None);
+            }
+        }
     });
 
     view! {
@@ -575,16 +592,15 @@ fn ChatControls(
     #[prop(into)] set_input: WriteSignal<String>,
     #[prop(into)] input_disabled: Signal<bool>,
     #[prop(into)] ref_input: NodeRef<html::Textarea>,
-    #[prop(into)] submit: Arc<impl Fn() + std::marker::Send + std::marker::Sync + 'static>,
+    #[prop(into)] submit: Callback<Option<String>>,
     #[prop(into)] cancel_action: Callback<()>,
 ) -> impl IntoView {
-    let submit2 = submit.clone();
     view! {
         <chat-controls>
             <form on:submit=move |ev| {
                 ev.prevent_default();
                 if !input_disabled.get() {
-                    submit()
+                    submit.run(None);
                 }
             }>
                 <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
@@ -596,7 +612,7 @@ fn ChatControls(
                         on:keydown:target=move |ev| {
                             if ev.key() == "Enter" && !ev.shift_key() && !input_disabled.get() {
                                 ev.prevent_default();
-                                submit2();
+                                submit.run(None);
                             }
                         }
                         disabled=input_disabled
@@ -621,7 +637,7 @@ fn ChatControls(
                                     type="submit"
                                     data-role="primary"
                                     style="flex-shrink:0"
-                                    disabled=input_disabled
+                                    disabled=input.get().is_empty() || input_disabled.get()
                                 >
                                     "Go"
                                 </button>
