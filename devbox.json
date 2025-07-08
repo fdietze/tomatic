@@ -18,6 +18,7 @@
     "bacon":        "latest",
     "ollama":       "latest",
     "cargo-leptos": "latest",
+    "cargo-udeps":  "latest",
   },
   "shell": {
     "init_hook": [

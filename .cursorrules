@@ -1,3 +1,17 @@
+Always:
+
+- explain the problem in great detail using terminology and math, then explain the detailed solution architecture and implementation plan before writing any code.
+- If there are multiple ways to do things, list the options and their tradeoffs and give a recommendation.
+- If in doubt, interrupt to ask questions to clarify the user's intentions and expectations
+- if there is a problem, try to find the root cause step by step.
+- which decisions do I have to make?
+- for compile errors, where things are not found, do a web search to find a relevant example.
+
+Project specific:
+
 - automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps. To automatically fix some linter errors (clippy), run `just fix` (will internally run cargo clippy --fix).
 - add dependencies by running `cargo add`. Before adding dependencies, read `Cargo.toml` if it is already present.
 - always stay on the happy path and propagate the error on failure.
+
+Rust:
+- variables should be used directly in the `format!` string: format!("{my_variable}")

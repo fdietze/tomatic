@@ -31,6 +31,7 @@ idb = "0.6.4"
 uuid = { version = "1.17.0", features = ["v4", "js"] }
 leptos_reactive = "0.6.15"
 futures-channel = "0.3.31"
+leptos_router = "0.8.2"
 
 [profile.check-tmp]
 inherits = "dev"
