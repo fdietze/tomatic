@@ -6,7 +6,7 @@ _default:
 
 # start development environment
 dev:
-  trunk serve --port 12345 --locked --no-error-reporting --skip-version-check
+  trunk serve --port 12345 --locked --no-error-reporting --skip-version-check --public-url /
 
 # Check Formatting
 check-format:
