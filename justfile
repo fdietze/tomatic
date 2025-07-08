@@ -6,7 +6,7 @@ _default:
 
 # start development environment
 dev:
-  RUSTFLAGS="--cfg erase_components" trunk serve --port 12345 --locked --no-error-reporting --skip-version-check
+  RUSTFLAGS="--cfg erase_components" trunk serve --port 12345 --locked --no-error-reporting --skip-version-check --public-url /
 
 # Check Formatting
 check-format:
