@@ -14,7 +14,7 @@ use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::components::{Redirect, Route, Router, Routes};
-use leptos_router::hooks::{use_navigate, use_params_map};
+use leptos_router::hooks::{use_navigate, use_params_map, use_query_map};
 use leptos_router::{path, NavigateOptions};
 use leptos_use::storage::use_local_storage;
 use leptos_use::use_debounce_fn_with_arg;
@@ -42,6 +42,7 @@ pub struct GlobalState {
     // Request from child to parent
     pub session_load_request: WriteSignal<Option<String>>,
     pub navigation_request: RwSignal<Option<String>>,
+    pub initial_chat_prompt: RwSignal<Option<String>>,
 }
 
 fn main() {
@@ -84,6 +85,7 @@ fn MainContent() -> impl IntoView {
     // --- Child-to-Parent Communication ---
     let (session_load_request, set_session_load_request) = signal(None::<String>);
     let navigation_request = RwSignal::new(None::<String>);
+    let initial_chat_prompt = RwSignal::new(None::<String>);
 
     // --- Provide Context ---
     let global_state = GlobalState {
@@ -103,6 +105,7 @@ fn MainContent() -> impl IntoView {
         current_session_id: RwSignal::new(None::<String>),
         session_load_request: set_session_load_request,
         navigation_request,
+        initial_chat_prompt,
     };
     provide_context(global_state.clone());
 
@@ -331,11 +334,19 @@ fn MainContent() -> impl IntoView {
 #[component]
 fn ChatPage() -> impl IntoView {
     let params = use_params_map();
+    let query = use_query_map();
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
 
     // When the :id parameter in the URL changes, send a request to the parent App to load the session
     Effect::new(move |_| {
         let id = params.with(|p| p.get("id").map(|s| s.to_owned()).unwrap_or_default());
+        if id == "new" {
+            if let Some(prompt_from_q) = query.with(|q| q.get("q").map(|s| s.to_owned())) {
+                if !prompt_from_q.is_empty() {
+                    state.initial_chat_prompt.set(Some(prompt_from_q));
+                }
+            }
+        }
         state.session_load_request.set(Some(id));
     });
 
@@ -355,6 +366,7 @@ fn ChatPage() -> impl IntoView {
             set_input=state.set_input
             cached_models=state.cached_models
             set_cached_models=state.set_cached_models
+            initial_chat_prompt=state.initial_chat_prompt
         />
     }
 }
