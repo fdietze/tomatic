@@ -3,7 +3,7 @@ use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+
 use uuid::Uuid;
 
 use crate::combobox::{Combobox, ComboboxItem};
@@ -427,66 +427,64 @@ pub fn ChatInterface(
         })
     });
 
-    let regenerate = {
-        Arc::new(move |index: usize| {
-            let model = llm::Model {
-                model: current_model_name(),
-                seed: None,
-                temperature: Some(1.0),
-            };
-            spawn_local(async move {
-                let (tx, rx) = oneshot::channel();
-                set_cancel_sender.set(Some(tx));
-                set_input_disabled.set(true);
-                set_error(None);
+    let regenerate = Callback::new(move |index: usize| {
+        let model = llm::Model {
+            model: current_model_name(),
+            seed: None,
+            temperature: Some(1.0),
+        };
+        spawn_local(async move {
+            let (tx, rx) = oneshot::channel();
+            set_cancel_sender.set(Some(tx));
+            set_input_disabled.set(true);
+            set_error(None);
 
-                set_messages.update(|m| {
-                    m.drain(index..);
-                });
+            set_messages.update(|m| {
+                m.drain(index..);
+            });
 
-                let system_prompt_content = selected_prompt()
-                    .map(|sp| sp.prompt)
-                    .unwrap_or("".to_string());
+            let system_prompt_content = selected_prompt()
+                .map(|sp| sp.prompt)
+                .unwrap_or("".to_string());
 
-                if api_key().is_empty() {
-                    set_error.set(Some(
-                        "No API key provided. Please add one in Settings.".to_string(),
-                    ));
-                } else {
-                    let mut messages_to_submit = Vec::new();
-                    if !system_prompt_content.is_empty() {
-                        messages_to_submit.push(Message {
-                            role: "system".to_string(),
-                            content: system_prompt_content,
-                            prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                            system_prompt_content: selected_prompt
-                                .get()
-                                .map(|sp| sp.prompt.clone()),
-                            model_name: Some(current_model_name()),
-                            cost: None,
-                        });
-                    }
-                    messages_to_submit.extend(messages());
-
-                    handle_llm_request(
-                        messages_to_submit,
-                        model,
-                        api_key(),
-                        set_messages,
-                        set_error,
-                        cached_models,
-                        current_model_name(),
-                        selected_prompt,
-                        rx,
-                    )
-                    .await;
+            if api_key().is_empty() {
+                set_error.set(Some(
+                    "No API key provided. Please add one in Settings.".to_string(),
+                ));
+            } else {
+                let mut messages_to_submit = Vec::new();
+                if !system_prompt_content.is_empty() {
+                    messages_to_submit.push(Message {
+                        role: "system".to_string(),
+                        content: system_prompt_content,
+                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
+                        system_prompt_content: selected_prompt
+                            .get()
+                            .map(|sp| sp.prompt.clone()),
+                        model_name: Some(current_model_name()),
+                        cost: None,
+                    });
                 }
+                messages_to_submit.extend(messages());
 
-                set_input_disabled.set(false);
-                set_cancel_sender.set(None);
-            })
+                handle_llm_request(
+                    messages_to_submit,
+                    model,
+                    api_key(),
+                    set_messages,
+                    set_error,
+                    cached_models,
+                    current_model_name(),
+                    selected_prompt,
+                    rx,
+                )
+                .await;
+            }
+
+            set_input_disabled.set(false);
+            set_cancel_sender.set(None);
         })
-    };
+    });
 
     let cancel_action = Callback::new(move |_| {
         set_cancel_sender.update(|sender_opt| {
@@ -556,7 +554,7 @@ pub fn ChatInterface(
                                     message=message
                                     set_messages
                                     message_index
-                                    regenerate=regenerate.clone()
+                                    regenerate=regenerate
                                 />
                             }
                         })
@@ -690,13 +688,12 @@ fn ChatMessage(
     #[prop(into)] message: Message,
     #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
     #[prop(into)] message_index: usize,
-    regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
+    regenerate: Callback<usize>,
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
 
     let handle_resubmit = {
-        let regenerate = regenerate.clone();
         let message = message.clone();
         move || {
             set_messages.update(|ms| {
@@ -706,11 +703,10 @@ fn ChatMessage(
                 };
             });
             set_is_editing(false);
-            regenerate(message_index + 1);
+            regenerate.run(message_index + 1);
         }
     };
 
-    let regenerate = regenerate.clone();
     let m_clone_for_copy = message.clone();
     let text_for_copy_button = Signal::derive(move || {
         if is_editing.get() {
@@ -742,15 +738,13 @@ fn ChatMessage(
                 <chat-message-buttons>
                     <CopyButton text_to_copy=text_for_copy_button />
                     {
-                        let regenerate = regenerate.clone();
                         let message = message.clone();
                         move || {
-                            let regenerate = regenerate.clone();
                             if message.role.clone() == "assistant" {
                                 view! {
                                     <button
                                         data-size="compact"
-                                        on:click=move |_| { regenerate(message_index) }
+                                        on:click=move |_| { regenerate.run(message_index) }
                                     >
                                         "regenerate"
                                     </button>
