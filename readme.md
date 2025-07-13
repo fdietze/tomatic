@@ -13,6 +13,12 @@
 <h1>Tomatic</h1>
 Openrouter based AI Chat Interface.
 
+Goals:
+- Frontend-only (statically hosted)
+- All AI models via Openrouter 
+- UI Very close to the LLM API interface. No hidden system prompts.
+- Space efficient UI, high information density
+
 ## Getting Started
 
 1. Setup on your system:
