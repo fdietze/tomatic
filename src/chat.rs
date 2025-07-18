@@ -507,6 +507,7 @@ pub fn ChatInterface(
         }
     });
 
+    let regenerate_for_messages = regenerate.clone();
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
@@ -536,13 +537,21 @@ pub fn ChatInterface(
                 {move || {
                     selected_prompt()
                         .map(|system_prompt| {
+                            let system_message_for_render = Message {
+                                role: "system".to_string(),
+                                content: system_prompt.prompt,
+                                prompt_name: Some(system_prompt.name),
+                                system_prompt_content: None,
+                                model_name: None,
+                                cost: None,
+                            };
                             view! {
-                                <chat-message data-role="system">
-                                    <chat-message-role>"system"</chat-message-role>
-                                    <chat-message-content>
-                                        <Markdown markdown_text=system_prompt.prompt />
-                                    </chat-message-content>
-                                </chat-message>
+                                <ChatMessage
+                                    message=system_message_for_render
+                                    set_messages=set_messages
+                                    message_index=0_usize
+                                    regenerate=regenerate.clone()
+                                />
                             }
                         })
                 }}
@@ -556,7 +565,7 @@ pub fn ChatInterface(
                                     message=message
                                     set_messages
                                     message_index
-                                    regenerate=regenerate.clone()
+                                    regenerate = regenerate_for_messages.clone()
                                 />
                             }
                         })
@@ -725,18 +734,22 @@ fn ChatMessage(
         <chat-message data-role=role>
             <div style="display: flex">
                 <chat-message-role>
-                    {if message.role == "assistant" {
-                        if let Some(model) = &message.model_name {
-                            format!("assistant ({model})")
-                        } else {
-                            "assistant".to_string()
+                    {match message.role.as_str() {
+                        "assistant" => {
+                            if let Some(model) = &message.model_name {
+                                format!("assistant ({model})")
+                            } else {
+                                "assistant".to_string()
+                            }
                         }
-                    } else {
-                        message
-                            .clone()
-                            .prompt_name
-                            .map(|name| "@".to_owned() + name.as_str())
-                            .unwrap_or(message.role.clone())
+                        "system" => {
+                            if let Some(name) = &message.prompt_name {
+                                format!("system @{name}")
+                            } else {
+                                "system".to_string()
+                            }
+                        }
+                        _ => message.role.clone(),
                     }}
                 </chat-message-role>
                 <chat-message-buttons>
