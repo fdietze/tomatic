@@ -1,8 +1,10 @@
 use futures::{pin_mut, select, FutureExt, StreamExt};
+pub mod types;
+pub use types::{Message, MessageCost, SystemPrompt};
+
 use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -12,36 +14,6 @@ use crate::dom_utils;
 use crate::llm::{self, DisplayModelInfo, StreamedMessage};
 use crate::GlobalState;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct SystemPrompt {
-    pub name: String,
-    pub prompt: String,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub struct MessageCost {
-    pub prompt: f64,
-    pub completion: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Message {
-    prompt_name: Option<String>,
-    role: String,
-    content: String,
-    model_name: Option<String>,
-    system_prompt_content: Option<String>,
-    cost: Option<MessageCost>,
-}
-
-impl Message {
-    fn to_llm(&self) -> llm::Message {
-        llm::Message {
-            role: self.role.clone(),
-            content: self.content.clone(),
-        }
-    }
-}
 
 fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Option<SystemPrompt> {
     input
