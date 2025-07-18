@@ -4,6 +4,7 @@ mod copy_button;
 mod dom_utils;
 mod llm;
 mod persistence;
+pub mod markdown;
 mod settings;
 
 use crate::chat::{ChatInterface, Message, SystemPrompt, SystemPromptBar};
