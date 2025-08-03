@@ -11,39 +11,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
-      uses: actions/checkout@v4
+        uses: actions/checkout@v4
 
-    - name: Install devbox
-      uses: jetify-com/devbox-install-action@v0.13.0
-      with:
-        enable-cache: 'true'
+      - name: Install devbox
+        uses: jetify-com/devbox-install-action@v0.13.0
+        with:
+          enable-cache: 'true'
 
-    - name: Cache Cargo registry and git dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-deps-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-deps-
+      - name: Cache Cargo registry and git dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-deps-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-deps-
 
-    - name: Cache Cargo target directory
-      uses: actions/cache@v4
-      with:
-        path: target # Path relative to workspace root
-        key: ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('src/**/*.rs', 'examples/**/*.rs', 'tests/**/*.rs') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-
-          ${{ runner.os }}-cargo-target-
+      - name: Cache Cargo target directory
+        uses: actions/cache@v4
+        with:
+          path: target # Path relative to workspace root
+          key: ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('src/**/*.rs', 'examples/**/*.rs', 'tests/**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-
+            ${{ runner.os }}-cargo-target-
 
-    - name: Run CI Checks (Format, Lint, Test, Debug Build)
-      run: devbox run -- just ci-checks
+      - name: Run CI Checks (Format, Lint, Test, Debug Build)
+        run: devbox run -- just ci-checks
 
-    - name: Build Release Artifact
-      run: devbox run -- just build-release
+      - name: Build Release Artifact
+        run: devbox run -- just build-release
 
       - name: Preview Deploy
         id: preview
