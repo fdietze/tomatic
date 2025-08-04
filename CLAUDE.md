@@ -10,17 +10,9 @@ Tomatic is a frontend-only AI chat interface built with Rust/Leptos that uses Op
 - Leptosfmt for code formatting
 - Clippy for linting
 
-## Key Commands
-Use these commands via the justfile:
-
-### Development
-- `just dev` - Start development server on port 12345
-- `just` - List all available commands
-
 ### Quality Assurance
 - `just check` - Run tests and clippy checks
 - `just fix` - Auto-fix clippy issues and format code
-- `just ci-checks` - Run all CI checks (format, lint, test, build)
 
 ### Individual Commands
 - `just check-format` - Check leptosfmt formatting
@@ -31,7 +23,6 @@ Use these commands via the justfile:
 
 ## Code Style Guidelines
 - Follow Rust best practices
-- Use leptosfmt for formatting
 - Address all clippy warnings
 - Write tests for new functionality
 - Use RUSTFLAGS="--cfg erase_components" for builds
@@ -44,12 +35,14 @@ Use these commands via the justfile:
 - `favicon/` - Favicon assets
 - `docs/` - Documentation
 
-## Development Workflow
-1. Run `just dev` to start development server
-2. Make changes to source code
-3. Use `just fix` to auto-format and fix linting issues
-4. Run `just check` to verify tests and linting
-5. Use `just ci-checks` before committing to ensure all checks pass
+## Development
+- automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps. To automatically fix some linter errors (clippy), run `just fix` (will internally run cargo clippy --fix). After running `just fix`, re-read the affected files and run `just check` again to make sure all linter errors are fixed.
+- Modify Cargo.toml using cargo commands.
+- trust the compiler.
+
+
+### Rust
+- variables should be used directly in the `format!`, `println!`, `assert!` strings, for example println!("{my_variable}") instead of println!("{}", my_variable)
 
 ## Dependencies
 Key dependencies include:
