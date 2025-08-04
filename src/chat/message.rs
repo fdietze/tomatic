@@ -15,6 +15,8 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    // System messages start collapsed by default
+    let (is_collapsed, set_is_collapsed) = signal(message.role == "system");
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -93,6 +95,18 @@ pub fn ChatMessage(
                                     </button>
                                 }
                                     .into_any()
+                            } else if message.role.clone() == "system" {
+                                view! {
+                                    <button
+                                        data-size="compact"
+                                        on:click=move |_| {
+                                            set_is_collapsed(!is_collapsed());
+                                        }
+                                    >
+                                        {move || if is_collapsed() { "expand" } else { "collapse" }}
+                                    </button>
+                                }
+                                    .into_any()
                             } else {
                                 ().into_any()
                             }
@@ -137,6 +151,23 @@ pub fn ChatMessage(
                             </div>
                         }
                             .into_any()
+                    } else if message.role == "system" && is_collapsed() {
+                        // Show truncated version for collapsed system messages
+                        let content = message.content.clone();
+                        let truncated = if content.len() > 100 {
+                            format!("{}...", &content[..100])
+                        } else {
+                            content
+                        };
+                        view! { 
+                            <div 
+                                style="opacity: 0.7; cursor: pointer;" 
+                                on:click=move |_| set_is_collapsed(false)
+                                title="Click to expand system prompt"
+                            >
+                                <Markdown markdown_text=truncated />
+                            </div>
+                        }.into_any()
                     } else {
                         let content = message.content.clone();
                         view! { <Markdown markdown_text=content /> }.into_any()
