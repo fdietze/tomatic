@@ -165,3 +165,23 @@ pub fn set_html_content_with_copy_buttons(target_element: &HtmlElement, html_con
         }
     }
 }
+
+/// Detects if the user is on a mobile device based on media queries.
+/// Uses CSS media query to detect pointer type and hover capability.
+/// Returns true for mobile/touch devices, false for desktop.
+pub fn is_mobile_device() -> bool {
+    let window = window();
+    
+    // Check for coarse pointer (touch) and no hover capability
+    let media_query = "(pointer: coarse) and (hover: none)";
+    
+    match window.match_media(media_query) {
+        Ok(Some(media_query_list)) => media_query_list.matches(),
+        _ => {
+            // Fallback: check if touch events are supported
+            // This is less reliable but better than nothing
+            let has_touch = js_sys::Reflect::has(&window, &"ontouchstart".into()).unwrap_or(false);
+            has_touch
+        }
+    }
+}

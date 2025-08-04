@@ -1,5 +1,7 @@
 use leptos::{html, prelude::*};
 
+use crate::dom_utils::is_mobile_device;
+
 #[component]
 pub fn ChatControls(
     #[prop(into)] input: Signal<String>,
@@ -23,10 +25,14 @@ pub fn ChatControls(
                         on:input:target=move |ev| set_input(ev.target().value())
                         placeholder="Message"
                         node_ref=ref_input
+                        enterkeyhint="send"
                         on:keydown:target=move |ev| {
                             if ev.key() == "Enter" && !ev.shift_key() && !input_disabled.get() {
-                                ev.prevent_default();
-                                submit.run(None);
+                                // On mobile devices, Enter should add newlines, not submit
+                                if !is_mobile_device() {
+                                    ev.prevent_default();
+                                    submit.run(None);
+                                }
                             }
                         }
                         disabled=input_disabled
