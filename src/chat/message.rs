@@ -15,6 +15,8 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    let is_system = message.role == "system";
+    let (is_collapsed, set_is_collapsed) = signal(is_system);
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -93,6 +95,18 @@ pub fn ChatMessage(
                                     </button>
                                 }
                                     .into_any()
+                            } else if message.role.clone() == "system" {
+                                view! {
+                                    <button
+                                        data-size="compact"
+                                        on:click=move |_| {
+                                            set_is_collapsed(!is_collapsed());
+                                        }
+                                    >
+                                        {move || if is_collapsed() { "expand" } else { "collapse" }}
+                                    </button>
+                                }
+                                    .into_any()
                             } else {
                                 ().into_any()
                             }
@@ -100,7 +114,11 @@ pub fn ChatMessage(
                     }
                 </chat-message-buttons>
             </div>
-            <chat-message-content>
+            <chat-message-content style={move || if is_system && is_collapsed() { "opacity: 0.6; cursor: pointer;" } else { "" }} on:click=move |_| {
+                if is_system && is_collapsed() {
+                    set_is_collapsed(false);
+                }
+            }>
                 {move || {
                     if is_editing() {
                         let handle_resubmit_for_textarea = handle_resubmit.clone();
@@ -137,6 +155,14 @@ pub fn ChatMessage(
                             </div>
                         }
                             .into_any()
+                    } else if is_system && is_collapsed() {
+                        let truncated: String = message.content.chars().take(100).collect();
+                        let display_content = if message.content.chars().count() > 100 {
+                            format!("{truncated}...")
+                        } else {
+                            truncated
+                        };
+                        view! { <Markdown markdown_text=display_content /> }.into_any()
                     } else {
                         let content = message.content.clone();
                         view! { <Markdown markdown_text=content /> }.into_any()
