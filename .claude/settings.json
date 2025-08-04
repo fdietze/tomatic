@@ -1,0 +1,7 @@
+{
+  "allowedTools": [
+    "Bash:just check",
+    "Bash:just fix"
+  ],
+  "description": "Claude Code settings for Tomatic project. Allows running 'just check' for quality assurance and 'just fix' for auto-formatting and linting fixes."
+}
