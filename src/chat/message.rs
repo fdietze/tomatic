@@ -15,6 +15,7 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    let (is_collapsed, set_is_collapsed) = signal(message.role == "system");
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -93,6 +94,18 @@ pub fn ChatMessage(
                                     </button>
                                 }
                                     .into_any()
+                            } else if message.role.clone() == "system" {
+                                view! {
+                                    <button
+                                        data-size="compact"
+                                        on:click=move |_| {
+                                            set_is_collapsed(!is_collapsed());
+                                        }
+                                    >
+                                        {move || if is_collapsed() { "expand" } else { "collapse" }}
+                                    </button>
+                                }
+                                    .into_any()
                             } else {
                                 ().into_any()
                             }
@@ -139,7 +152,27 @@ pub fn ChatMessage(
                             .into_any()
                     } else {
                         let content = message.content.clone();
-                        view! { <Markdown markdown_text=content /> }.into_any()
+                        let role = message.role.clone();
+                        
+                        if role == "system" && is_collapsed() {
+                            let truncated: String = content.chars().take(100).collect();
+                            let display_content = if content.chars().count() > 100 {
+                                format!("{truncated}...")
+                            } else {
+                                truncated
+                            };
+                            
+                            view! {
+                                <div
+                                    style="opacity: 0.7; cursor: pointer;"
+                                    on:click=move |_| { set_is_collapsed(false); }
+                                >
+                                    <Markdown markdown_text=display_content />
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <Markdown markdown_text=content /> }.into_any()
+                        }
                     }
                 }}
             </chat-message-content>
