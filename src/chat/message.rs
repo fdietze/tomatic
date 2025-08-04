@@ -15,6 +15,7 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    let (is_collapsed, set_is_collapsed) = signal(message.role == "system");
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -93,6 +94,18 @@ pub fn ChatMessage(
                                     </button>
                                 }
                                     .into_any()
+                            } else if message.role.clone() == "system" {
+                                view! {
+                                    <button
+                                        data-size="compact"
+                                        on:click=move |_| {
+                                            set_is_collapsed(!is_collapsed());
+                                        }
+                                    >
+                                        {move || if is_collapsed() { "expand" } else { "collapse" }}
+                                    </button>
+                                }
+                                    .into_any()
                             } else {
                                 ().into_any()
                             }
@@ -100,7 +113,16 @@ pub fn ChatMessage(
                     }
                 </chat-message-buttons>
             </div>
-            <chat-message-content>
+            <chat-message-content
+                style=move || if message.role == "system" && is_collapsed() {
+                    "opacity: 0.7; cursor: pointer;"
+                } else {
+                    ""
+                }
+                on:click=move |_| if message.role == "system" && is_collapsed() {
+                    set_is_collapsed(false);
+                }
+            >
                 {move || {
                     if is_editing() {
                         let handle_resubmit_for_textarea = handle_resubmit.clone();
@@ -137,6 +159,12 @@ pub fn ChatMessage(
                             </div>
                         }
                             .into_any()
+                    } else if message.role == "system" && is_collapsed() {
+                        let truncated = format!(
+                            "{}...",
+                            message.content.chars().take(100).collect::<String>()
+                        );
+                        view! { <Markdown markdown_text=truncated /> }.into_any()
                     } else {
                         let content = message.content.clone();
                         view! { <Markdown markdown_text=content /> }.into_any()
