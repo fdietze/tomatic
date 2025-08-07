@@ -46,3 +46,5 @@ jobs:
           #   bun.sh
           #   registry.npmjs.org
           #   .blob.core.windows.net
+        env:
+          ALLOWED_TOOLS: "Edit,View,Replace,Write,Create,BatchTool,GlobTool,GrepTool,NotebookEditCell,Bash,mcp__*"
