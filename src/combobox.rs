@@ -1,9 +1,9 @@
 use leptos::html::{Div, Input, Ul};
-use web_sys::HtmlElement;
 use leptos::prelude::*;
 use leptos_use::on_click_outside;
-use web_sys::KeyboardEvent;
 use wasm_bindgen::JsCast;
+use web_sys::HtmlElement;
+use web_sys::KeyboardEvent;
 
 const MIN_QUERY_LENGTH: usize = 1;
 
@@ -66,14 +66,15 @@ pub fn Combobox(
             return vec![];
         }
 
-        items.get()
+        items
+            .get()
             .into_iter()
             .filter(|item| {
                 let item_id_lower = item.id.to_lowercase();
                 let item_display_lower = item.display_text.to_lowercase();
-                search_terms.iter().all(|term| {
-                    item_id_lower.contains(term) || item_display_lower.contains(term)
-                })
+                search_terms
+                    .iter()
+                    .all(|term| item_id_lower.contains(term) || item_display_lower.contains(term))
             })
             .collect::<Vec<ComboboxItem>>()
     });
@@ -89,7 +90,10 @@ pub fn Combobox(
     };
 
     let scroll_highlighted_item_into_view = move || {
-        if let (Some(list_el), Some(idx)) = (suggestions_list_ref.get(), highlighted_index.get_untracked()) {
+        if let (Some(list_el), Some(idx)) = (
+            suggestions_list_ref.get(),
+            highlighted_index.get_untracked(),
+        ) {
             if let Some(item_node) = list_el.children().item(idx as u32) {
                 if let Ok(item_el) = item_node.dyn_into::<HtmlElement>() {
                     let list_scroll_top = list_el.scroll_top();
@@ -98,12 +102,15 @@ pub fn Combobox(
                     let item_offset_height = item_el.offset_height();
 
                     let item_is_above_visible_area = item_offset_top < list_scroll_top;
-                    let item_is_below_visible_area = item_offset_top + item_offset_height > list_scroll_top + list_client_height;
+                    let item_is_below_visible_area =
+                        item_offset_top + item_offset_height > list_scroll_top + list_client_height;
 
                     if item_is_above_visible_area {
                         list_el.set_scroll_top(item_offset_top);
                     } else if item_is_below_visible_area {
-                        list_el.set_scroll_top(item_offset_top + item_offset_height - list_client_height);
+                        list_el.set_scroll_top(
+                            item_offset_top + item_offset_height - list_client_height,
+                        );
                     }
                 }
             }
@@ -122,7 +129,9 @@ pub fn Combobox(
     };
 
     let handle_focus = move |_ev: web_sys::FocusEvent| {
-        if search_query.get().len() >= MIN_QUERY_LENGTH && !filtered_items.get_untracked().is_empty() {
+        if search_query.get().len() >= MIN_QUERY_LENGTH
+            && !filtered_items.get_untracked().is_empty()
+        {
             show_suggestions.set(true);
         }
     };
@@ -132,9 +141,12 @@ pub fn Combobox(
     // If specific on_blur logic for input is needed, it must be handled carefully.
 
     let handle_keydown = move |ev: KeyboardEvent| {
-        if !show_suggestions.get() && ev.key() != "Enter" { // Allow Enter to try selecting even if not shown
+        if !show_suggestions.get() && ev.key() != "Enter" {
+            // Allow Enter to try selecting even if not shown
             if ev.key() == "ArrowDown" || ev.key() == "ArrowUp" {
-                if search_query.get().len() >= MIN_QUERY_LENGTH && !filtered_items.get_untracked().is_empty() {
+                if search_query.get().len() >= MIN_QUERY_LENGTH
+                    && !filtered_items.get_untracked().is_empty()
+                {
                     show_suggestions.set(true); // Open suggestions if user tries to navigate
                 } else {
                     return;
@@ -144,29 +156,28 @@ pub fn Combobox(
             }
         }
 
-
         match ev.key().as_str() {
             "ArrowDown" => {
                 ev.prevent_default();
                 let num_items = filtered_items.get().len();
-                if num_items == 0 { return; }
-                highlighted_index.update(|h_idx| {
-                    match *h_idx {
-                        Some(i) => *h_idx = Some((i + 1) % num_items),
-                        None => *h_idx = Some(0),
-                    }
+                if num_items == 0 {
+                    return;
+                }
+                highlighted_index.update(|h_idx| match *h_idx {
+                    Some(i) => *h_idx = Some((i + 1) % num_items),
+                    None => *h_idx = Some(0),
                 });
                 scroll_highlighted_item_into_view();
             }
             "ArrowUp" => {
                 ev.prevent_default();
                 let num_items = filtered_items.get().len();
-                if num_items == 0 { return; }
-                highlighted_index.update(|h_idx| {
-                    match *h_idx {
-                        Some(i) => *h_idx = Some((i + num_items - 1) % num_items),
-                        None => *h_idx = Some(num_items - 1),
-                    }
+                if num_items == 0 {
+                    return;
+                }
+                highlighted_index.update(|h_idx| match *h_idx {
+                    Some(i) => *h_idx = Some((i + num_items - 1) % num_items),
+                    None => *h_idx = Some(num_items - 1),
                 });
                 scroll_highlighted_item_into_view();
             }
@@ -183,14 +194,18 @@ pub fn Combobox(
                 }
 
                 if current_filtered.len() == 1 {
-                     handle_select_item(current_filtered[0].clone());
-                     return;
+                    handle_select_item(current_filtered[0].clone());
+                    return;
                 }
-                
+
                 // Fallback: if current input text exactly matches an item ID, select it
                 let current_query = search_query.get_untracked();
                 if !current_query.is_empty() {
-                    if let Some(item_to_select) = items.get_untracked().into_iter().find(|item| item.id == current_query) {
+                    if let Some(item_to_select) = items
+                        .get_untracked()
+                        .into_iter()
+                        .find(|item| item.id == current_query)
+                    {
                         handle_select_item(item_to_select);
                         return;
                     }

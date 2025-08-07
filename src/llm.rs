@@ -23,8 +23,8 @@ impl Message {
         OpenRouterMessage {
             role: self.role.clone(),
             content: self.content.clone(),
-            name: None,        // OpenRouter's Message has a name field, default to None
-            tool_calls: None,  // Not used in basic chat
+            name: None,       // OpenRouter's Message has a name field, default to None
+            tool_calls: None, // Not used in basic chat
             tool_call_id: None,
         }
     }
@@ -32,8 +32,8 @@ impl Message {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Model {
-    pub model: String,        // e.g., "openai/gpt-4o"
-    pub seed: Option<i64>,    // OpenRouter might not directly support seed for all models in the same way
+    pub model: String,     // e.g., "openai/gpt-4o"
+    pub seed: Option<i64>, // OpenRouter might not directly support seed for all models in the same way
     pub temperature: Option<f64>,
 }
 
@@ -77,9 +77,9 @@ pub async fn request_message_content_streamed(
         // They might be configurable via the model string (e.g., "model_name@temperature=0.7")
         // or through other mechanisms depending on the crate's API for advanced features.
         // For now, we rely on OpenRouter's defaults for these if not specified in the model string.
-        };
+    };
 
-        let chat_api = client.chat()?;
+    let chat_api = client.chat()?;
     let mut stream = chat_api.chat_completion_stream(request);
 
     let output_stream = async_stream::stream! {
@@ -141,12 +141,15 @@ pub async fn list_available_models(api_key: String) -> anyhow::Result<Vec<Displa
     let model_infos: Vec<DisplayModelInfo> = open_router_model_list
         .data
         .into_iter()
-        .map(|m: openrouter_api::types::models::ModelInfo| DisplayModelInfo { // Use the correct ModelInfo from the library
-            id: m.id,
-            name: m.name, // m.name is String, not Option<String>
-            prompt_cost_usd_pm: parse_price_to_per_million(&m.pricing.prompt),
-            completion_cost_usd_pm: parse_price_to_per_million(&m.pricing.completion),
-        })
+        .map(
+            |m: openrouter_api::types::models::ModelInfo| DisplayModelInfo {
+                // Use the correct ModelInfo from the library
+                id: m.id,
+                name: m.name, // m.name is String, not Option<String>
+                prompt_cost_usd_pm: parse_price_to_per_million(&m.pricing.prompt),
+                completion_cost_usd_pm: parse_price_to_per_million(&m.pricing.completion),
+            },
+        )
         .collect();
 
     Ok(model_infos)
