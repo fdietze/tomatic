@@ -262,6 +262,24 @@ chat-message-content {
         top: 4px;
         right: 4px;
     }
+
+    .system-message-content {
+        transition: all 0.2s ease;
+    }
+
+    .system-message-collapsed {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.4;
+        max-height: calc(3 * 1.4em);
+    }
+
+    .system-message-collapsed:hover {
+        opacity: 0.8;
+    }
 }
 
 chat-history {

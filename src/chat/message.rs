@@ -15,6 +15,7 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    let (is_system_collapsed, set_is_system_collapsed) = signal(message.role == "system");
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -137,6 +138,19 @@ pub fn ChatMessage(
                             </div>
                         }
                             .into_any()
+                    } else if message.role == "system" {
+                        let content = message.content.clone();
+                        let content_for_click = content.clone();
+                        view! {
+                            <div
+                                class=("system-message-content", true)
+                                class=("system-message-collapsed", is_system_collapsed)
+                                on:click=move |_| set_is_system_collapsed(!is_system_collapsed())
+                                style="cursor: pointer;"
+                            >
+                                <Markdown markdown_text=content_for_click />
+                            </div>
+                        }.into_any()
                     } else {
                         let content = message.content.clone();
                         view! { <Markdown markdown_text=content /> }.into_any()
