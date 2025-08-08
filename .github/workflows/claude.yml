@@ -52,7 +52,7 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('src/**/*.rs', 'examples/**/*.rs', 'tests/**/*.rs') }}
           restore-keys: |
             ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-
-          ${{ runner.os }}-cargo-target-
+            ${{ runner.os }}-cargo-target-
 
       - name: Run Claude PR Action
         uses: anthropics/claude-code-action@v0.0.33
