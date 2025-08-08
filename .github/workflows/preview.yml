@@ -1,8 +1,17 @@
 name: Vercel Preview Deployment
+permissions:
+  contents: read
+  pull-requests: write  # Required for PR commenting
+
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 on:
+  pull_request:
+    branches-ignore:
+      - main
+  # Optional: still run on push to branch without PR
   push:
     branches-ignore:
       - main
