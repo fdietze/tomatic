@@ -150,7 +150,8 @@ pub fn ChatMessage(
                             >
                                 <Markdown markdown_text=content_for_click />
                             </div>
-                        }.into_any()
+                        }
+                            .into_any()
                     } else {
                         let content = message.content.clone();
                         view! { <Markdown markdown_text=content /> }.into_any()
