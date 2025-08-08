@@ -265,13 +265,14 @@ chat-message-content {
 
     .system-message-content {
         transition: all 0.2s ease;
+        max-height: 100vh; /* A large value to accommodate any content */
+        overflow: hidden;
     }
 
     .system-message-collapsed {
         display: -webkit-box;
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
-        overflow: hidden;
         text-overflow: ellipsis;
         line-height: 1.4;
         max-height: calc(3 * 1.4em);
