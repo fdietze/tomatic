@@ -40,7 +40,9 @@ pub async fn handle_llm_request(
             let mut buffer = String::new();
             let mut last_update_time: Option<f64> = None;
             const THROTTLE_MS: f64 = 200.0;
-            let performance = window().performance().expect("performance should be available");
+            let performance = window()
+                .performance()
+                .expect("performance should be available");
 
             loop {
                 select! {

@@ -3,8 +3,8 @@ mod combobox;
 mod copy_button;
 mod dom_utils;
 mod llm;
-mod persistence;
 pub mod markdown;
+mod persistence;
 mod settings;
 
 use crate::chat::{ChatInterface, Message, SystemPrompt, SystemPromptBar};
@@ -150,7 +150,9 @@ fn MainContent() -> impl IntoView {
                 spawn_local(async move {
                     match persistence::load_session(&id_to_load).await {
                         Ok(Some(session)) => {
-                            global_state.current_session_id.set(Some(session.session_id));
+                            global_state
+                                .current_session_id
+                                .set(Some(session.session_id));
                             messages.set(session.messages);
                             selected_prompt_name.set(None);
                             error.set(None);
@@ -171,9 +173,9 @@ fn MainContent() -> impl IntoView {
     Effect::new(move |_| {
         let current_id = global_state.current_session_id.get();
         let sorted_ids = sorted_session_ids.get();
-        let new_index = current_id.as_ref().and_then(|id_str| {
-            sorted_ids.iter().position(|k| k == id_str)
-        });
+        let new_index = current_id
+            .as_ref()
+            .and_then(|id_str| sorted_ids.iter().position(|k| k == id_str));
         current_session_index.set(new_index);
     });
 
@@ -213,10 +215,7 @@ fn MainContent() -> impl IntoView {
                     created_at_ms: created_at,
                     updated_at_ms: Date::now(),
                 };
-                if persistence::save_session(&session_to_save_db)
-                    .await
-                    .is_ok()
-                {
+                if persistence::save_session(&session_to_save_db).await.is_ok() {
                     load_session_list.get_value()();
                 }
             });
@@ -282,7 +281,6 @@ fn MainContent() -> impl IntoView {
             navigate("/chat/new", Default::default());
         }
     };
-
 
     let on_chat = {
         let navigate = navigate.clone();
@@ -392,4 +390,3 @@ fn ChatPage() -> impl IntoView {
         />
     }
 }
-

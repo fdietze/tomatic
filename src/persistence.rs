@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
-use crate::chat::Message; // Assuming Message struct is in chat.rs
+use crate::chat::Message;
+use serde::{Deserialize, Serialize}; // Assuming Message struct is in chat.rs
 
 // --- IndexedDB Constants ---
 pub const DB_NAME: &str = "tomatic_chat_db";
@@ -20,7 +20,10 @@ pub struct ChatSession {
 }
 
 use anyhow::{anyhow, Result};
-use idb::{Database, event::VersionChangeEvent, Error as IdbError, Factory, IndexParams, KeyPath, ObjectStoreParams, TransactionMode, DatabaseEvent, Event, Request, CursorDirection};
+use idb::{
+    event::VersionChangeEvent, CursorDirection, Database, DatabaseEvent, Error as IdbError, Event,
+    Factory, IndexParams, KeyPath, ObjectStoreParams, Request, TransactionMode,
+};
 use wasm_bindgen::JsValue;
 
 // --- Database Interaction Functions ---
@@ -98,7 +101,9 @@ pub async fn get_db() -> Result<Database, IdbError> {
 
 /// Saves (adds or updates) a chat session in IndexedDB.
 pub async fn save_session(session: &ChatSession) -> Result<()> {
-    let db = get_db().await.map_err(|e| anyhow!("[DB] Save: DB open error: {}", e.to_string()))?;
+    let db = get_db()
+        .await
+        .map_err(|e| anyhow!("[DB] Save: DB open error: {}", e.to_string()))?;
     let tx = db
         .transaction(&[SESSIONS_STORE_NAME], TransactionMode::ReadWrite)
         .map_err(|e| anyhow!("[DB] Save: Failed to start transaction: {}", e.to_string()))?;
@@ -115,20 +120,35 @@ pub async fn save_session(session: &ChatSession) -> Result<()> {
         .put(&js_value, None)
         .map_err(|e| anyhow!("[DB] Save: Failed to put session (sync): {}", e.to_string()))?
         .await // Wait for the put operation itself to complete
-        .map_err(|e| anyhow!("[DB] Save: Failed to put session (async): {}", e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Save: Failed to put session (async): {}",
+                e.to_string()
+            )
+        })?;
 
     tx.commit() // Commit the transaction
-        .map_err(|e| anyhow!("[DB] Save: Failed to initiate commit (sync): {}", e.to_string()))?
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Save: Failed to initiate commit (sync): {}",
+                e.to_string()
+            )
+        })?
         .await // Wait for commit to complete
         .map_err(|e| anyhow!("[DB] Save: Transaction commit error: {}", e.to_string()))?;
 
-    leptos::logging::log!("[DEBUG] [DB] Session saved successfully: {}", session.session_id);
+    leptos::logging::log!(
+        "[DEBUG] [DB] Session saved successfully: {}",
+        session.session_id
+    );
     Ok(())
 }
 
 /// Loads a chat session from IndexedDB by its ID.
 pub async fn load_session(session_id: &str) -> Result<Option<ChatSession>> {
-    let db = get_db().await.map_err(|e| anyhow!("[DB] Load: DB open error: {}", e.to_string()))?;
+    let db = get_db()
+        .await
+        .map_err(|e| anyhow!("[DB] Load: DB open error: {}", e.to_string()))?;
     let tx = db
         .transaction(&[SESSIONS_STORE_NAME], TransactionMode::ReadOnly)
         .map_err(|e| anyhow!("[DB] Load: Failed to start transaction: {}", e.to_string()))?;
@@ -139,15 +159,30 @@ pub async fn load_session(session_id: &str) -> Result<Option<ChatSession>> {
     let key_js_value = JsValue::from_str(session_id);
     let js_value_opt: Option<JsValue> = store
         .get(idb::Query::from(key_js_value)) // Query::from takes ownership, or use Query::key()
-        .map_err(|e| anyhow!("[DB] Load: Failed to initiate get op for id '{}' (sync): {}", session_id, e.to_string()))?
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Load: Failed to initiate get op for id '{}' (sync): {}",
+                session_id,
+                e.to_string()
+            )
+        })?
         .await
-        .map_err(|e| anyhow!("[DB] Load: Failed to get JsValue for id '{}' (async): {}", session_id, e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Load: Failed to get JsValue for id '{}' (async): {}",
+                session_id,
+                e.to_string()
+            )
+        })?;
 
     let session_opt: Option<ChatSession> = match js_value_opt {
-        Some(js_value) => {
-            Some(serde_wasm_bindgen::from_value(js_value)
-                .map_err(|e| anyhow!("[DB] Load: Failed to deserialize session id '{}': {}", session_id, e.to_string()))?)
-        }
+        Some(js_value) => Some(serde_wasm_bindgen::from_value(js_value).map_err(|e| {
+            anyhow!(
+                "[DB] Load: Failed to deserialize session id '{}': {}",
+                session_id,
+                e.to_string()
+            )
+        })?),
         None => None,
     };
 
@@ -164,22 +199,42 @@ pub async fn load_session(session_id: &str) -> Result<Option<ChatSession>> {
 
 /// Loads all session keys (IDs) from IndexedDB, sorted by `updated_at_ms` in descending order (newest first).
 pub async fn get_all_session_keys_sorted_by_update() -> Result<Vec<String>> {
-    let db = get_db().await.map_err(|e| anyhow!("[DB] ListKeys: DB open error: {}", e.to_string()))?;
+    let db = get_db()
+        .await
+        .map_err(|e| anyhow!("[DB] ListKeys: DB open error: {}", e.to_string()))?;
     let tx = db
         .transaction(&[SESSIONS_STORE_NAME], TransactionMode::ReadOnly)
-        .map_err(|e| anyhow!("[DB] ListKeys: Failed to start transaction: {}", e.to_string()))?;
-    let store = tx
-        .object_store(SESSIONS_STORE_NAME)
-        .map_err(|e| anyhow!("[DB] ListKeys: Failed to get object store: {}", e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] ListKeys: Failed to start transaction: {}",
+                e.to_string()
+            )
+        })?;
+    let store = tx.object_store(SESSIONS_STORE_NAME).map_err(|e| {
+        anyhow!(
+            "[DB] ListKeys: Failed to get object store: {}",
+            e.to_string()
+        )
+    })?;
     let index = store
         .index(UPDATED_AT_INDEX)
         .map_err(|e| anyhow!("[DB] ListKeys: Failed to get index: {}", e.to_string()))?;
 
     let mut cursor = index
         .open_cursor(None, Some(CursorDirection::Prev))
-        .map_err(|e| anyhow!("[DB] ListKeys: Failed to open cursor (sync): {}", e.to_string()))?
+        .map_err(|e| {
+            anyhow!(
+                "[DB] ListKeys: Failed to open cursor (sync): {}",
+                e.to_string()
+            )
+        })?
         .await
-        .map_err(|e| anyhow!("[DB] ListKeys: Failed to open cursor (async): {}", e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] ListKeys: Failed to open cursor (async): {}",
+                e.to_string()
+            )
+        })?;
 
     let mut keys = Vec::new();
     while let Some(c) = cursor {
@@ -191,29 +246,56 @@ pub async fn get_all_session_keys_sorted_by_update() -> Result<Vec<String>> {
                     leptos::logging::log!("[WARN] [DB] ListKeys: Cursor found a record with a non-string or null primary key.");
                 }
             }
-            Err(e) => leptos::logging::log!("[WARN] [DB] ListKeys: Error getting primary key from cursor: {:?}", e),
+            Err(e) => leptos::logging::log!(
+                "[WARN] [DB] ListKeys: Error getting primary key from cursor: {:?}",
+                e
+            ),
         }
-        cursor = c.next(None)
-            .map_err(|e| anyhow!("[DB] ListKeys: Failed to initiate next (sync): {}", e.to_string()))?
+        cursor = c
+            .next(None)
+            .map_err(|e| {
+                anyhow!(
+                    "[DB] ListKeys: Failed to initiate next (sync): {}",
+                    e.to_string()
+                )
+            })?
             .await
-            .map_err(|e| anyhow!("[DB] ListKeys: Error advancing cursor (async): {}", e.to_string()))?;
+            .map_err(|e| {
+                anyhow!(
+                    "[DB] ListKeys: Error advancing cursor (async): {}",
+                    e.to_string()
+                )
+            })?;
     }
 
-    tx.await
-        .map_err(|e| anyhow!("[DB] ListKeys: Transaction completion error: {}", e.to_string()))?;
+    tx.await.map_err(|e| {
+        anyhow!(
+            "[DB] ListKeys: Transaction completion error: {}",
+            e.to_string()
+        )
+    })?;
 
-    leptos::logging::log!("[DEBUG] [DB] Fetched {} session keys sorted by update time.", keys.len());
+    leptos::logging::log!(
+        "[DEBUG] [DB] Fetched {} session keys sorted by update time.",
+        keys.len()
+    );
     Ok(keys)
 }
-
 
 /// Deletes a chat session from IndexedDB by its ID. (For future use)
 #[allow(dead_code)]
 pub async fn delete_session(session_id: &str) -> Result<()> {
-    let db = get_db().await.map_err(|e| anyhow!("[DB] Delete: DB open error: {}", e.to_string()))?;
+    let db = get_db()
+        .await
+        .map_err(|e| anyhow!("[DB] Delete: DB open error: {}", e.to_string()))?;
     let tx = db
         .transaction(&[SESSIONS_STORE_NAME], TransactionMode::ReadWrite)
-        .map_err(|e| anyhow!("[DB] Delete: Failed to start transaction: {}", e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Delete: Failed to start transaction: {}",
+                e.to_string()
+            )
+        })?;
     let store = tx
         .object_store(SESSIONS_STORE_NAME)
         .map_err(|e| anyhow!("[DB] Delete: Failed to get object store: {}", e.to_string()))?;
@@ -221,15 +303,32 @@ pub async fn delete_session(session_id: &str) -> Result<()> {
     let key_js_value = JsValue::from_str(session_id);
     store
         .delete(idb::Query::from(key_js_value))
-        .map_err(|e| anyhow!("[DB] Delete: Failed to initiate delete for id '{}' (sync): {}", session_id, e.to_string()))?
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Delete: Failed to initiate delete for id '{}' (sync): {}",
+                session_id,
+                e.to_string()
+            )
+        })?
         .await
-        .map_err(|e| anyhow!("[DB] Delete: Failed to complete delete for id '{}' (async): {}", session_id, e.to_string()))?;
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Delete: Failed to complete delete for id '{}' (async): {}",
+                session_id,
+                e.to_string()
+            )
+        })?;
 
     tx.commit()
-        .map_err(|e| anyhow!("[DB] Delete: Failed to initiate commit (sync): {}", e.to_string()))?
+        .map_err(|e| {
+            anyhow!(
+                "[DB] Delete: Failed to initiate commit (sync): {}",
+                e.to_string()
+            )
+        })?
         .await
         .map_err(|e| anyhow!("[DB] Delete: Transaction commit error: {}", e.to_string()))?;
-    
+
     leptos::logging::log!("[DEBUG] [DB] Session deleted successfully: {}", session_id);
     Ok(())
 }

@@ -1,23 +1,22 @@
 pub mod request;
 pub use request::handle_llm_request;
-pub mod types;
 pub mod message;
+pub mod types;
 pub use message::ChatMessage;
 pub mod controls;
 pub use controls::ChatControls;
 pub mod system_prompt_bar;
-pub use system_prompt_bar::SystemPromptBar;
-pub use types::{Message, SystemPrompt};
 use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
 use std::sync::Arc;
+pub use system_prompt_bar::SystemPromptBar;
+pub use types::{Message, SystemPrompt};
 use uuid::Uuid;
 
 use crate::combobox::{Combobox, ComboboxItem};
 use crate::llm::{self, DisplayModelInfo};
 use crate::GlobalState;
-
 
 fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Option<SystemPrompt> {
     input
@@ -32,7 +31,6 @@ fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Opt
         })
         .next()
 }
-
 
 #[component]
 pub fn ChatInterface(
@@ -63,8 +61,7 @@ pub fn ChatInterface(
     let (input_disabled, set_input_disabled) = signal(false);
     let (models_loading, set_models_loading) = signal(false);
     let (models_error, set_models_error) = signal::<Option<String>>(None);
-    let (_cancel_sender, set_cancel_sender) =
-        signal::<Option<oneshot::Sender<()>>>(None);
+    let (_cancel_sender, set_cancel_sender) = signal::<Option<oneshot::Sender<()>>>(None);
 
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
@@ -431,5 +428,3 @@ pub fn ChatInterface(
         </chat-interface>
     }
 }
-
-

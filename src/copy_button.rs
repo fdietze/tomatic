@@ -30,7 +30,8 @@ pub fn CopyButton(#[prop(into)] text_to_copy: Signal<String>) -> impl IntoView {
         // The clipboard API may not be available in all contexts (e.g. non-secure http).
         // `window().navigator().clipboard()` returns a `Clipboard` object which can be `undefined`.
         // We wrap it in an `Option` and filter it to handle this case gracefully.
-        if let Some(clipboard) = Some(window().navigator().clipboard()).filter(|c| !c.is_undefined())
+        if let Some(clipboard) =
+            Some(window().navigator().clipboard()).filter(|c| !c.is_undefined())
         {
             let promise = clipboard.write_text(&current_text_to_copy);
 
