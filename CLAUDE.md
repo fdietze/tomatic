@@ -36,6 +36,7 @@ Tomatic is a frontend-only AI chat interface built with Rust/Leptos that uses Op
 ## Development
 
 - automatically run `devbox run -- just check` to check (for compiling, linting and running tests) in-between and after implementation steps. To automatically fix some linter errors (clippy), run `devbox run -- just fix` (will internally run cargo clippy --fix). After running `devbox run -- just fix`, re-read the affected files and run `devbox run -- just check` again to make sure all linter errors are fixed.
+- before commiting, the code must be formatted. run `devbox run -- just fix` to format.
 - Modify Cargo.toml using cargo commands.
 - trust the compiler.
 
@@ -59,4 +60,3 @@ Key dependencies include:
 - All AI functionality via OpenRouter
 - Focus on space-efficient, high-density UI
 - Transparent interaction with LLM APIs
-
