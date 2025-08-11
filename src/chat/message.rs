@@ -59,8 +59,11 @@ pub fn ChatMessage(
                 <chat-message-role>
                     {if is_system {
                         view! {
-                            <span class="collapse-icon">{move || if is_collapsed.get() { "▶" } else { "▼" }}</span>
-                        }.into_any()
+                            <span class="collapse-icon">
+                                {move || if is_collapsed.get() { "▶" } else { "▼" }}
+                            </span>
+                        }
+                            .into_any()
                     } else {
                         ().into_any()
                     }}
