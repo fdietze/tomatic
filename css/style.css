@@ -453,18 +453,17 @@ error-box {
 
 .collapse-icon {
     margin-right: 0.5em;
+}
+
+chat-message-role.expandable {
     cursor: pointer;
 }
 
-chat-message[data-role="system"] {
-    cursor: pointer;
-}
-
-chat-message[data-role="system"].collapsed chat-message-content {
+chat-message.collapsed chat-message-content {
     display: none;
 }
 
-chat-message[data-role="system"].collapsed chat-message-role {
+chat-message.collapsed chat-message-role {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

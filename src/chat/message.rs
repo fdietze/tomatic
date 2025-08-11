@@ -49,14 +49,16 @@ pub fn ChatMessage(
         <chat-message
             data-role=role
             class:collapsed=move || is_system && is_collapsed.get()
-            on:click=move |_| {
-                if is_system {
-                    set_is_collapsed.update(|v| *v = !*v)
-                }
-            }
         >
             <div style="display: flex">
-                <chat-message-role>
+                <chat-message-role
+                    class:expandable=is_system
+                    on:click=move |_| {
+                        if is_system {
+                            set_is_collapsed.update(|v| *v = !*v)
+                        }
+                    }
+                >
                     {if is_system {
                         view! {
                             <span class="collapse-icon">
