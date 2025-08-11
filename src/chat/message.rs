@@ -15,6 +15,7 @@ pub fn ChatMessage(
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
+    let (is_collapsed, set_is_collapsed) = signal(true);
 
     let handle_resubmit = {
         let regenerate = regenerate.clone();
@@ -42,10 +43,27 @@ pub fn ChatMessage(
     });
     let role = message.role.clone();
     let message_for_cost = message.clone();
+    let is_system = message.role == "system";
+
     view! {
-        <chat-message data-role=role>
+        <chat-message
+            data-role=role
+            class:collapsed=move || is_system && is_collapsed.get()
+            on:click=move |_| {
+                if is_system {
+                    set_is_collapsed.update(|v| *v = !*v)
+                }
+            }
+        >
             <div style="display: flex">
                 <chat-message-role>
+                    {if is_system {
+                        view! {
+                            <span class="collapse-icon">{move || if is_collapsed.get() { "▶" } else { "▼" }}</span>
+                        }.into_any()
+                    } else {
+                        ().into_any()
+                    }}
                     {match message.role.as_str() {
                         "assistant" => {
                             if let Some(model) = &message.model_name {

@@ -450,3 +450,22 @@ error-box {
 @keyframes spinner-border {
     to { transform: rotate(360deg); }
 }
+
+.collapse-icon {
+    margin-right: 0.5em;
+    cursor: pointer;
+}
+
+chat-message[data-role="system"] {
+    cursor: pointer;
+}
+
+chat-message[data-role="system"].collapsed chat-message-content {
+    display: none;
+}
+
+chat-message[data-role="system"].collapsed chat-message-role {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
