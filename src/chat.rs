@@ -52,7 +52,6 @@ pub fn ChatInterface(
 ) -> impl IntoView {
     let is_mobile = RwSignal::new(false);
     Effect::new(move |_| {
-        #[cfg(any(feature = "csr", feature = "hydrate"))]
         is_mobile.set(crate::utils::is_mobile());
     });
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
