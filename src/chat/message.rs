@@ -46,10 +46,7 @@ pub fn ChatMessage(
     let is_system = message.role == "system";
 
     view! {
-        <chat-message
-            data-role=role
-            class:collapsed=move || is_system && is_collapsed.get()
-        >
+        <chat-message data-role=role class:collapsed=move || is_system && is_collapsed.get()>
             <div style="display: flex">
                 <chat-message-role
                     class:expandable=is_system
