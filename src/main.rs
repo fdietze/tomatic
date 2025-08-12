@@ -134,6 +134,11 @@ fn MainContent() -> impl IntoView {
     // Listen for requests from ChatPage to load a session
     Effect::new(move |_| {
         if let Some(id_to_load) = session_load_request.get() {
+
+            leptos::logging::log!(
+                "[DEBUG] [MainContent] Session load request received for id: '{}'",
+                id_to_load
+            );
             // 2.1.1. Handle "new" path explicitly
             if id_to_load == "new" {
                 global_state.current_session_id.set(None);
@@ -195,31 +200,41 @@ fn MainContent() -> impl IntoView {
     });
 
     // Debounced save session
+
     let debounced_save_session = use_debounce_fn_with_arg(
         move |(session_id_to_save, msgs_to_save): (String, Vec<Message>)| {
             if session_id_to_save.is_empty() || msgs_to_save.is_empty() {
                 return;
             }
             spawn_local(async move {
-                let created_at = persistence::load_session(&session_id_to_save)
+                let existing_session = persistence::load_session(&session_id_to_save)
                     .await
                     .ok()
-                    .flatten()
-                    .map(|s| s.created_at_ms)
-                    .unwrap_or_else(Date::now);
+                    .flatten();
+
+                let is_new_session = existing_session.is_none();
+
                 let session_to_save_db = ChatSession {
                     session_id: session_id_to_save.clone(),
                     messages: msgs_to_save,
                     name: None,
-                    created_at_ms: created_at,
+                    created_at_ms: existing_session
+                        .map(|s| s.created_at_ms)
+                        .unwrap_or_else(Date::now),
                     updated_at_ms: Date::now(),
                 };
+
                 if persistence::save_session(&session_to_save_db)
                     .await
                     .is_ok()
-                {
-                    load_session_list.get_value()();
-                }
+                    && is_new_session {
+                        sorted_session_ids.update(|ids| {
+                            // Double check it's not already there before inserting
+                            if !ids.iter().any(|id| id == &session_id_to_save) {
+                               ids.insert(0, session_id_to_save);
+                            }
+                        });
+                    }
             });
         },
         2000.0,
@@ -247,32 +262,67 @@ fn MainContent() -> impl IntoView {
     let can_go_next =
         Memo::new(move |_| matches!(current_session_index.get(), Some(idx) if idx > 0));
 
+
     let on_prev = {
         let navigate = navigate.clone();
         move |_| {
+            leptos::logging::log!("[DEBUG] [MainContent] 'Prev' button clicked.");
             let ids = sorted_session_ids.get();
             if ids.is_empty() {
+                leptos::logging::log!("[WARN] [MainContent] 'Prev' clicked with no sessions available.");
                 return;
             }
-            let new_index = match current_session_index.get() {
+            let current_idx = current_session_index.get();
+            let new_index = match current_idx {
                 Some(idx) => idx + 1,
                 None => 0,
             };
-            if new_index < ids.len() {
-                navigate(&format!("/chat/{}", ids[new_index]), Default::default());
+            leptos::logging::log!(
+                "[DEBUG] [MainContent] 'Prev' navigation. Current index: {:?}, New index: {}.",
+                current_idx,
+                new_index
+            );
+
+            if let Some(new_id) = ids.get(new_index) {
+                leptos::logging::log!(
+                    "[DEBUG] [MainContent] Navigating to previous session ID: {}",
+                    new_id
+                );
+                navigate(&format!("/chat/{new_id}"), Default::default());
+            } else {
+                leptos::logging::log!(
+                    "[WARN] [MainContent] 'Prev' navigation failed: New index {} is out of bounds (len={}).",
+                    new_index,
+                    ids.len()
+                );
             }
         }
     };
 
+
     let on_next = {
         let navigate = navigate.clone();
         move |_| {
+            leptos::logging::log!("[DEBUG] [MainContent] 'Next' button clicked.");
             if let Some(idx) = current_session_index.get() {
                 if idx > 0 {
                     let ids = sorted_session_ids.get();
                     let new_index = idx - 1;
-                    navigate(&format!("/chat/{}", ids[new_index]), Default::default());
+                    if let Some(new_id) = ids.get(new_index) {
+                        leptos::logging::log!(
+                            "[DEBUG] [MainContent] 'Next' navigation. Current index: {}, New index: {}. Navigating to ID: {}",
+                            idx, new_index, new_id
+                        );
+                        navigate(&format!("/chat/{new_id}"), Default::default());
+                    } else {
+                         leptos::logging::log!(
+                            "[WARN] [MainContent] 'Next' navigation failed: New index {} is out of bounds for sorted_session_ids (len={}).",
+                            new_index, ids.len()
+                        );
+                    }
                 }
+            } else {
+                leptos::logging::log!("[WARN] [MainContent] 'Next' clicked but no current session index.");
             }
         }
     };
@@ -361,15 +411,20 @@ fn ChatPage() -> impl IntoView {
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
 
     // When the :id parameter in the URL changes, send a request to the parent App to load the session
+
     Effect::new(move |_| {
         let id = params.with(|p| p.get("id").map(|s| s.to_owned()).unwrap_or_default());
+        leptos::logging::log!("[DEBUG] [ChatPage] URL parameter 'id' changed to: '{}'.", &id);
+
         if id == "new" {
             if let Some(prompt_from_q) = query.with(|q| q.get("q").map(|s| s.to_owned())) {
                 if !prompt_from_q.is_empty() {
+                    leptos::logging::log!("[DEBUG] [ChatPage] Found 'q' parameter, setting initial prompt.");
                     state.initial_chat_prompt.set(Some(prompt_from_q));
                 }
             }
         }
+        leptos::logging::log!("[DEBUG] [ChatPage] Requesting session load for id: '{}'.", &id);
         state.session_load_request.set(Some(id));
     });
 
