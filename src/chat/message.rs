@@ -16,6 +16,9 @@ pub fn ChatMessage(
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
 
+    let is_system_message = message.role == "system";
+    let (collapsed, set_collapsed) = signal(is_system_message);
+
     let handle_resubmit = {
         let regenerate = regenerate.clone();
         let message = message.clone();
@@ -40,30 +43,52 @@ pub fn ChatMessage(
             m_clone_for_copy.content.clone()
         }
     });
-    let role = message.role.clone();
+
+    let role_for_view = message.role.clone();
     let message_for_cost = message.clone();
+    let toggle_collapsed = move |_| {
+        if is_system_message {
+            set_collapsed.update(|c| *c = !*c);
+        }
+    };
+
+    let role_display = Signal::derive({
+        let message = message.clone();
+        move || {
+            let role_string = match message.role.as_str() {
+                "assistant" => {
+                    if let Some(model) = &message.model_name {
+                        format!("assistant ({model})")
+                    } else {
+                        "assistant".to_string()
+                    }
+                }
+                "system" => {
+                    if let Some(name) = &message.prompt_name {
+                        format!("system @{name}")
+                    } else {
+                        "system".to_string()
+                    }
+                }
+                _ => message.role.clone(),
+            };
+
+            if is_system_message {
+                let indicator = if collapsed() { "▶" } else { "▼" };
+                format!("{indicator} {role_string}")
+            } else {
+                role_string
+            }
+        }
+    });
+
     view! {
-        <chat-message data-role=role>
-            <div style="display: flex">
-                <chat-message-role>
-                    {match message.role.as_str() {
-                        "assistant" => {
-                            if let Some(model) = &message.model_name {
-                                format!("assistant ({model})")
-                            } else {
-                                "assistant".to_string()
-                            }
-                        }
-                        "system" => {
-                            if let Some(name) = &message.prompt_name {
-                                format!("system @{name}")
-                            } else {
-                                "system".to_string()
-                            }
-                        }
-                        _ => message.role.clone(),
-                    }}
-                </chat-message-role>
+        <chat-message
+            data-role=role_for_view
+            class:collapsed=move || is_system_message && collapsed()
+        >
+            <div style="display: flex" on:click=toggle_collapsed>
+                <chat-message-role>{role_display}</chat-message-role>
                 <chat-message-buttons>
                     <CopyButton text_to_copy=text_for_copy_button />
                     {

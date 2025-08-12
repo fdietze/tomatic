@@ -475,3 +475,11 @@ error-box {
     align-items: center;
     gap: 4px;
 }
+
+chat-message[data-role="system"] chat-message-role {
+    cursor: pointer;
+}
+
+chat-message.collapsed chat-message-content {
+    display: none;
+}
