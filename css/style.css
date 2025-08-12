@@ -248,6 +248,25 @@ chat-message-buttons {
 
 chat-message-content {
     word-wrap: break-word;
+    table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        border-collapse: collapse;
+        border-spacing: 0;
+
+        th,
+        td {
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        th {
+            text-align: left;
+            white-space: nowrap;
+        }
+    }
+
     pre {
         margin: 8px 0;
         background-color: var(--base02);
