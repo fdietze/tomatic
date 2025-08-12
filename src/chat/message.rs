@@ -1,6 +1,6 @@
 use crate::copy_button::CopyButton;
 use crate::markdown::Markdown;
-use leptos::ev::KeyboardEvent;
+use super::textarea::create_textarea_enter_handler;
 use leptos::prelude::*;
 use std::sync::Arc;
 
@@ -12,6 +12,7 @@ pub fn ChatMessage(
     #[prop(into)] set_messages: WriteSignal<Vec<Message>>,
     #[prop(into)] message_index: usize,
     regenerate: Arc<impl Fn(usize) + std::marker::Send + std::marker::Sync + 'static>,
+    #[prop(into)] is_mobile: Signal<bool>,
 ) -> impl IntoView {
     let (is_editing, set_is_editing) = signal(false);
     let (input, set_input) = signal(message.content.clone());
@@ -135,12 +136,12 @@ pub fn ChatMessage(
                                 style="width: 100%"
                                 prop:value=input
                                 on:input:target=move |ev| { set_input(ev.target().value()) }
-                                on:keydown=move |ev: KeyboardEvent| {
-                                    if ev.key() == "Enter" && !ev.shift_key() {
-                                        ev.prevent_default();
+                                on:keydown=create_textarea_enter_handler(
+                                    is_mobile,
+                                    Callback::new(move |_| {
                                         handle_resubmit_for_textarea();
-                                    }
-                                }
+                                    }),
+                                )
                             />
                             <div style="display:flex; justify-content: flex-end; gap: 4px;">
                                 <button

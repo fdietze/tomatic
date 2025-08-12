@@ -1,3 +1,4 @@
+use super::textarea::create_textarea_enter_handler;
 use leptos::{html, prelude::*};
 
 #[component]
@@ -24,20 +25,14 @@ pub fn ChatControls(
                         on:input:target=move |ev| set_input(ev.target().value())
                         placeholder="Message"
                         node_ref=ref_input
-                        on:keydown=move |ev: web_sys::KeyboardEvent| {
-                            if ev.key() != "Enter" {
-                                return;
-                            }
-
-                            if is_mobile.get() || ev.shift_key() {
-                                return;
-                            }
-
-                            if !input_disabled.get() {
-                                ev.prevent_default();
-                                submit.run(None);
-                            }
-                        }
+                        on:keydown=create_textarea_enter_handler(
+                            is_mobile,
+                            Callback::new(move |_| {
+                                if !input_disabled.get() {
+                                    submit.run(None);
+                                }
+                            }),
+                        )
                         disabled=input_disabled
                     />
                     {move || {

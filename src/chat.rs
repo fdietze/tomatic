@@ -2,6 +2,7 @@ pub mod request;
 pub use request::handle_llm_request;
 pub mod message;
 pub mod types;
+pub mod textarea;
 pub use message::ChatMessage;
 pub mod controls;
 pub use controls::ChatControls;
@@ -382,6 +383,7 @@ pub fn ChatInterface(
                                     set_messages=set_messages
                                     message_index=0_usize
                                     regenerate=regenerate.clone()
+                                    is_mobile=is_mobile.read_only()
                                 />
                             }
                         })
@@ -397,6 +399,7 @@ pub fn ChatInterface(
                                     set_messages
                                     message_index
                                     regenerate=regenerate_for_messages.clone()
+                                    is_mobile=is_mobile.read_only()
                                 />
                             }
                         })
