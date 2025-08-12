@@ -8,7 +8,22 @@ pub fn ChatControls(
     #[prop(into)] ref_input: NodeRef<html::Textarea>,
     #[prop(into)] submit: Callback<Option<String>>,
     #[prop(into)] cancel_action: Callback<()>,
+    #[prop(into)] is_mobile: Signal<bool>,
 ) -> impl IntoView {
+    let on_keydown = move |ev: web_sys::KeyboardEvent| {
+        if ev.key() != "Enter" {
+            return;
+        }
+
+        if is_mobile.get() || ev.shift_key() {
+            return;
+        }
+
+        if !input_disabled.get() {
+            ev.prevent_default();
+            submit.run(None);
+        }
+    };
     view! {
         <chat-controls>
             <form on:submit=move |ev| {
@@ -29,6 +44,7 @@ pub fn ChatControls(
                                 submit.run(None);
                             }
                         }
+                        on:keydown=on_keydown
                         disabled=input_disabled
                     />
                     {move || {

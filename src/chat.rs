@@ -50,6 +50,11 @@ pub fn ChatInterface(
     #[prop(into)] set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
     #[prop(into)] initial_chat_prompt: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let is_mobile = RwSignal::new(false);
+    Effect::new(move |_| {
+        #[cfg(any(feature = "csr", feature = "hydrate"))]
+        is_mobile.set(crate::utils::is_mobile());
+    });
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
     leptos::logging::log!(
         "[LOG] [ChatInterface] Component created. Any `use_local_storage` here is risky."
@@ -417,6 +422,7 @@ pub fn ChatInterface(
                 ref_input=ref_input
                 submit=submit
                 cancel_action=cancel_action
+                is_mobile=is_mobile.read_only()
             />
         </chat-interface>
     }

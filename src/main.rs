@@ -6,6 +6,7 @@ mod llm;
 mod persistence;
 pub mod markdown;
 mod settings;
+pub mod utils;
 
 use crate::chat::{ChatInterface, Message, SystemPrompt, SystemPromptBar};
 use crate::llm::DisplayModelInfo;
