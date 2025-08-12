@@ -381,21 +381,12 @@ error-box {
 }
 
 .combobox-suggestions {
-    position: absolute;
-    top: 100%; /* Position below the input */
-    left: 0;
-    right: 0;
-    background-color: var(--base00);
-    border: 1px solid var(--base02);
-    border-top: none; /* Avoid double border with input */
-    border-radius: 0 0 4px 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 1000; /* Ensure it's above other content */
     list-style: none;
     padding: 0;
     margin: 0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 200px; /* Or whatever height you prefer */
+    overflow-y: auto;
+    /* Remove absolute positioning from here as it's now on the container */
 }
 
 .combobox-item {
@@ -449,4 +440,38 @@ error-box {
 
 @keyframes spinner-border {
     to { transform: rotate(360deg); }
+}
+
+.combobox-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.combobox-suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--base00);
+    border: 1px solid var(--base02);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.combobox-footer {
+    padding: 4px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--base02);
+}
+
+.combobox-reload-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }

@@ -355,18 +355,11 @@ pub fn ChatInterface(
                             })
                             placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
                             loading=models_loading
+                            on_reload=Callback::new(move |_| fetch_models.get_value()())
                             error_message=combobox_external_error
                             disabled=Signal::derive(move || api_key.get().is_empty())
                         />
                     </div>
-                    <button
-                        data-size="compact"
-                        on:click=move |_| fetch_models.get_value()()
-                        disabled=models_loading
-                        title="Reload model list"
-                    >
-                        "reload"
-                    </button>
                 </div>
                 {move || {
                     selected_prompt()

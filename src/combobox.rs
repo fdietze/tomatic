@@ -23,6 +23,7 @@ pub fn Combobox(
     #[prop(optional, into)] placeholder: Signal<String>,
     #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] loading: Signal<bool>,
+    #[prop(optional, into)] on_reload: Option<Callback<()>>,
     #[prop(optional, into)] error_message: Signal<Option<String>>,
     #[prop(optional, into)] label: Option<String>,
 ) -> impl IntoView {
@@ -218,28 +219,29 @@ pub fn Combobox(
     view! {
         <div class="combobox-wrapper" node_ref=combobox_wrapper_ref id=id_prop>
             {label.map(|l| view! { <label class="combobox-label">{l}</label> })}
-            <input
-                type="text"
-                class=move || {
-                    format!(
-                        "{} {} {}",
-                        base_input_class,
-                        if disabled.get() { disabled_class } else { "" },
-                        if loading.get() { loading_class } else { "" },
-                    )
-                }
-                node_ref=input_ref
-                prop:value=move || search_query.get()
-                on:input=handle_input
-                on:focus=handle_focus
-                on:keydown=handle_keydown
-                placeholder=move || placeholder.get()
-                disabled=move || disabled.get()
-                aria-autocomplete="list"
-                aria-expanded=move || show_suggestions.get().to_string()
-                // Ensure this ID matches the list's ID
-                aria-controls="combobox-suggestions-list"
-            />
+            <div class="combobox-input-wrapper">
+                <input
+                    type="text"
+                    class=move || {
+                        format!(
+                            "{} {} {}",
+                            base_input_class,
+                            if disabled.get() { disabled_class } else { "" },
+                            if loading.get() { loading_class } else { "" },
+                        )
+                    }
+                    node_ref=input_ref
+                    prop:value=move || search_query.get()
+                    on:input=handle_input
+                    on:focus=handle_focus
+                    on:keydown=handle_keydown
+                    placeholder=move || placeholder.get()
+                    disabled=move || disabled.get()
+                    aria-autocomplete="list"
+                    aria-expanded=move || show_suggestions.get().to_string()
+                    aria-controls="combobox-suggestions-list"
+                />
+            </div>
             // aria-activedescendant: Would need to set IDs on list items
 
             {move || {
@@ -249,49 +251,85 @@ pub fn Combobox(
                     view! { <div class="combobox-error-message">{err_msg}</div> }.into_any()
                 } else if show_suggestions.get() && !filtered_items.get().is_empty() {
                     view! {
-                        <ul
-                            class="combobox-suggestions"
-                            id="combobox-suggestions-list"
-                            role="listbox"
-                            node_ref=suggestions_list_ref
-                        >
-                            <For
-                                each=move || filtered_items.get().into_iter().enumerate()
-                                key=|(_, item)| item.id.clone()
-                                children=move |(idx, item)| {
-                                    let item_clone = item.clone();
-                                    let item_clone_for_click = item.clone();
-                                    let is_highlighted = Memo::new(move |_| {
-                                        highlighted_index.get() == Some(idx)
-                                    });
-                                    view! {
-                                        <li
-                                            class="combobox-item"
-                                            class:combobox-item-highlighted=is_highlighted
-                                            role="option"
-                                            aria-selected=move || is_highlighted.get().to_string()
-                                            // id=format!("combobox-item-{}", item.id) // For aria-activedescendant
-                                            // Mousedown fires before input blur
-                                            on:mousedown=move |ev| {
-                                                ev.prevent_default();
-                                                handle_select_item(item_clone_for_click.clone());
-                                            }
-                                        >
-                                            {
-                                                let item = item_clone.clone();
-                                                move || {
-                                                    if let Some(html) = item.display_html.clone() {
-                                                        view! { <div inner_html=html></div> }.into_any()
-                                                    } else {
-                                                        item.display_text.clone().into_any()
+                        <div class="combobox-suggestions-container">
+                            <ul
+                                class="combobox-suggestions"
+                                id="combobox-suggestions-list"
+                                role="listbox"
+                                node_ref=suggestions_list_ref
+                            >
+                                <For
+                                    each=move || filtered_items.get().into_iter().enumerate()
+                                    key=|(_, item)| item.id.clone()
+                                    children=move |(idx, item)| {
+                                        let item_clone = item.clone();
+                                        let item_clone_for_click = item.clone();
+                                        let is_highlighted = Memo::new(move |_| {
+                                            highlighted_index.get() == Some(idx)
+                                        });
+                                        view! {
+                                            <li
+                                                class="combobox-item"
+                                                class:combobox-item-highlighted=is_highlighted
+                                                role="option"
+                                                aria-selected=move || is_highlighted.get().to_string()
+                                                on:mousedown=move |ev| {
+                                                    ev.prevent_default();
+                                                    handle_select_item(item_clone_for_click.clone());
+                                                }
+                                            >
+                                                {
+                                                    let item = item_clone.clone();
+                                                    move || {
+                                                        if let Some(html) = item.display_html.clone() {
+                                                            view! { <div inner_html=html></div> }.into_any()
+                                                        } else {
+                                                            item.display_text.clone().into_any()
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        </li>
+                                            </li>
+                                        }
                                     }
+                                />
+                            </ul>
+                            {if let Some(on_reload) = on_reload {
+                                view! {
+                                    <div class="combobox-footer">
+                                        <button
+                                            class="combobox-reload-button"
+                                            on:click=move |ev| {
+                                                ev.prevent_default();
+                                                on_reload.run(());
+                                            }
+                                            disabled=loading
+                                            title="Reload model list"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="1em"
+                                                height="1em"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4m-4 4a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"
+                                                />
+                                            </svg>
+                                            "Reload"
+                                        </button>
+                                    </div>
                                 }
-                            />
-                        </ul>
+                                    .into_any()
+                            } else {
+                                let _: () = view! { <></> };
+                                ().into_any()
+                            }}
+                        </div>
                     }
                         .into_any()
                 } else if show_suggestions.get() && !search_query.get().is_empty()
