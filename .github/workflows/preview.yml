@@ -11,10 +11,7 @@ on:
   pull_request:
     branches-ignore:
       - main
-  # Optional: still run on push to branch without PR
-  push:
-    branches-ignore:
-      - main
+
 jobs:
   Deploy-Preview:
     runs-on: ubuntu-latest
@@ -59,6 +56,5 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          github-comment: false
+          github-comment: true
           working-directory: ./dist
-
