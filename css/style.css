@@ -262,6 +262,13 @@ chat-message-content {
         top: 4px;
         right: 4px;
     }
+
+    textarea {
+      height: 60px;
+      &:focus {
+        height: 120px;
+      }
+    }
 }
 
 chat-history {
@@ -286,6 +293,9 @@ chat-controls {
             width: 100%;
             resize: none;
             height: 60px;
+            &:focus {
+              height: 120px;
+            }
         }
         flex-wrap: wrap;
     }
