@@ -284,6 +284,7 @@ chat-message-content {
 
     textarea {
       height: 60px;
+      transition: height 0.2s ease-in-out 0.1s;
       &:focus {
         height: 120px;
       }
@@ -312,6 +313,7 @@ chat-controls {
             width: 100%;
             resize: none;
             height: 60px;
+            transition: height 0.2s ease-in-out 0.1s;
             &:focus {
               height: 120px;
             }
