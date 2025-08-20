@@ -4,6 +4,7 @@ mod copy_button;
 mod dom_utils;
 mod llm;
 mod persistence;
+mod state;
 pub mod markdown;
 mod settings;
 pub mod utils;
@@ -11,6 +12,7 @@ pub mod utils;
 use crate::chat::{ChatInterface, Message, SystemPrompt, SystemPromptBar};
 use crate::llm::DisplayModelInfo;
 use crate::persistence::ChatSession;
+use crate::state::GlobalState;
 use crate::settings::Settings;
 use codee::string::{FromToStringCodec, JsonSerdeCodec};
 use leptos::prelude::*;
@@ -23,29 +25,6 @@ use leptos_use::use_debounce_fn_with_arg;
 
 use web_sys::js_sys::Date;
 
-#[derive(Clone)]
-pub struct GlobalState {
-    // App-wide state
-    api_key: Signal<String>,
-    set_api_key: WriteSignal<String>,
-    system_prompts: Signal<Vec<SystemPrompt>>,
-    set_system_prompts: WriteSignal<Vec<SystemPrompt>>,
-    model_name: Signal<String>,
-    set_model_name: WriteSignal<String>,
-    input: Signal<String>,
-    set_input: WriteSignal<String>,
-    cached_models: Signal<Vec<DisplayModelInfo>>,
-    set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
-    // Current session state
-    pub messages: RwSignal<Vec<Message>>,
-    pub selected_prompt_name: RwSignal<Option<String>>,
-    pub error: RwSignal<Option<String>>,
-    pub current_session_id: RwSignal<Option<String>>,
-    // Request from child to parent
-    pub session_load_request: WriteSignal<Option<String>>,
-    pub navigation_request: RwSignal<Option<String>>,
-    pub initial_chat_prompt: RwSignal<Option<String>>,
-}
 
 fn main() {
     console_error_panic_hook::set_once();
