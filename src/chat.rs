@@ -7,6 +7,7 @@ pub use message::ChatMessage;
 pub mod controls;
 pub use controls::ChatControls;
 pub mod system_prompt_bar;
+pub mod model_management;
 use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
@@ -15,8 +16,9 @@ pub use system_prompt_bar::SystemPromptBar;
 pub use types::{Message, SystemPrompt};
 use uuid::Uuid;
 
-use crate::combobox::{Combobox, ComboboxItem};
+use crate::combobox::Combobox;
 use crate::llm::{self, DisplayModelInfo};
+use model_management::ModelManager;
 use crate::GlobalState;
 
 fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Option<SystemPrompt> {
@@ -68,6 +70,12 @@ pub fn ChatInterface(
     let (models_error, set_models_error) = signal::<Option<String>>(None);
     let (_cancel_sender, set_cancel_sender) = signal::<Option<oneshot::Sender<()>>>(None);
 
+    let model_manager = ModelManager::new(
+        cached_models,
+        models_loading,
+        models_error,
+        api_key,
+    );
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let prompt_name: Option<String> = selected_prompt_name();
@@ -120,46 +128,7 @@ pub fn ChatInterface(
         }
     });
 
-    let combobox_items = Memo::new(move |_| {
-        cached_models
-            .get()
-            .into_iter()
-            .map(|model_info| {
-                let (display_text, display_html) =
-                    if let (Some(prompt_cost), Some(completion_cost)) =
-                        (model_info.prompt_cost_usd_pm, model_info.completion_cost_usd_pm)
-                    {
-                        let price_display = format!("in: {prompt_cost: >6.2}$ out: {completion_cost: >6.2}$/MTok");
 
-                        let text = format!(
-                            "{} {}",
-                            model_info.name, price_display
-                        );
-                        let html = format!(
-                            "<div style='display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 1em;'>\n                                <span style='white-space: nowrap; flex-shrink: 0'>{}</span>\n                                <span class='model-price' style='white-space: pre; text-align: right; overflow: hidden; flex-shrink: 1'>{}</span>\n                            </div>",
-                            model_info.name, &price_display
-                        );
-                        (text, Some(html))
-                    } else {
-                        let text = format!("{} (ID: {})", model_info.name, model_info.id);
-                        (text, None)
-                    };
-                ComboboxItem { id: model_info.id.clone(), display_text, display_html }
-            })
-            .collect::<Vec<ComboboxItem>>()
-    });
-
-    let combobox_external_error = Memo::new(move |_| {
-        if api_key.get().is_empty() {
-            Some("API key required in Settings to use models.".to_string())
-        } else if let Some(e) = models_error.get() {
-            Some(format!("Failed to load models: {e}"))
-        } else if cached_models.get().is_empty() && !models_loading.get() {
-            Some("No models found. Try reloading.".to_string())
-        } else {
-            None
-        }
-    });
 
     Effect::new(move |_| {
         if let Some(ref_input) = ref_input.get() {
@@ -353,7 +322,7 @@ pub fn ChatInterface(
                 <div style="display: flex; align-items: center; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
                     <div style="flex-grow: 1;">
                         <Combobox
-                            items=combobox_items
+                            items=model_manager.items
                             selected_id=model_name
                             on_select=Callback::new(move |id_str: String| {
                                 set_model_name.set(id_str)
@@ -361,7 +330,7 @@ pub fn ChatInterface(
                             placeholder="Select or type model ID (e.g. openai/gpt-4o)".to_string()
                             loading=models_loading
                             on_reload=Callback::new(move |_| fetch_models.get_value()())
-                            error_message=combobox_external_error
+                            error_message=model_manager.external_error
                             disabled=Signal::derive(move || api_key.get().is_empty())
                         />
                     </div>
