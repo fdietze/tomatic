@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::chat::Message; // Assuming Message struct is in chat.rs
+use crate::chat::types::Message;
 
 // --- IndexedDB Constants ---
 pub const DB_NAME: &str = "tomatic_chat_db";

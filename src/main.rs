@@ -11,7 +11,7 @@ pub mod markdown;
 mod settings;
 pub mod utils;
 
-use crate::chat::{Message, SystemPrompt};
+use crate::chat::types::{Message, SystemPrompt};
 use crate::header::Header;
 use crate::chat_page::ChatPage;
 use crate::llm::DisplayModelInfo;

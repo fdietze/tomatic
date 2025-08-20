@@ -1,6 +1,6 @@
 use leptos::prelude::*;
 
-use crate::chat::SystemPrompt;
+use crate::chat::types::SystemPrompt;
 
 #[component]
 pub fn Settings(

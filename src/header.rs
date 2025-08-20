@@ -1,4 +1,5 @@
-use crate::chat::{SystemPrompt, SystemPromptBar};
+use crate::chat::types::SystemPrompt;
+use crate::chat::SystemPromptBar;
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
 use leptos::ev;

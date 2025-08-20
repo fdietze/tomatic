@@ -1,5 +1,6 @@
 pub mod request;
 pub mod prompt_mention;
+pub mod actions;
 pub use request::handle_llm_request;
 pub mod message;
 pub mod types;
@@ -9,19 +10,17 @@ pub mod controls;
 pub use controls::ChatControls;
 pub mod system_prompt_bar;
 pub mod model_management;
+pub use system_prompt_bar::SystemPromptBar;
 pub use prompt_mention::extract_mentioned_prompt;
 use futures_channel::oneshot;
-use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
-use std::sync::Arc;
-pub use system_prompt_bar::SystemPromptBar;
-pub use types::{Message, SystemPrompt};
-use uuid::Uuid;
-
-use crate::combobox::Combobox;
-use crate::llm::{self, DisplayModelInfo};
+use crate::llm::{DisplayModelInfo};
 use model_management::ModelManager;
 use crate::GlobalState;
+use crate::chat::actions::{regenerate_action, submit_action};
+use crate::chat::types::{Message, SystemPrompt};
+use std::sync::Arc;
+use crate::combobox::Combobox;
 
 
 #[component]
@@ -70,7 +69,7 @@ pub fn ChatInterface(
         let prompt_name: Option<String> = selected_prompt_name();
         prompt_name
             .and_then(|name| system_prompts.iter().find(|sp| sp.name == name))
-            .cloned()
+            .cloned() // This is now unambiguous
     });
 
     Effect::new(move |_| {
@@ -135,155 +134,39 @@ pub fn ChatInterface(
     });
 
     let submit = Callback::new(move |prompt_override: Option<String>| {
-        let content = prompt_override.unwrap_or_else(|| input.get());
-        if content.is_empty() {
-            return;
-        }
-
-        let model = llm::Model {
-            model: current_model_name.get(),
-            seed: None,
-            temperature: Some(1.0),
-        };
-        let state = state.clone();
-        spawn_local(async move {
-            // If this is a new chat, generate a new ID and navigate
-            if state.current_session_id.get().is_none() {
-                let new_id = Uuid::new_v4().to_string();
-                state.current_session_id.set(Some(new_id.clone()));
-                state
-                    .navigation_request
-                    .set(Some(format!("/chat/{new_id}")));
-            }
-
-            let (tx, rx) = oneshot::channel();
-            set_cancel_sender.set(Some(tx));
-            set_input_disabled.set(true);
-            set_error.set(None);
-            let system_prompt_content = selected_prompt
-                .get()
-                .map(|sp| sp.prompt)
-                .unwrap_or("".to_string());
-
-            let user_message = Message {
-                role: "user".to_string(),
-                content,
-                prompt_name: None,
-                system_prompt_content: None,
-                model_name: None,
-                cost: None,
-            };
-
-            set_input.set("".to_string());
-            set_messages.update(|m| m.push(user_message.clone()));
-
-            if let Some(ref_history) = ref_history.get() {
-                log!("scrolling");
-                ref_history.set_scroll_top(ref_history.scroll_height());
-            }
-
-            if api_key.get().is_empty() {
-                set_error.set(Some(
-                    "No API key provided. Please add one in Settings.".to_string(),
-                ));
-            } else {
-                let mut messages_to_submit = Vec::new();
-                if !system_prompt_content.is_empty() {
-                    messages_to_submit.push(Message {
-                        role: "system".to_string(),
-                        content: system_prompt_content,
-                        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                        model_name: Some(current_model_name.get()),
-                        cost: None,
-                    });
-                }
-                messages_to_submit.extend(messages.get());
-
-                handle_llm_request(
-                    messages_to_submit,
-                    model,
-                    api_key.get(),
-                    set_messages,
-                    set_error,
-                    cached_models,
-                    current_model_name.get(),
-                    selected_prompt,
-                    rx,
-                )
-                .await;
-            }
-
-            set_input_disabled.set(false);
-            set_cancel_sender.set(None);
-
-            if let Some(ref_input) = ref_input.get() {
-                println!("focus");
-                let _ = ref_input.focus();
-            }
-        })
+        submit_action(
+            prompt_override,
+            input,
+            set_input,
+            current_model_name,
+            state.clone(),
+            set_cancel_sender,
+            set_input_disabled,
+            set_error,
+            selected_prompt,
+            set_messages,
+            ref_history,
+            api_key,
+            messages,
+            cached_models,
+            ref_input,
+        );
     });
 
-    let regenerate = {
-        Arc::new(move |index: usize| {
-            let model = llm::Model {
-                model: current_model_name(),
-                seed: None,
-                temperature: Some(1.0),
-            };
-            spawn_local(async move {
-                let (tx, rx) = oneshot::channel();
-                set_cancel_sender.set(Some(tx));
-                set_input_disabled.set(true);
-                set_error(None);
-
-                set_messages.update(|m| {
-                    m.drain(index..);
-                });
-
-                let system_prompt_content = selected_prompt()
-                    .map(|sp| sp.prompt)
-                    .unwrap_or("".to_string());
-
-                if api_key().is_empty() {
-                    set_error.set(Some(
-                        "No API key provided. Please add one in Settings.".to_string(),
-                    ));
-                } else {
-                    let mut messages_to_submit = Vec::new();
-                    if !system_prompt_content.is_empty() {
-                        messages_to_submit.push(Message {
-                            role: "system".to_string(),
-                            content: system_prompt_content,
-                            prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                            system_prompt_content: selected_prompt
-                                .get()
-                                .map(|sp| sp.prompt.clone()),
-                            model_name: Some(current_model_name()),
-                            cost: None,
-                        });
-                    }
-                    messages_to_submit.extend(messages());
-
-                    handle_llm_request(
-                        messages_to_submit,
-                        model,
-                        api_key(),
-                        set_messages,
-                        set_error,
-                        cached_models,
-                        current_model_name(),
-                        selected_prompt,
-                        rx,
-                    )
-                    .await;
-                }
-
-                set_input_disabled.set(false);
-                set_cancel_sender.set(None);
-            })
-        })
-    };
+    let regenerate = Arc::new(move |index: usize| {
+        regenerate_action(
+            index,
+            current_model_name,
+            set_cancel_sender,
+            set_input_disabled,
+            set_error,
+            set_messages,
+            selected_prompt,
+            api_key,
+            messages,
+            cached_models,
+        );
+    });
 
     let cancel_action = Callback::new(move |_| {
         set_cancel_sender.update(|sender_opt| {

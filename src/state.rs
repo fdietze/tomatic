@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use crate::chat::{Message, SystemPrompt};
+use crate::chat::types::{Message, SystemPrompt};
 use crate::llm::DisplayModelInfo;
 
 #[derive(Clone)]
