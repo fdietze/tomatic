@@ -1,4 +1,4 @@
-use super::types::{Message, MessageCost, SystemPrompt};
+use super::types::{Message, MessageCost};
 use crate::llm::{self, DisplayModelInfo, StreamedMessage};
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use futures_channel::oneshot;
@@ -13,14 +13,12 @@ pub async fn handle_llm_request(
     set_error: WriteSignal<Option<String>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
     current_model_name: String,
-    selected_prompt: Memo<Option<SystemPrompt>>,
     mut cancel_receiver: oneshot::Receiver<()>,
 ) {
     let response_message = Message {
         role: "assistant".to_string(),
         content: String::new(),
-        prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-        system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
+        prompt_name: None,
         model_name: Some(current_model_name.clone()),
         cost: None,
     };

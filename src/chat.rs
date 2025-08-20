@@ -161,7 +161,6 @@ pub fn ChatInterface(
             set_input_disabled,
             set_error,
             set_messages,
-            selected_prompt,
             api_key,
             messages,
             cached_models,
@@ -207,28 +206,6 @@ pub fn ChatInterface(
                         />
                     </div>
                 </div>
-                {move || {
-                    selected_prompt()
-                        .map(|system_prompt| {
-                            let system_message_for_render = Message {
-                                role: "system".to_string(),
-                                content: system_prompt.prompt,
-                                prompt_name: Some(system_prompt.name),
-                                system_prompt_content: None,
-                                model_name: None,
-                                cost: None,
-                            };
-                            view! {
-                                <ChatMessage
-                                    message=system_message_for_render
-                                    set_messages=set_messages
-                                    message_index=0_usize
-                                    regenerate=regenerate.clone()
-                                    is_mobile=is_mobile.read_only()
-                                />
-                            }
-                        })
-                }}
                 {move || {
                     messages()
                         .into_iter()

@@ -157,9 +157,9 @@ fn MainContent() -> impl IntoView {
                 spawn_local(async move {
                     match persistence::load_session(&id_to_load).await {
                         Ok(Some(session)) => {
-                            global_state.current_session_id.set(Some(session.session_id));
+                            global_state.current_session_id.set(Some(session.session_id.clone()));
                             messages.set(session.messages);
-                            // Do not reset the prompt when loading a session
+                            global_state.set_selected_prompt_name.set(session.prompt_name);
                             error.set(None);
                         }
                         Ok(None) => {
@@ -215,6 +215,10 @@ fn MainContent() -> impl IntoView {
 
                 let is_new_session = existing_session.is_none();
 
+                let session_prompt_name = msgs_to_save.first()
+                    .filter(|m| m.role == "system")
+                    .and_then(|m| m.prompt_name.clone());
+
                 let session_to_save_db = ChatSession {
                     session_id: session_id_to_save.clone(),
                     messages: msgs_to_save,
@@ -223,6 +227,7 @@ fn MainContent() -> impl IntoView {
                         .map(|s| s.created_at_ms)
                         .unwrap_or_else(Date::now),
                     updated_at_ms: Date::now(),
+                    prompt_name: session_prompt_name, // <-- Set the prompt name
                 };
 
                 if persistence::save_session(&session_to_save_db)

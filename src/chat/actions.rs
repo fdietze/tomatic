@@ -44,13 +44,31 @@ pub fn submit_action(
             role: "user".to_string(),
             content,
             prompt_name: None,
-            system_prompt_content: None,
             model_name: None,
             cost: None,
         };
 
         set_input.set("".to_string());
-        set_messages.update(|m| m.push(user_message.clone()));
+
+        let mut new_messages = Vec::new();
+
+        // Only add a system prompt if this is the first message in the chat.
+        if messages.get().is_empty() {
+            if let Some(prompt) = selected_prompt.get() {
+                let system_message = Message {
+                    role: "system".to_string(),
+                    content: prompt.prompt.clone(),
+                    prompt_name: Some(prompt.name.clone()),
+                    model_name: None,
+                    cost: None,
+                };
+                new_messages.push(system_message);
+            }
+        }
+
+        new_messages.push(user_message);
+
+        set_messages.update(|m| m.extend(new_messages));
 
         if let Some(ref_history) = ref_history.get() {
             log!("scrolling");
@@ -73,7 +91,6 @@ pub fn submit_action(
         set_input_disabled,
         set_error,
         set_messages,
-        selected_prompt,
         api_key,
         messages,
         cached_models,
@@ -87,7 +104,6 @@ pub fn regenerate_action(
     set_input_disabled: WriteSignal<bool>,
     set_error: WriteSignal<Option<String>>,
     set_messages: WriteSignal<Vec<Message>>,
-    selected_prompt: Memo<Option<SystemPrompt>>,
     api_key: Signal<String>,
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
@@ -108,7 +124,6 @@ pub fn regenerate_action(
         set_input_disabled,
         set_error,
         set_messages,
-        selected_prompt,
         api_key,
         messages,
         cached_models,
@@ -124,7 +139,6 @@ fn execute_llm_request<F, Fut>(
     set_input_disabled: WriteSignal<bool>,
     set_error: WriteSignal<Option<String>>,
     set_messages: WriteSignal<Vec<Message>>,
-    selected_prompt: Memo<Option<SystemPrompt>>,
     api_key: Signal<String>,
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
@@ -151,35 +165,15 @@ fn execute_llm_request<F, Fut>(
                 "No API key provided. Please add one in Settings.".to_string(),
             ));
         } else {
-            let system_prompt_content = selected_prompt
-                .get()
-                .map(|sp| sp.prompt)
-                .unwrap_or_default();
-
-            let mut messages_to_submit = Vec::new();
-            if !system_prompt_content.is_empty() {
-                messages_to_submit.push(Message {
-                    role: "system".to_string(),
-                    content: system_prompt_content,
-                    prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                    system_prompt_content: selected_prompt
-                        .get()
-                        .map(|sp| sp.prompt.clone()),
-                    model_name: Some(current_model_name()),
-                    cost: None,
-                });
-            }
-            messages_to_submit.extend(messages());
 
             handle_llm_request(
-                messages_to_submit,
+                messages(),
                 model,
                 api_key(),
                 set_messages,
                 set_error,
                 cached_models,
                 current_model_name(),
-                selected_prompt,
                 rx,
             )
             .await;

@@ -17,6 +17,7 @@ pub struct ChatSession {
     pub name: Option<String>, // User-defined name for the session
     pub created_at_ms: f64,
     pub updated_at_ms: f64,
+    pub prompt_name: Option<String>,
 }
 
 use anyhow::{anyhow, Result};

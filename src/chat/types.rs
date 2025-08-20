@@ -19,7 +19,6 @@ pub struct Message {
     pub role: String,
     pub content: String,
     pub model_name: Option<String>,
-    pub system_prompt_content: Option<String>,
     pub cost: Option<MessageCost>,
 }
 
