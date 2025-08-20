@@ -3,6 +3,7 @@ mod chat_page;
 mod combobox;
 mod copy_button;
 mod dom_utils;
+mod header;
 mod llm;
 mod persistence;
 mod state;
@@ -10,7 +11,8 @@ pub mod markdown;
 mod settings;
 pub mod utils;
 
-use crate::chat::{Message, SystemPrompt, SystemPromptBar};
+use crate::chat::{Message, SystemPrompt};
+use crate::header::Header;
 use crate::chat_page::ChatPage;
 use crate::llm::DisplayModelInfo;
 use crate::persistence::ChatSession;
@@ -308,61 +310,17 @@ fn MainContent() -> impl IntoView {
         }
     };
 
-    let on_new_chat = {
-        let navigate = navigate.clone();
-        move |_| {
-            navigate("/chat/new", Default::default());
-        }
-    };
-
-
-    let on_chat = {
-        let navigate = navigate.clone();
-        let global_state = global_state.clone();
-        move |_| {
-            if let Some(id) = global_state.current_session_id.get() {
-                navigate(&format!("/chat/{id}"), Default::default());
-            } else {
-                navigate("/chat/new", Default::default());
-            }
-        }
-    };
-
-    let on_settings = {
-        let navigate = navigate.clone();
-        move |_| {
-            navigate("/settings", Default::default());
-        }
-    };
-
     view! {
-        <header>
-            <SystemPromptBar
-                system_prompts=system_prompts
-                selected_prompt_name=selected_prompt_name.read_only()
-                set_selected_prompt_name=selected_prompt_name.write_only()
-            />
-            <button
-                data-size="compact"
-                on:click=on_prev
-                disabled=move || !can_go_prev.get()
-                style:margin-left="auto"
-            >
-                "Prev"
-            </button>
-            <button data-size="compact" on:click=on_next disabled=move || !can_go_next.get()>
-                "Next"
-            </button>
-            <button data-role="primary" data-size="compact" on:click=on_new_chat>
-                "New Chat"
-            </button>
-            <button data-size="compact" on:click=on_chat style:margin-left="4px">
-                "Chat"
-            </button>
-            <button data-size="compact" on:click=on_settings>
-                "Settings"
-            </button>
-        </header>
+        <Header
+            system_prompts=system_prompts
+            selected_prompt_name=selected_prompt_name.read_only()
+            set_selected_prompt_name=selected_prompt_name.write_only()
+            can_go_prev=can_go_prev
+            can_go_next=can_go_next
+            on_prev=on_prev
+            on_next=on_next
+            global_state=global_state
+        />
         <Routes fallback=|| view! { <h1>"Not Found"</h1> }>
             <Route path=path!("/chat/:id") view=ChatPage />
             <Route
