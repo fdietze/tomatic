@@ -7,7 +7,7 @@ use leptos::ev;
 #[component]
 pub fn Header(
     system_prompts: Signal<Vec<SystemPrompt>>,
-    selected_prompt_name: ReadSignal<Option<String>>,
+    selected_prompt_name: Signal<Option<String>>,
     set_selected_prompt_name: WriteSignal<Option<String>>,
     can_go_prev: Memo<bool>,
     can_go_next: Memo<bool>,

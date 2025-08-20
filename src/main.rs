@@ -56,6 +56,8 @@ fn MainContent() -> impl IntoView {
     let (cached_models, set_cached_models, _) =
         use_local_storage::<Vec<DisplayModelInfo>, JsonSerdeCodec>("cached_models");
     let (input, set_input, _) = use_local_storage::<String, FromToStringCodec>("input");
+    let (selected_prompt_name, set_selected_prompt_name, _) =
+        use_local_storage::<Option<String>, JsonSerdeCodec>("selected_prompt_name");
 
     // --- Session Navigation State ---
     let sorted_session_ids = RwSignal::new(Vec::<String>::new());
@@ -64,7 +66,6 @@ fn MainContent() -> impl IntoView {
     // --- Current Session State ---
     // Current session state
     let messages = RwSignal::new(Vec::<Message>::new());
-    let selected_prompt_name = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
 
     // --- Child-to-Parent Communication ---
@@ -86,6 +87,7 @@ fn MainContent() -> impl IntoView {
         set_cached_models,
         messages,
         selected_prompt_name,
+        set_selected_prompt_name,
         error,
         current_session_id: RwSignal::new(None::<String>),
         session_load_request: set_session_load_request,
@@ -114,6 +116,22 @@ fn MainContent() -> impl IntoView {
         }
     });
 
+    // When the app loads, check if the stored prompt name is still valid.
+    Effect::new(move |_| {
+        let all_prompts = system_prompts.get();
+        let current_prompt_name = selected_prompt_name.get();
+
+        if let Some(name) = current_prompt_name {
+            if !all_prompts.iter().any(|p| p.name == name) {
+                leptos::logging::log!(
+                    "[DEBUG] [MainContent] Clearing stale selected_prompt_name: {}",
+                    name
+                );
+                set_selected_prompt_name.set(None);
+            }
+        }
+    });
+
     // Listen for requests from ChatPage to load a session
     Effect::new(move |_| {
         if let Some(id_to_load) = session_load_request.get() {
@@ -126,7 +144,7 @@ fn MainContent() -> impl IntoView {
             if id_to_load == "new" {
                 global_state.current_session_id.set(None);
                 messages.set(vec![]);
-                selected_prompt_name.set(None);
+                // When starting a new chat, we preserve the selected system prompt
                 error.set(None);
             }
             // 2.1.2. Prevent unnecessary reloads for newly ID'd sessions
@@ -141,7 +159,7 @@ fn MainContent() -> impl IntoView {
                         Ok(Some(session)) => {
                             global_state.current_session_id.set(Some(session.session_id));
                             messages.set(session.messages);
-                            selected_prompt_name.set(None);
+                            // Do not reset the prompt when loading a session
                             error.set(None);
                         }
                         Ok(None) => {
@@ -313,8 +331,8 @@ fn MainContent() -> impl IntoView {
     view! {
         <Header
             system_prompts=system_prompts
-            selected_prompt_name=selected_prompt_name.read_only()
-            set_selected_prompt_name=selected_prompt_name.write_only()
+            selected_prompt_name=selected_prompt_name
+            set_selected_prompt_name=set_selected_prompt_name
             can_go_prev=can_go_prev
             can_go_next=can_go_next
             on_prev=on_prev

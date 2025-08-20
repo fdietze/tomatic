@@ -17,7 +17,10 @@ pub struct GlobalState {
     pub set_cached_models: WriteSignal<Vec<DisplayModelInfo>>,
     // Current session state
     pub messages: RwSignal<Vec<Message>>,
-    pub selected_prompt_name: RwSignal<Option<String>>,
+
+    pub selected_prompt_name: Signal<Option<String>>,
+    pub set_selected_prompt_name: WriteSignal<Option<String>>,
+    
     pub error: RwSignal<Option<String>>,
     pub current_session_id: RwSignal<Option<String>>,
     // Request from child to parent

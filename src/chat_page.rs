@@ -32,8 +32,8 @@ pub fn ChatPage() -> impl IntoView {
             messages=state.messages.read_only()
             set_messages=state.messages.write_only()
             system_prompts=state.system_prompts
-            selected_prompt_name=state.selected_prompt_name.read_only()
-            set_selected_prompt_name=state.selected_prompt_name.write_only()
+            selected_prompt_name=state.selected_prompt_name
+            set_selected_prompt_name=state.set_selected_prompt_name
             error=state.error.read_only()
             set_error=state.error.write_only()
             api_key=state.api_key
