@@ -1,7 +1,8 @@
+
 use futures_channel::oneshot;
 use leptos::html;
-use leptos::task::spawn_local;
 use leptos::prelude::*;
+use leptos::task::spawn_local;
 use leptos::logging::log;
 use uuid::Uuid;
 
@@ -32,31 +33,12 @@ pub fn submit_action(
         return;
     }
 
-    let model = llm::Model {
-        model: current_model_name.get(),
-        seed: None,
-        temperature: Some(1.0),
-    };
-
-    spawn_local(async move {
-        // If this is a new chat, generate a new ID and navigate
+    let prepare_messages = async move {
         if state.current_session_id.get().is_none() {
             let new_id = Uuid::new_v4().to_string();
             state.current_session_id.set(Some(new_id.clone()));
-            state
-                .navigation_request
-                .set(Some(format!("/chat/{new_id}")));
+            state.navigation_request.set(Some(format!("/chat/{new_id}")));
         }
-
-        let (tx, rx) = oneshot::channel();
-        set_cancel_sender.set(Some(tx));
-        set_input_disabled.set(true);
-        set_error.set(None);
-
-        let system_prompt_content = selected_prompt
-            .get()
-            .map(|sp| sp.prompt)
-            .unwrap_or_default();
 
         let user_message = Message {
             role: "user".to_string(),
@@ -74,47 +56,28 @@ pub fn submit_action(
             log!("scrolling");
             ref_history.set_scroll_top(ref_history.scroll_height());
         }
+    };
 
-        if api_key.get().is_empty() {
-            set_error.set(Some(
-                "No API key provided. Please add one in Settings.".to_string(),
-            ));
-        } else {
-            let mut messages_to_submit = Vec::new();
-            if !system_prompt_content.is_empty() {
-                messages_to_submit.push(Message {
-                    role: "system".to_string(),
-                    content: system_prompt_content,
-                    prompt_name: selected_prompt.get().map(|sp| sp.name.clone()),
-                    system_prompt_content: selected_prompt.get().map(|sp| sp.prompt.clone()),
-                    model_name: Some(current_model_name.get()),
-                    cost: None,
-                });
-            }
-            messages_to_submit.extend(messages.get());
-
-            handle_llm_request(
-                messages_to_submit,
-                model,
-                api_key.get(),
-                set_messages,
-                set_error,
-                cached_models,
-                current_model_name.get(),
-                selected_prompt,
-                rx,
-            )
-            .await;
-        }
-
-        set_input_disabled.set(false);
-        set_cancel_sender.set(None);
-
+    let post_hook = move || {
         if let Some(ref_input) = ref_input.get() {
             println!("focus");
             let _ = ref_input.focus();
         }
-    });
+    };
+
+    execute_llm_request(
+        move || prepare_messages,
+        post_hook,
+        current_model_name,
+        set_cancel_sender,
+        set_input_disabled,
+        set_error,
+        set_messages,
+        selected_prompt,
+        api_key,
+        messages,
+        cached_models,
+    );
 }
 
 pub fn regenerate_action(
@@ -129,30 +92,70 @@ pub fn regenerate_action(
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
 ) {
+    let prepare_messages = async move {
+        set_messages.update(|m| {
+            m.drain(index..);
+        });
+    };
+
+    let post_hook = || {};
+
+    execute_llm_request(
+        move || prepare_messages,
+        post_hook,
+        current_model_name,
+        set_cancel_sender,
+        set_input_disabled,
+        set_error,
+        set_messages,
+        selected_prompt,
+        api_key,
+        messages,
+        cached_models,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_llm_request<'a, F, Fut>(
+    prepare_messages: F,
+    post_hook: impl FnOnce() + 'static,
+    current_model_name: Memo<String>,
+    set_cancel_sender: WriteSignal<Option<oneshot::Sender<()>>>,
+    set_input_disabled: WriteSignal<bool>,
+    set_error: WriteSignal<Option<String>>,
+    set_messages: WriteSignal<Vec<Message>>,
+    selected_prompt: Memo<Option<SystemPrompt>>,
+    api_key: Signal<String>,
+    messages: Signal<Vec<Message>>,
+    cached_models: Signal<Vec<DisplayModelInfo>>,
+) where
+    F: FnOnce() -> Fut + 'static,
+    Fut: std::future::Future<Output = ()> + 'static,
+{
     let model = llm::Model {
         model: current_model_name(),
         seed: None,
         temperature: Some(1.0),
     };
+
     spawn_local(async move {
+        prepare_messages().await;
+
         let (tx, rx) = oneshot::channel();
         set_cancel_sender.set(Some(tx));
         set_input_disabled.set(true);
         set_error(None);
-
-        set_messages.update(|m| {
-            m.drain(index..);
-        });
-
-        let system_prompt_content = selected_prompt()
-            .map(|sp| sp.prompt)
-            .unwrap_or_default();
 
         if api_key().is_empty() {
             set_error.set(Some(
                 "No API key provided. Please add one in Settings.".to_string(),
             ));
         } else {
+            let system_prompt_content = selected_prompt
+                .get()
+                .map(|sp| sp.prompt)
+                .unwrap_or_default();
+
             let mut messages_to_submit = Vec::new();
             if !system_prompt_content.is_empty() {
                 messages_to_submit.push(Message {
@@ -184,5 +187,7 @@ pub fn regenerate_action(
 
         set_input_disabled.set(false);
         set_cancel_sender.set(None);
+        post_hook();
     });
 }
+
