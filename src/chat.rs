@@ -1,4 +1,5 @@
 pub mod request;
+pub mod prompt_mention;
 pub use request::handle_llm_request;
 pub mod message;
 pub mod types;
@@ -8,6 +9,7 @@ pub mod controls;
 pub use controls::ChatControls;
 pub mod system_prompt_bar;
 pub mod model_management;
+pub use prompt_mention::extract_mentioned_prompt;
 use futures_channel::oneshot;
 use leptos::logging::log;
 use leptos::{html, prelude::*, task::spawn_local};
@@ -21,19 +23,6 @@ use crate::llm::{self, DisplayModelInfo};
 use model_management::ModelManager;
 use crate::GlobalState;
 
-fn extract_mentioned_prompt(input: &str, system_prompts: &[SystemPrompt]) -> Option<SystemPrompt> {
-    input
-        .split_whitespace()
-        .filter_map(|word| {
-            if let Some(name) = word.strip_prefix('@') {
-                let name = name.trim_matches(|c: char| !c.is_alphanumeric());
-                system_prompts.iter().find(|sp| sp.name == name).cloned()
-            } else {
-                None
-            }
-        })
-        .next()
-}
 
 #[component]
 pub fn ChatInterface(
