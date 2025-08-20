@@ -35,34 +35,42 @@ pub fn ChatControls(
                         )
                         disabled=input_disabled
                     />
-                    {move || {
-                        if input_disabled.get() {
-                            view! {
-                                <button
-                                    type="button"
-                                    data-role="destructive"
-                                    style="flex-shrink:0"
-                                    on:click=move |_| cancel_action.run(())
-                                >
-                                    <span class="spinner"></span>
-                                    "Cancel"
-                                </button>
-                            }
-                                .into_any()
-                        } else {
-                            view! {
-                                <button
-                                    type="submit"
-                                    data-role="primary"
-                                    style="flex-shrink:0"
-                                    disabled=input.get().is_empty() || input_disabled.get()
-                                >
-                                    "Go"
-                                </button>
-                            }
-                                .into_any()
-                        }
-                    }}
+
+                    // HACK: This section works around a bug in Leptos's virtual DOM diffing.
+                    // When conditionally rendering two different buttons in the same place,
+                    // a boolean attribute (`disabled`) from one button can "bleed" over
+                    // to the other when the view is swapped.
+                    // A minimal reproduction of this bug has been created in `main.rs`.
+                    // Once the bug is fixed in Leptos, this code can be simplified back
+                    // to a single `if/else` or `move || if ...` block.
+                    // The original implementation was:
+                    // 
+                    // {move || {
+                    // if input_disabled.get() {
+                    // view! { <button type="button" on:click=cancel_action>"Cancel"</button> }
+                    // } else {
+                    // view! { <button type="submit" disabled=input.get().is_empty()>"Go"</button> }
+                    // }
+                    // }}
+                    <button
+                        type="button"
+                        data-role="destructive"
+                        style="flex-shrink:0"
+                        on:click=move |_| cancel_action.run(())
+                        hidden=move || !input_disabled.get()
+                    >
+                        <span class="spinner"></span>
+                        "Cancel"
+                    </button>
+                    <button
+                        type="submit"
+                        data-role="primary"
+                        style="flex-shrink:0"
+                        disabled=move || input.get().is_empty()
+                        hidden=input_disabled
+                    >
+                        "Go"
+                    </button>
                 </div>
             </form>
         </chat-controls>

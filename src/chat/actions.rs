@@ -116,7 +116,7 @@ pub fn regenerate_action(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_llm_request<'a, F, Fut>(
+fn execute_llm_request<F, Fut>(
     prepare_messages: F,
     post_hook: impl FnOnce() + 'static,
     current_model_name: Memo<String>,
