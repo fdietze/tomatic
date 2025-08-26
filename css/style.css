@@ -547,3 +547,63 @@ header .tabs button[data-active="true"] {
     margin-left: auto;
     margin-right: auto;
 }
+
+.system-prompt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.system-prompt-item-view, .system-prompt-item-edit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.system-prompt-name {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.system-prompt-text {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--base04);
+}
+
+.system-prompt-inputs {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.system-prompt-inputs input,
+.system-prompt-inputs textarea {
+    width: 100%;
+}
+
+.system-prompt-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.system-prompt-item-edit {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.system-prompt-edit-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.system-prompt-item-view, .system-prompt-item-edit {
+    background-color: var(--base01);
+    border-radius: 8px;
+    padding: 8px;
+}
