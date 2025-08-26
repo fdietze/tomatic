@@ -27,4 +27,5 @@ pub struct GlobalState {
     pub session_load_request: WriteSignal<Option<String>>,
     pub navigation_request: RwSignal<Option<String>>,
     pub initial_chat_prompt: RwSignal<Option<String>>,
+    pub save_session: Callback<()>,
 }

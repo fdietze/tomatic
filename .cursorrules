@@ -6,5 +6,7 @@
 
 # Rust
 
+- leptos
+  - callbacks are called with .run()
 - variables should be used directly in the `format!` string: format!("{my_variable}")
 - trust the compiler.

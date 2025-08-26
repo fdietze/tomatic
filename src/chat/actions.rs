@@ -27,6 +27,7 @@ pub fn submit_action(
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
     ref_input: NodeRef<html::Textarea>,
+    save_session: Callback<()>,
 ) {
     let content = prompt_override.unwrap_or_else(|| input.get());
     if content.is_empty() {
@@ -52,7 +53,6 @@ pub fn submit_action(
 
         let mut new_messages = Vec::new();
 
-        // Only add a system prompt if this is the first message in the chat.
         if messages.get().is_empty() {
             if let Some(prompt) = selected_prompt.get() {
                 let system_message = Message {
@@ -94,6 +94,7 @@ pub fn submit_action(
         api_key,
         messages,
         cached_models,
+        save_session,
     );
 }
 
@@ -107,6 +108,7 @@ pub fn regenerate_action(
     api_key: Signal<String>,
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
+    save_session: Callback<()>
 ) {
     let prepare_messages = async move {
         set_messages.update(|m| {
@@ -115,7 +117,6 @@ pub fn regenerate_action(
     };
 
     let post_hook = || {};
-
     execute_llm_request(
         move || prepare_messages,
         post_hook,
@@ -127,6 +128,7 @@ pub fn regenerate_action(
         api_key,
         messages,
         cached_models,
+        save_session,
     );
 }
 
@@ -142,6 +144,7 @@ fn execute_llm_request<F, Fut>(
     api_key: Signal<String>,
     messages: Signal<Vec<Message>>,
     cached_models: Signal<Vec<DisplayModelInfo>>,
+    save_session: Callback<()>
 ) where
     F: FnOnce() -> Fut + 'static,
     Fut: std::future::Future<Output = ()> + 'static,
@@ -182,6 +185,7 @@ fn execute_llm_request<F, Fut>(
         set_input_disabled.set(false);
         set_cancel_sender.set(None);
         post_hook();
+        save_session.run(());
     });
 }
 

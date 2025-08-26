@@ -72,6 +72,44 @@ pub fn ChatInterface(
             .cloned() // This is now unambiguous
     });
 
+    let save_session = state.save_session;
+    Effect::new(move |_| {
+        let prompt = selected_prompt.get();
+        set_messages.update(|messages| {
+            // Find the index of the first system message, if any.
+            let system_message_index = messages.iter().position(|m| m.role == "system");
+
+            match (prompt, system_message_index) {
+                // 1. Prompt selected, and a system message exists: Replace it.
+                (Some(prompt), Some(index)) => {
+                    messages[index] = Message {
+                        role: "system".to_string(),
+                        content: prompt.prompt.clone(),
+                        prompt_name: Some(prompt.name.clone()),
+                        model_name: None,
+                        cost: None,
+                    };
+                }
+                // 2. Prompt selected, and no system message exists: Add one at the beginning.
+                (Some(prompt), None) => {
+                    messages.insert(0, Message {
+                        role: "system".to_string(),
+                        content: prompt.prompt.clone(),
+                        prompt_name: Some(prompt.name.clone()),
+                        model_name: None,
+                        cost: None,
+                    });
+                }
+                // 3. Prompt deselected, and a system message exists: Remove it.
+                (None, Some(index)) => {
+                    messages.remove(index);
+                }
+                // 4. Prompt deselected, and no system message exists: Do nothing.
+                (None, None) => {}
+            }
+        });
+    });
+
     Effect::new(move |_| {
         let mentioned_prompt = extract_mentioned_prompt(&input(), &system_prompts());
         if let Some(prompt) = mentioned_prompt {
@@ -150,6 +188,7 @@ pub fn ChatInterface(
             messages,
             cached_models,
             ref_input,
+            save_session,
         );
     });
 
@@ -164,6 +203,7 @@ pub fn ChatInterface(
             api_key,
             messages,
             cached_models,
+            save_session,
         );
     });
 

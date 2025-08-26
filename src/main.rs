@@ -25,7 +25,7 @@ use leptos_router::components::{Redirect, Route, Router, Routes};
 use leptos_router::hooks::use_navigate;
 use leptos_router::{path, NavigateOptions};
 use leptos_use::storage::use_local_storage;
-use leptos_use::use_debounce_fn_with_arg;
+use leptos_use::use_debounce_fn;
 
 use web_sys::js_sys::Date;
 
@@ -73,7 +73,45 @@ fn MainContent() -> impl IntoView {
     let navigation_request = RwSignal::new(None::<String>);
     let initial_chat_prompt = RwSignal::new(None::<String>);
 
-    // --- Provide Context ---
+    let debounced_save_session = use_debounce_fn(
+        move || {
+            let session_id_to_save = use_context::<GlobalState>().unwrap().current_session_id.get();
+            let msgs_to_save = messages.get();
+
+            if let Some(session_id_to_save) = session_id_to_save {
+                if session_id_to_save.is_empty() || msgs_to_save.is_empty() {
+                    return;
+                }
+                spawn_local(async move {
+                    let existing_session = persistence::load_session(&session_id_to_save).await.ok().flatten();
+                    let is_new_session = existing_session.is_none();
+                    let session_prompt_name = msgs_to_save
+                        .first()
+                        .filter(|m| m.role == "system")
+                        .and_then(|m| m.prompt_name.clone());
+
+                    let session_to_save_db = ChatSession {
+                        session_id: session_id_to_save.clone(),
+                        messages: msgs_to_save,
+                        name: None,
+                        created_at_ms: existing_session.map_or_else(Date::now, |s| s.created_at_ms),
+                        updated_at_ms: Date::now(),
+                        prompt_name: session_prompt_name,
+                    };
+
+                    if persistence::save_session(&session_to_save_db).await.is_ok() && is_new_session {
+                        sorted_session_ids.update(|ids| {
+                            if !ids.iter().any(|id| id == &session_id_to_save) {
+                                ids.insert(0, session_id_to_save);
+                            }
+                        });
+                    }
+                });
+            }
+        },
+        2000.0,
+    );
+
     let global_state = GlobalState {
         api_key,
         set_api_key,
@@ -93,6 +131,7 @@ fn MainContent() -> impl IntoView {
         session_load_request: set_session_load_request,
         navigation_request,
         initial_chat_prompt,
+        save_session: Callback::new(move |_| { debounced_save_session(); }),
     };
     provide_context(global_state.clone());
 
@@ -200,64 +239,6 @@ fn MainContent() -> impl IntoView {
         }
     });
 
-    // Debounced save session
-
-    let debounced_save_session = use_debounce_fn_with_arg(
-        move |(session_id_to_save, msgs_to_save): (String, Vec<Message>)| {
-            if session_id_to_save.is_empty() || msgs_to_save.is_empty() {
-                return;
-            }
-            spawn_local(async move {
-                let existing_session = persistence::load_session(&session_id_to_save)
-                    .await
-                    .ok()
-                    .flatten();
-
-                let is_new_session = existing_session.is_none();
-
-                let session_prompt_name = msgs_to_save.first()
-                    .filter(|m| m.role == "system")
-                    .and_then(|m| m.prompt_name.clone());
-
-                let session_to_save_db = ChatSession {
-                    session_id: session_id_to_save.clone(),
-                    messages: msgs_to_save,
-                    name: None,
-                    created_at_ms: existing_session
-                        .map(|s| s.created_at_ms)
-                        .unwrap_or_else(Date::now),
-                    updated_at_ms: Date::now(),
-                    prompt_name: session_prompt_name, // <-- Set the prompt name
-                };
-
-                if persistence::save_session(&session_to_save_db)
-                    .await
-                    .is_ok()
-                    && is_new_session {
-                        sorted_session_ids.update(|ids| {
-                            // Double check it's not already there before inserting
-                            if !ids.iter().any(|id| id == &session_id_to_save) {
-                               ids.insert(0, session_id_to_save);
-                            }
-                        });
-                    }
-            });
-        },
-        2000.0,
-    );
-
-    // Effect to trigger debounced save
-    Effect::new(move |_| {
-        let id = global_state.current_session_id.get();
-        let msgs = messages.get();
-        // 2.2. Adjust `debounced_save_session` Trigger:
-        // Only save if a session ID has been assigned and there are messages.
-        if let Some(id_val) = id {
-            if !msgs.is_empty() {
-                debounced_save_session((id_val, msgs));
-            }
-        }
-    });
 
     // --- Navigation Logic ---
     let can_go_prev = Memo::new(move |_| match current_session_index.get() {
