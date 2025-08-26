@@ -198,11 +198,8 @@ li {
 }
 
 header {
-    display: flex;
-    justify-content: flex-end;
-    gap: 4px;
-    margin: 4px;
-    flex-wrap: wrap;
+    margin: 0;
+    padding: 4px 0 0 12px;
 }
 
 chat-interface {
@@ -515,4 +512,38 @@ chat-message[data-role="system"] chat-message-role {
 
 chat-message.collapsed chat-message-content {
     display: none;
+}
+
+header {
+  background-color: var(--base01);
+}
+
+header .tabs {
+    display: flex;
+}
+
+header .tabs button {
+    background-color: var(--base01);
+    /* color: var(--base04); */
+    border: none;
+    padding: 5px 10px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+}
+
+header .tabs button[data-active="true"] {
+    background-color: var(--base02);
+    color: var(--base05);
+}
+
+.chat-header {
+    display: flex;
+    justify-content: flex-start;
+    gap: 4px;
+    margin: 4px;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: var(--chat-width);
+    margin-left: auto;
+    margin-right: auto;
 }

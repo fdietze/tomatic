@@ -315,18 +315,21 @@ fn MainContent() -> impl IntoView {
     };
 
     view! {
-        <Header
-            system_prompts=system_prompts
-            selected_prompt_name=selected_prompt_name
-            set_selected_prompt_name=set_selected_prompt_name
-            can_go_prev=can_go_prev
-            can_go_next=can_go_next
-            on_prev=on_prev
-            on_next=on_next
-            global_state=global_state
-        />
+        <Header />
         <Routes fallback=|| view! { <h1>"Not Found"</h1> }>
-            <Route path=path!("/chat/:id") view=ChatPage />
+            <Route
+                path=path!("/chat/:id")
+                view=move || {
+                    view! {
+                        <ChatPage
+                            on_prev=on_prev.clone()
+                            on_next=on_next.clone()
+                            can_go_prev=can_go_prev
+                            can_go_next=can_go_next
+                        />
+                    }
+                }
+            />
             <Route
                 path=path!("/settings")
                 view=move || {
@@ -346,5 +349,3 @@ fn MainContent() -> impl IntoView {
         </Routes>
     }
 }
-
-

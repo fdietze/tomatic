@@ -19,7 +19,7 @@ pub fn ChatControls(
                     submit.run(None);
                 }
             }>
-                <div style="display:flex; padding-left: 4px; padding-right: 4px; padding-bottom: 4px; gap: 4px;">
+                <div style="display:flex; padding: 4px; gap: 4px;">
                     <textarea
                         prop:value=input
                         on:input:target=move |ev| set_input(ev.target().value())

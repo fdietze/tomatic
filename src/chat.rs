@@ -1,27 +1,27 @@
-pub mod request;
-pub mod prompt_mention;
 pub mod actions;
+pub mod header;
+pub mod prompt_mention;
+pub mod request;
 pub use request::handle_llm_request;
 pub mod message;
-pub mod types;
 pub mod textarea;
+pub mod types;
 pub use message::ChatMessage;
 pub mod controls;
 pub use controls::ChatControls;
-pub mod system_prompt_bar;
 pub mod model_management;
-pub use system_prompt_bar::SystemPromptBar;
-pub use prompt_mention::extract_mentioned_prompt;
-use futures_channel::oneshot;
-use leptos::{html, prelude::*, task::spawn_local};
-use crate::llm::{DisplayModelInfo};
-use model_management::ModelManager;
-use crate::GlobalState;
+pub mod system_prompt_bar;
 use crate::chat::actions::{regenerate_action, submit_action};
 use crate::chat::types::{Message, SystemPrompt};
-use std::sync::Arc;
 use crate::combobox::Combobox;
-
+use crate::llm::DisplayModelInfo;
+use crate::GlobalState;
+use futures_channel::oneshot;
+use leptos::{html, prelude::*, task::spawn_local};
+use model_management::ModelManager;
+pub use prompt_mention::extract_mentioned_prompt;
+use std::sync::Arc;
+pub use system_prompt_bar::SystemPromptBar;
 
 #[component]
 pub fn ChatInterface(
@@ -58,12 +58,7 @@ pub fn ChatInterface(
     let (models_error, set_models_error) = signal::<Option<String>>(None);
     let (_cancel_sender, set_cancel_sender) = signal::<Option<oneshot::Sender<()>>>(None);
 
-    let model_manager = ModelManager::new(
-        cached_models,
-        models_loading,
-        models_error,
-        api_key,
-    );
+    let model_manager = ModelManager::new(cached_models, models_loading, models_error, api_key);
     let selected_prompt = Memo::new(move |_| {
         let system_prompts = system_prompts();
         let prompt_name: Option<String> = selected_prompt_name();
@@ -92,13 +87,16 @@ pub fn ChatInterface(
                 }
                 // 2. Prompt selected, and no system message exists: Add one at the beginning.
                 (Some(prompt), None) => {
-                    messages.insert(0, Message {
-                        role: "system".to_string(),
-                        content: prompt.prompt.clone(),
-                        prompt_name: Some(prompt.name.clone()),
-                        model_name: None,
-                        cost: None,
-                    });
+                    messages.insert(
+                        0,
+                        Message {
+                            role: "system".to_string(),
+                            content: prompt.prompt.clone(),
+                            prompt_name: Some(prompt.name.clone()),
+                            model_name: None,
+                            cost: None,
+                        },
+                    );
                 }
                 // 3. Prompt deselected, and a system message exists: Remove it.
                 (None, Some(index)) => {
@@ -153,8 +151,6 @@ pub fn ChatInterface(
             set_models_error(None);
         }
     });
-
-
 
     Effect::new(move |_| {
         if let Some(ref_input) = ref_input.get() {
@@ -230,7 +226,7 @@ pub fn ChatInterface(
     view! {
         <chat-interface>
             <chat-history node_ref=ref_history>
-                <div style="display: flex; align-items: center; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
+                <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; padding-right: 4px; border-bottom: 1px solid var(--border-color); background-color: var(--background-secondary-color); position: relative; z-index: 10;">
                     <div style="flex-grow: 1;">
                         <Combobox
                             items=model_manager.items

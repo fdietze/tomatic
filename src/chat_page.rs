@@ -1,10 +1,17 @@
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
 use leptos_router::hooks::{use_params_map, use_query_map};
 
+use crate::chat::header::ChatHeader;
 use crate::chat::ChatInterface;
 use crate::state::GlobalState;
+
 #[component]
-pub fn ChatPage() -> impl IntoView {
+pub fn ChatPage(
+    can_go_prev: Memo<bool>,
+    can_go_next: Memo<bool>,
+    on_prev: impl Fn(ev::MouseEvent) + Clone + 'static,
+    on_next: impl Fn(ev::MouseEvent) + Clone + 'static,
+) -> impl IntoView {
     let params = use_params_map();
     let query = use_query_map();
     let state = use_context::<GlobalState>().expect("GlobalState context not found");
@@ -18,7 +25,9 @@ pub fn ChatPage() -> impl IntoView {
         if id == "new" {
             if let Some(prompt_from_q) = query.with(|q| q.get("q").map(|s| s.to_owned())) {
                 if !prompt_from_q.is_empty() {
-                    leptos::logging::log!("[DEBUG] [ChatPage] Found 'q' parameter, setting initial prompt.");
+                    leptos::logging::log!(
+                        "[DEBUG] [ChatPage] Found 'q' parameter, setting initial prompt."
+                    );
                     state.initial_chat_prompt.set(Some(prompt_from_q));
                 }
             }
@@ -28,6 +37,15 @@ pub fn ChatPage() -> impl IntoView {
     });
 
     view! {
+        <ChatHeader
+            system_prompts=state.system_prompts
+            selected_prompt_name=state.selected_prompt_name
+            set_selected_prompt_name=state.set_selected_prompt_name
+            can_go_prev=can_go_prev
+            can_go_next=can_go_next
+            on_prev=on_prev
+            on_next=on_next
+        />
         <ChatInterface
             messages=state.messages.read_only()
             set_messages=state.messages.write_only()
