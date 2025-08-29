@@ -67,7 +67,7 @@ fn MainContent() -> impl IntoView {
     // Current session state
     let messages = RwSignal::new(Vec::<Message>::new());
     let error = RwSignal::new(None::<String>);
-
+    let current_session_id = RwSignal::new(None::<String>);
     // --- Child-to-Parent Communication ---
     let (session_load_request, set_session_load_request) = signal(None::<String>);
     let navigation_request = RwSignal::new(None::<String>);
@@ -75,7 +75,7 @@ fn MainContent() -> impl IntoView {
 
     let debounced_save_session = use_debounce_fn(
         move || {
-            let session_id_to_save = use_context::<GlobalState>().unwrap().current_session_id.get();
+            let session_id_to_save = current_session_id.get();
             let msgs_to_save = messages.get();
 
             if let Some(session_id_to_save) = session_id_to_save {
@@ -127,7 +127,7 @@ fn MainContent() -> impl IntoView {
         selected_prompt_name,
         set_selected_prompt_name,
         error,
-        current_session_id: RwSignal::new(None::<String>),
+        current_session_id,
         session_load_request: set_session_load_request,
         navigation_request,
         initial_chat_prompt,
