@@ -570,7 +570,7 @@ header .tabs button[data-active="true"] {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--base04);
+    color: var(--base03);
 }
 
 .system-prompt-inputs {
