@@ -1,13 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import type { SystemPrompt } from '@/types/storage';
 
 const SettingsPage: React.FC = () => {
-  const apiKey = useAppStore((state) => state.apiKey);
-  const setApiKey = useAppStore((state) => state.setApiKey);
+  const storeApiKey = useAppStore((state) => state.apiKey);
+  const setStoreApiKey = useAppStore((state) => state.setApiKey);
   const systemPrompts = useAppStore((state) => state.systemPrompts);
   const setSystemPrompts = useAppStore((state) => state.setSystemPrompts);
+
+  const [localApiKey, setLocalApiKey] = useState(storeApiKey);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+
+  useEffect(() => {
+    setLocalApiKey(storeApiKey);
+  }, [storeApiKey]);
+
+  const handleSaveApiKey = () => {
+    setStoreApiKey(localApiKey);
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  };
 
   const handleNewPrompt = () => {
     const newPrompts = [{ name: '', prompt: '' }, ...systemPrompts];
@@ -30,12 +43,18 @@ const SettingsPage: React.FC = () => {
     <div style={{ marginBottom: '50px' }}>
       <div className="settings-section">
         <div className="settings-label">OPENROUTER_API_KEY</div>
-        <input
-          type="text"
-          value={apiKey}
-          onInput={(e) => setApiKey(e.currentTarget.value)}
-          placeholder="OPENROUTER_API_KEY"
-        />
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={localApiKey}
+            onChange={(e) => setLocalApiKey(e.currentTarget.value)}
+            placeholder="OPENROUTER_API_KEY"
+            style={{ flexGrow: 1 }}
+          />
+          <button onClick={handleSaveApiKey} data-role="primary" disabled={saveStatus === 'saved'}>
+            {saveStatus === 'saved' ? 'Saved!' : 'Save'}
+          </button>
+        </div>
       </div>
       <div className="settings-section">
         <div className="settings-label">system prompts</div>
