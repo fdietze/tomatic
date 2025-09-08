@@ -448,7 +448,7 @@ button.chat-controls-system-prompt {
 .combobox-error-message,
 .combobox-no-results {
     padding: 8px 12px;
-    color: var(--base04);
+    color: var(--base03);
     background-color: var(--base00); /* Match suggestions background */
     border: 1px solid var(--base02);
     border-top: none;
