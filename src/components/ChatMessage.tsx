@@ -77,7 +77,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     <div
       className={`chat-message ${isSystemMessage && collapsed ? 'collapsed' : ''}`}
       data-role={message.role}
-      data-testid="chat-message"
+      data-testid={`chat-message-${messageIndex}`}
     >
       <div style={{ display: 'flex' }} onClick={toggleCollapsed}>
         <div className="chat-message-role">{roleDisplay}</div>

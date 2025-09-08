@@ -49,8 +49,6 @@ const Header: React.FC = () => {
 const App: React.FC = () => {
   // Fetch initial data on app load
   useEffect(() => {
-    useAppStore.getState().fetchSessionList();
-
     // Check for stale selected prompt on startup
     const { systemPrompts, selectedPromptName, setSelectedPromptName } = useAppStore.getState();
     if (selectedPromptName) {

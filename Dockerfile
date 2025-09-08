@@ -1,5 +1,5 @@
 # Use the official Node.js image as a base
-FROM node:22-slim
+FROM docker.io/library/node:22-slim
 
 # Install Playwright browsers and their dependencies
 RUN apt-get update && apt-get install -yq libgconf-2-4 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev libnss3 libxss1 && \

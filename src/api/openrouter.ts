@@ -15,6 +15,9 @@ const modelInfoSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   context_length: z.number(),
+  created: z.number().optional(),
+  canonical_slug: z.string().nullable().optional(),
+  hugging_face_id: z.string().nullable().optional(),
   architecture: z.object({
     modality: z.string(),
     input_modalities: z.array(z.string()),
@@ -27,12 +30,18 @@ const modelInfoSchema = z.object({
     completion: z.string(),
     request: z.string().optional().nullable(),
     image: z.string().optional().nullable(),
+    web_search: z.string().optional().nullable(),
+    internal_reasoning: z.string().optional().nullable(),
+    input_cache_read: z.string().optional().nullable(),
+    input_cache_write: z.string().optional().nullable(),
   }),
   top_provider: z.object({
     context_length: z.number().nullable(),
     max_completion_tokens: z.number().nullable(),
     is_moderated: z.boolean(),
   }),
+  per_request_limits: z.unknown().nullable().optional(),
+  supported_parameters: z.array(z.string()).nullable().optional(),
 });
 
 // Zod schema for the entire API response

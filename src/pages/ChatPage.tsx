@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/appStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,16 +15,16 @@ const ChatPage: React.FC = () => {
     systemPrompts,
     selectedPromptName,
     setSelectedPromptName,
-    sortedSessionIds,
-    currentSessionId,
+    prevSessionId,
+    nextSessionId,
   } = useAppStore(
     useShallow((state) => ({
       loadSession: state.loadSession,
       systemPrompts: state.systemPrompts,
       selectedPromptName: state.selectedPromptName,
       setSelectedPromptName: state.setSelectedPromptName,
-      sortedSessionIds: state.sortedSessionIds,
-      currentSessionId: state.currentSessionId,
+      prevSessionId: state.prevSessionId,
+      nextSessionId: state.nextSessionId,
     }))
   );
 
@@ -42,37 +42,18 @@ const ChatPage: React.FC = () => {
     }
   }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams]);
 
-  const currentSessionIndex = useMemo(() => {
-    if (!currentSessionId) return null;
-    return sortedSessionIds.indexOf(currentSessionId);
-  }, [currentSessionId, sortedSessionIds]);
-
-  const canGoPrev = useMemo(() => {
-    if (currentSessionIndex === null) {
-      return sortedSessionIds.length > 0;
-    }
-    return currentSessionIndex + 1 < sortedSessionIds.length;
-  }, [currentSessionIndex, sortedSessionIds.length]);
-  
-  const canGoNext = useMemo(() => {
-      return currentSessionIndex !== null && currentSessionIndex > 0;
-  }, [currentSessionIndex]);
+  const canGoPrev = !!prevSessionId; // "Prev" button goes to older sessions
+  const canGoNext = !!nextSessionId; // "Next" button goes to newer sessions
 
   const onPrev = () => {
-    if (!canGoPrev) return;
-    const newIndex = currentSessionIndex === null ? 0 : currentSessionIndex + 1;
-    const nextId = sortedSessionIds[newIndex];
-    if (nextId) {
-        navigate(`/chat/${nextId}`);
+    if (prevSessionId) {
+      navigate(`/chat/${prevSessionId}`);
     }
   };
 
   const onNext = () => {
-    if (!canGoNext || currentSessionIndex === null) return;
-    const newIndex = currentSessionIndex - 1;
-    const prevId = sortedSessionIds[newIndex];
-    if (prevId) {
-        navigate(`/chat/${prevId}`);
+    if (nextSessionId) {
+      navigate(`/chat/${nextSessionId}`);
     }
   };
 

@@ -9,17 +9,18 @@ const messageCostSchema = z.object({
 });
 
 const messageSchema = z.object({
-  prompt_name: z.string().nullable(),
+  id: z.string(),
+  prompt_name: z.string().nullable().optional(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
-  model_name: z.string().nullable(),
-  cost: messageCostSchema.nullable(),
+  model_name: z.string().nullable().optional(),
+  cost: messageCostSchema.nullable().optional(),
 });
 
 const chatSessionSchema = z.object({
   session_id: z.string(),
   messages: z.array(messageSchema),
-  name: z.string().nullable(),
+  name: z.string().nullable().optional(),
   created_at_ms: z.number(),
   updated_at_ms: z.number(),
   prompt_name: z.string().nullable(),
@@ -27,7 +28,7 @@ const chatSessionSchema = z.object({
 
 // --- IndexedDB Constants ---
 const DB_NAME = 'tomatic_chat_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSIONS_STORE_NAME = 'chat_sessions';
 const SESSION_ID_KEY_PATH = 'session_id';
 const UPDATED_AT_INDEX = 'updated_at_ms';
@@ -91,18 +92,52 @@ export async function loadSession(sessionId: string): Promise<ChatSession | null
   }
 }
 
-export async function getAllSessionKeysSortedByUpdate(): Promise<string[]> {
+export async function findNeighbourSessionIds(
+  currentSession: ChatSession,
+): Promise<{ prevId: string | null; nextId: string | null }> {
   try {
     const db = await getDb();
-    const keys = await db.getAllKeysFromIndex(
-      SESSIONS_STORE_NAME,
-      UPDATED_AT_INDEX,
+    const tx = db.transaction(SESSIONS_STORE_NAME, 'readonly');
+    const index = tx.store.index(UPDATED_AT_INDEX);
+    const currentTimestamp = currentSession.updated_at_ms;
+
+    // Query for the previous (older) session ID
+    const prevCursor = await index.openKeyCursor(
+      IDBKeyRange.upperBound(currentTimestamp, true), // keys < currentTimestamp
+      'prev', // Go backwards from the upper bound to get the newest of the older sessions
     );
-    // The keys are sorted ascending by default, we want descending (newest first).
-    return keys.reverse();
+    const prevId = prevCursor ? (prevCursor.primaryKey as string) : null;
+
+    // Query for the next (newer) session ID
+    const nextCursor = await index.openKeyCursor(
+      IDBKeyRange.lowerBound(currentTimestamp, true), // keys > currentTimestamp
+      'next', // Go forwards from the lower bound to get the oldest of the newer sessions
+    );
+    const nextId = nextCursor ? (nextCursor.primaryKey as string) : null;
+
+    await tx.done;
+    return { prevId, nextId };
   } catch (error) {
-    console.error('[DB] ListKeys: Failed to get all session keys:', error);
-    throw new Error('Failed to get session keys.');
+    console.error(
+      `[DB] findNeighbourSessionIds: Failed to find neighbors for '${currentSession.session_id}':`,
+      error,
+    );
+    return { prevId: null, nextId: null };
+  }
+}
+
+export async function getMostRecentSessionId(): Promise<string | null> {
+  try {
+    const db = await getDb();
+    const cursor = await db
+      .transaction(SESSIONS_STORE_NAME, 'readonly')
+      .store.index(UPDATED_AT_INDEX)
+      .openKeyCursor(null, 'prev'); // 'prev' direction gets the newest item first
+
+    return cursor ? (cursor.primaryKey as string) : null;
+  } catch (error) {
+    console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
+    return null;
   }
 }
 

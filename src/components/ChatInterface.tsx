@@ -157,7 +157,7 @@ const ChatInterface: React.FC = () => {
 
                 {messages.map((message, index) => (
                     <ChatMessage
-                        key={index} // Note: Using index is not ideal if messages can be deleted/inserted.
+                        key={message.id} // Note: Using index is not ideal if messages can be deleted/inserted.
                         message={message}
                         messageIndex={index}
                         onRegenerate={handleRegenerate}

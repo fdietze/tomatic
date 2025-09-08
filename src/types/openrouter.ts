@@ -13,6 +13,10 @@ export interface PricingInfo {
   completion: string;
   request?: string | null;
   image?: string | null;
+  web_search?: string | null;
+  internal_reasoning?: string | null;
+  input_cache_read?: string | null;
+  input_cache_write?: string | null;
 }
 
 export interface TopProviderInfo {
@@ -26,7 +30,12 @@ export interface ModelInfo {
   name: string;
   description: string | null;
   context_length: number;
+  created?: number;
+  canonical_slug?: string | null;
+  hugging_face_id?: string | null;
   architecture: ArchitectureDetails;
   pricing: PricingInfo;
   top_provider: TopProviderInfo;
+  per_request_limits?: unknown | null;
+  supported_parameters?: string[] | null;
 }

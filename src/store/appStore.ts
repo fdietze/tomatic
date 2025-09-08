@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { NavigateFunction } from 'react-router-dom';
 import {
-  getAllSessionKeysSortedByUpdate,
+  findNeighbourSessionIds,
+  getMostRecentSessionId,
   loadSession,
   saveSession,
   deleteSession as dbDeleteSession,
@@ -31,8 +32,9 @@ interface AppState {
   // --- Session State (in IndexedDB, managed by actions) ---
   messages: Message[];
   currentSessionId: string | null;
-  sortedSessionIds: string[];
-  
+  prevSessionId: string | null;
+  nextSessionId: string | null;
+
   // --- Transient State ---
   error: string | null;
   modelsLoading: boolean;
@@ -54,13 +56,16 @@ interface AppState {
   loadSession: (sessionId: string | 'new') => Promise<void>;
   startNewSession: () => void;
   saveCurrentSession: () => Promise<void>;
-  deleteSession: (sessionId: string) => Promise<void>;
-  fetchSessionList: () => Promise<void>;
+  deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
 
   fetchModelList: () => Promise<void>;
   
   // Core chat actions
-  submitMessage: (options: { promptOverride?: string; navigate?: NavigateFunction }) => Promise<void>;
+  submitMessage: (options: {
+    promptOverride?: string;
+    navigate?: NavigateFunction;
+    isRegeneration?: boolean;
+  }) => Promise<void>;
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
   cancelStream: () => void;
@@ -80,8 +85,9 @@ export const useAppStore = create<AppState>()(
       // --- Session State ---
       messages: [],
       currentSessionId: null,
-      sortedSessionIds: [],
-      
+      prevSessionId: null,
+      nextSessionId: null,
+
       // --- Transient State ---
       error: null,
       modelsLoading: false,
@@ -107,26 +113,34 @@ export const useAppStore = create<AppState>()(
       setInitialChatPrompt: (prompt) => set({ initialChatPrompt: prompt }),
       
       loadSession: async (sessionId) => {
-        if (get().currentSessionId === sessionId) {
-            return; // Session is already in memory, no need to load.
+        if (get().isStreaming) {
+          get().cancelStream();
         }
-        set({ error: null });
+        if (get().currentSessionId === sessionId && sessionId !== 'new') {
+          return; // Session is already in memory, no need to load.
+        }
+
+        set({ error: null, messages: [], currentSessionId: sessionId });
+
         if (sessionId === 'new') {
-          get().startNewSession();
+          await get().startNewSession();
           return;
         }
-        
+
         try {
           const session = await loadSession(sessionId);
           if (session) {
+            const { prevId, nextId } = await findNeighbourSessionIds(session);
             set({
               messages: session.messages,
               currentSessionId: session.session_id,
               selectedPromptName: session.prompt_name,
+              prevSessionId: prevId,
+              nextSessionId: nextId,
             });
           } else {
             get().setError(`Session ${sessionId} not found.`);
-            get().startNewSession(); 
+            await get().startNewSession();
           }
         } catch (e) {
           console.error(e);
@@ -134,18 +148,16 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      startNewSession: () => {
+      startNewSession: async () => {
+        const mostRecentId = await getMostRecentSessionId();
         set({
           messages: [],
           currentSessionId: null,
+          prevSessionId: mostRecentId, // The "previous" session from "new" is the most recent one
+          nextSessionId: null,
         });
       },
       
-      fetchSessionList: async () => {
-        const sortedSessionIds = await getAllSessionKeysSortedByUpdate();
-        set({ sortedSessionIds });
-      },
-
       saveCurrentSession: async () => {
         const { currentSessionId, messages, selectedPromptName } = get();
         if (messages.length === 0 || !currentSessionId) return;
@@ -161,14 +173,28 @@ export const useAppStore = create<AppState>()(
           name: existingSession?.name || null,
         };
         await saveSession(session);
-        await get().fetchSessionList(); // Refresh list after saving
+        // No longer need to fetch the whole list after saving
       },
 
-      deleteSession: async (sessionId) => {
+      deleteSession: async (sessionId, navigate) => {
+        const sessionToDelete = await loadSession(sessionId);
+        if (!sessionToDelete) return;
+
+        // Find neighbors before deleting to know where to navigate next.
+        const { prevId } = await findNeighbourSessionIds(sessionToDelete);
+
         await dbDeleteSession(sessionId);
-        await get().fetchSessionList();
+
         if (get().currentSessionId === sessionId) {
-          get().startNewSession();
+          // Navigate to the next older session, or to 'new' if it was the oldest.
+          navigate(prevId ? `/chat/${prevId}` : '/chat/new');
+        } else {
+          // If we deleted a background session, we might need to update the
+          // current session's neighbor state if the deleted one was a neighbor.
+          const currentId = get().currentSessionId;
+          if (currentId) {
+            await get().loadSession(currentId);
+          }
         }
       },
 
@@ -187,8 +213,8 @@ export const useAppStore = create<AppState>()(
       },
 
       // --- Core Chat Actions ---
-      submitMessage: async ({ promptOverride, navigate }) => {
-        const { input, apiKey, modelName, messages, systemPrompts, selectedPromptName } = get();
+      submitMessage: async ({ promptOverride, navigate, isRegeneration }) => {
+        const { input, apiKey, modelName, systemPrompts, selectedPromptName } = get();
         const content = promptOverride || input;
         if (!content || !apiKey) return;
 
@@ -201,8 +227,9 @@ export const useAppStore = create<AppState>()(
 
         const newMessages: Message[] = [];
         const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
-        if (messages.length === 0 && systemPrompt) {
+        if (get().messages.length === 0 && systemPrompt) {
             newMessages.push({
+                id: uuidv4(),
                 role: 'system',
                 content: systemPrompt.prompt,
                 prompt_name: systemPrompt.name,
@@ -210,9 +237,13 @@ export const useAppStore = create<AppState>()(
             });
         }
         
-        newMessages.push({ role: 'user', content, prompt_name: null, model_name: null, cost: null });
+        if (!isRegeneration) {
+            newMessages.push({ id: uuidv4(), role: 'user', content, prompt_name: null, model_name: null, cost: null });
+        }
 
-        set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
+        if (newMessages.length > 0) {
+            set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
+        }
         
         // Navigate after the first message if it's a new session
         if (isNewSession && navigate && sessionId) {
@@ -233,7 +264,7 @@ export const useAppStore = create<AppState>()(
             );
 
             set((state) => ({ 
-                messages: [...state.messages, { role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
+                messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
             }));
 
             for await (const chunk of stream) {
@@ -255,22 +286,28 @@ export const useAppStore = create<AppState>()(
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(error);
             // Remove the placeholder assistant message on error
-            set(state => ({ messages: state.messages.slice(0, -1) }));
+            set(state => ({ messages: state.messages.filter(m => m.role !== 'assistant' || m.content !== '') }));
         } finally {
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
+            // After saving, we need to update the neighbors
+            const currentSession = await loadSession(get().currentSessionId!);
+            if (currentSession) {
+                const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
+                set({ prevSessionId: prevId, nextSessionId: nextId });
+            }
         }
       },
 
       regenerateMessage: async (index) => {
         const messagesToRegenerate = get().messages.slice(0, index);
-        const lastUserMessage = messagesToRegenerate.reverse().find(m => m.role === 'user');
+        const lastUserMessage = messagesToRegenerate.reverse().find((m) => m.role === 'user');
         
         set({ messages: get().messages.slice(0, index) }); // Trim history
 
         if (lastUserMessage) {
             // Since this is an internal call, we don't need to navigate.
-            await get().submitMessage({ promptOverride: lastUserMessage.content });
+            await get().submitMessage({ promptOverride: lastUserMessage.content, isRegeneration: true });
         }
       },
 
@@ -279,7 +316,7 @@ export const useAppStore = create<AppState>()(
         newMessages[index] = { ...newMessages[index], content: newContent };
         
         set({ messages: newMessages.slice(0, index + 1) });
-        await get().submitMessage({ promptOverride: newContent });
+        await get().submitMessage({ promptOverride: newContent, isRegeneration: true });
       },
       
       cancelStream: () => {
