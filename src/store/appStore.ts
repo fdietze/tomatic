@@ -13,6 +13,69 @@ import { listAvailableModels, requestMessageContentStreamed } from '@/api/openro
 import type { ChatSession, Message } from '@/types/chat';
 import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
 
+const STORAGE_KEY = 'tomatic-storage';
+
+// --- One-Time LocalStorage Migration ---
+// This function checks for data from the old, non-Zustand version of the app
+// and migrates it to the new Zustand-managed format.
+const runLocalStorageMigration = () => {
+  if (localStorage.getItem(STORAGE_KEY)) {
+    // New storage format already exists, no migration needed.
+    return;
+  }
+
+  const oldApiKey = localStorage.getItem('OPENROUTER_API_KEY');
+  if (!oldApiKey) {
+    // No sign of old data, nothing to migrate.
+    return;
+  }
+
+  console.log('[Migration] Migrating old localStorage data to new format...');
+
+  try {
+    const oldState = {
+      apiKey: oldApiKey || '',
+      modelName: localStorage.getItem('MODEL_NAME') || 'google/gemini-2.5-pro',
+      systemPrompts: JSON.parse(localStorage.getItem('system_prompts') || '[]'),
+      cachedModels: JSON.parse(localStorage.getItem('cached_models') || '[]'),
+      input: localStorage.getItem('input') || '',
+      selectedPromptName: JSON.parse(localStorage.getItem('selected_prompt_name') || 'null'),
+    };
+
+    const newState = {
+      state: oldState,
+      version: 0, 
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+
+    // Clean up old keys
+    localStorage.removeItem('OPENROUTER_API_KEY');
+    localStorage.removeItem('MODEL_NAME');
+    localStorage.removeItem('system_prompts');
+    localStorage.removeItem('cached_models');
+    localStorage.removeItem('input');
+    localStorage.removeItem('selected_prompt_name');
+    
+    console.log('[Migration] Migration successful.');
+
+  } catch (error) {
+    console.error('[Migration] Failed to migrate localStorage:', error);
+    // If migration fails, it's safer to clear the broken old keys
+    // to prevent a broken state on next load.
+    localStorage.removeItem('OPENROUTER_API_KEY');
+    localStorage.removeItem('MODEL_NAME');
+    localStorage.removeItem('system_prompts');
+    localStorage.removeItem('cached_models');
+    localStorage.removeItem('input');
+    localStorage.removeItem('selected_prompt_name');
+  }
+};
+
+// Run the migration before the store is created.
+runLocalStorageMigration();
+
+
 // Helper to get the current system prompt object
 const getCurrentSystemPrompt = (prompts: SystemPrompt[], name: string | null): SystemPrompt | null => {
     if (!name) return null;
@@ -418,8 +481,17 @@ export const useAppStore = create<AppState>()(
 
     }),
     {
-      name: 'tomatic-storage', 
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
+      version: 1, // Start versioning our state
+      migrate: (persistedState, version) => {
+        if (version === 0) {
+          // In this specific case, the migration from v0 to v1 requires no changes,
+          // as the initial migration script already shapes the data correctly for v1.
+          // This block is here to establish the pattern for future migrations.
+        }
+        return persistedState as AppState;
+      },
       partialize: (state) => ({
         apiKey: state.apiKey,
         systemPrompts: state.systemPrompts,

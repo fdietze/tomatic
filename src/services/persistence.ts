@@ -1,6 +1,7 @@
 import { openDB, DBSchema } from 'idb';
 import { z } from 'zod';
-import type { ChatSession } from '@/types/chat';
+import { v4 as uuidv4 } from 'uuid';
+import type { ChatSession, Message } from '@/types/chat';
 
 // --- Zod Schemas for Runtime Validation ---
 const messageCostSchema = z.object({
@@ -49,17 +50,43 @@ async function getDb() {
   return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, tx) {
       if (oldVersion < 2) {
-        if (db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
-            const store = tx.objectStore(SESSIONS_STORE_NAME);
-            if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
-                store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
-            }
-        } else {
-             const store = db.createObjectStore(SESSIONS_STORE_NAME, {
-                keyPath: SESSION_ID_KEY_PATH,
-            });
-            store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
+        console.log('[DB] Upgrading database from version 1 to 2...');
+        // Create store if it doesn't exist
+        const store = db.objectStoreNames.contains(SESSIONS_STORE_NAME)
+          ? tx.objectStore(SESSIONS_STORE_NAME)
+          : db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
+        
+        // Create index if it doesn't exist
+        if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+          store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
         }
+
+        // Migrate data
+        (store.openCursor()).then(async function migrate(cursor) {
+          if (!cursor) {
+            console.log('[DB] Migration complete.');
+            return;
+          }
+          
+          const oldSession = cursor.value;
+
+          // V2 introduces optional `name` on sessions and required `id` and optional `prompt_name` on messages
+          const newSession: ChatSession = {
+            ...oldSession,
+            name: oldSession.name || null,
+            messages: oldSession.messages.map((m: any) => {
+              const newMessage: Message = {
+                ...m,
+                id: m.id || uuidv4(),
+                prompt_name: m.prompt_name || null,
+              };
+              return newMessage;
+            }),
+          };
+          
+          cursor.update(newSession);
+          cursor.continue().then(migrate);
+        });
       }
     },
   });
