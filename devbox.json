@@ -16,9 +16,9 @@
     "leptosfmt":    "latest",
     "cargo-chef":   "latest",
     "bacon":        "latest",
-    "ollama":       "latest",
     "cargo-leptos": "latest",
     "cargo-udeps":  "latest",
+    "nodejs":       "latest",
   },
   "shell": {
     "init_hook": [

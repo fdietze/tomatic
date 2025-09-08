@@ -1,0 +1,10 @@
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.4;
+}
+
