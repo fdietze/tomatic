@@ -140,20 +140,28 @@ const ChatInterface: React.FC = () => {
     return (
         <div className="chat-interface">
             <div className="chat-history" ref={historyRef}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--background-secondary-color)', position: 'sticky', top: 0, zIndex: 10 }}>
-                    <div style={{ flexGrow: 1 }}>
-                        <Combobox
-                            items={modelComboboxItems}
-                            selectedId={modelName}
-                            onSelect={setModelName}
-                            placeholder="Select or type model ID (e.g. openai/gpt-4o)"
-                            loading={modelsLoading}
-                            onReload={fetchModelList}
-                            errorMessage={modelsError}
-                            disabled={!apiKey}
-                        />
+                {apiKey && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px', borderBottom: '1px solid var(--base02)' }}>
+                        <div style={{ flexGrow: 1 }}>
+                            <Combobox
+                                items={modelComboboxItems}
+                                selectedId={modelName}
+                                onSelect={setModelName}
+                                placeholder="Select or type model ID (e.g. openai/gpt-4o)"
+                                loading={modelsLoading}
+                                onReload={fetchModelList}
+                                errorMessage={modelsError}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {!apiKey && messages.length === 0 && (
+                    <div className="onboarding-message">
+                        <p style={{ marginBottom: '1em' }}>To get started, please add your API key in the settings.</p>
+                        <button data-role="primary" onClick={() => navigate('/settings')}>Go to Settings</button>
+                    </div>
+                )}
 
                 {messages.map((message, index) => (
                     <ChatMessage
@@ -181,6 +189,7 @@ const ChatInterface: React.FC = () => {
                 onCancel={handleCancel}
                 isMobile={isMobile}
                 inputRef={inputRef}
+                apiKey={apiKey}
             />
         </div>
     );

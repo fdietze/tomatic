@@ -9,6 +9,7 @@ interface ChatControlsProps {
   onCancel: () => void;
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  apiKey: string;
 }
 
 const ChatControls: React.FC<ChatControlsProps> = ({
@@ -19,6 +20,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   onCancel,
   isMobile,
   inputRef,
+  apiKey,
 }) => {
   
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -44,7 +46,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
             onInput={(e) => setInput(e.currentTarget.value)}
             placeholder="Message"
             onKeyDown={handleKeyDown}
-            disabled={isStreaming}
+            disabled={isStreaming || !apiKey}
             data-testid="chat-input"
           />
           {isStreaming ? (
@@ -62,7 +64,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
               type="submit"
               data-role="primary"
               style={{ flexShrink: 0 }}
-              disabled={input.trim().length === 0}
+              disabled={input.trim().length === 0 || !apiKey}
               data-testid="chat-submit"
             >
               Go

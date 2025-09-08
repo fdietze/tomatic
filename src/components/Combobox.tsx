@@ -2,8 +2,6 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
 
-const MIN_QUERY_LENGTH = 1;
-
 export interface ComboboxItem {
   id: string;
   display_text: string;
@@ -58,9 +56,6 @@ const Combobox: React.FC<ComboboxProps> = ({
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (query.length < MIN_QUERY_LENGTH) {
-      return [];
-    }
     const searchTerms = query.split(/\s+/);
     return items.filter((item) => {
       const itemText = `${item.id} ${item.display_text}`.toLowerCase();
@@ -140,14 +135,12 @@ const Combobox: React.FC<ComboboxProps> = ({
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearchQuery(newValue);
-    setShowSuggestions(newValue.length >= MIN_QUERY_LENGTH);
+    setShowSuggestions(true);
     setHighlightedIndex(null);
   };
 
   const handleFocus = () => {
-    if (searchQuery.length >= MIN_QUERY_LENGTH) {
-      setShowSuggestions(true);
-    }
+    setShowSuggestions(true);
   };
 
   return (

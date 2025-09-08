@@ -625,3 +625,11 @@ header .tabs button[data-active="true"] {
     border-radius: 8px;
     padding: 8px;
 }
+
+.onboarding-message {
+    padding: 20px;
+    margin: 20px;
+    text-align: center;
+    background-color: var(--base01);
+    border-radius: 8px;
+}

@@ -77,7 +77,7 @@ export const useAppStore = create<AppState>()(
       // --- Persisted State ---
       apiKey: '',
       systemPrompts: [],
-      modelName: 'openai/gpt-4o',
+      modelName: 'google/gemini-2.5-pro',
       cachedModels: [],
       input: '',
       selectedPromptName: null,
