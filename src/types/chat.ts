@@ -18,5 +18,4 @@ export interface ChatSession {
   name?: string | null;
   created_at_ms: number;
   updated_at_ms: number;
-  prompt_name: string | null;
 }

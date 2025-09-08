@@ -11,6 +11,7 @@ const SettingsPage: React.FC = () => {
 
   const handleNewPrompt = () => {
     const newPrompts = [{ name: '', prompt: '' }, ...systemPrompts];
+    console.log('[DEBUG] new prompts list in handleNewPrompt:', newPrompts);
     setSystemPrompts(newPrompts);
   };
 
@@ -49,8 +50,10 @@ const SettingsPage: React.FC = () => {
         <div className="system-prompt-list">
           {systemPrompts.map((prompt, index) => (
             <SystemPromptItem
-              key={index} // Using index is okay here as we don't have stable IDs
+              key={prompt.name || `new-prompt-${index}`} // Use a more stable key
               prompt={prompt}
+              promptIndex={index}
+              allPrompts={systemPrompts}
               onUpdate={(updatedPrompt) => handleUpdatePrompt(index, updatedPrompt)}
               onRemove={() => handleRemovePrompt(index)}
             />

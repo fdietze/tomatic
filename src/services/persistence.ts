@@ -23,7 +23,6 @@ const chatSessionSchema = z.object({
   name: z.string().nullable().optional(),
   created_at_ms: z.number(),
   updated_at_ms: z.number(),
-  prompt_name: z.string().nullable(),
 });
 
 // --- IndexedDB Constants ---
@@ -60,18 +59,20 @@ async function getDb() {
 }
 
 export async function saveSession(session: ChatSession): Promise<void> {
+  const db = await getDb();
   try {
-    const db = await getDb();
     await db.put(SESSIONS_STORE_NAME, session);
   } catch (error) {
     console.error('[DB] Save: Failed to save session:', error);
     throw new Error('Failed to save session.');
+  } finally {
+    db.close();
   }
 }
 
 export async function loadSession(sessionId: string): Promise<ChatSession | null> {
+  const db = await getDb();
   try {
-    const db = await getDb();
     const result = await db.get(SESSIONS_STORE_NAME, sessionId);
     if (!result) {
       return null;
@@ -89,14 +90,16 @@ export async function loadSession(sessionId: string): Promise<ChatSession | null
   } catch (error) {
     console.error(`[DB] Load: Failed to load session '${sessionId}':`, error);
     throw new Error('Failed to load session.');
+  } finally {
+    db.close();
   }
 }
 
 export async function findNeighbourSessionIds(
   currentSession: ChatSession,
 ): Promise<{ prevId: string | null; nextId: string | null }> {
+  const db = await getDb();
   try {
-    const db = await getDb();
     const tx = db.transaction(SESSIONS_STORE_NAME, 'readonly');
     const index = tx.store.index(UPDATED_AT_INDEX);
     const currentTimestamp = currentSession.updated_at_ms;
@@ -123,12 +126,14 @@ export async function findNeighbourSessionIds(
       error,
     );
     return { prevId: null, nextId: null };
+  } finally {
+    db.close();
   }
 }
 
 export async function getMostRecentSessionId(): Promise<string | null> {
+  const db = await getDb();
   try {
-    const db = await getDb();
     const cursor = await db
       .transaction(SESSIONS_STORE_NAME, 'readonly')
       .store.index(UPDATED_AT_INDEX)
@@ -138,15 +143,19 @@ export async function getMostRecentSessionId(): Promise<string | null> {
   } catch (error) {
     console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
     return null;
+  } finally {
+    db.close();
   }
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
+  const db = await getDb();
   try {
-    const db = await getDb();
     await db.delete(SESSIONS_STORE_NAME, sessionId);
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete session '${sessionId}':`, error);
     throw new Error('Failed to delete session.');
+  } finally {
+    db.close();
   }
 }

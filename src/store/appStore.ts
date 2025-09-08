@@ -101,7 +101,36 @@ export const useAppStore = create<AppState>()(
       setSystemPrompts: (systemPrompts) => set({ systemPrompts }),
       setModelName: (modelName) => set({ modelName }),
       setInput: (input) => set({ input }),
-      setSelectedPromptName: (selectedPromptName) => set({ selectedPromptName }),
+      setSelectedPromptName: (selectedPromptName) => {
+        const { systemPrompts, messages } = get();
+        const newPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
+        const newMessages = [...messages];
+
+        const systemMessageIndex = newMessages.findIndex((m) => m.role === 'system');
+
+        if (newPrompt) {
+          const newSystemMessage: Message = {
+            id: uuidv4(),
+            role: 'system',
+            content: newPrompt.prompt,
+            prompt_name: newPrompt.name,
+            model_name: null,
+            cost: null,
+          };
+          if (systemMessageIndex !== -1) {
+            // Replace existing system message
+            newMessages[systemMessageIndex] = newSystemMessage;
+          } else {
+            // Add new system message to the beginning
+            newMessages.unshift(newSystemMessage);
+          }
+        } else if (systemMessageIndex !== -1) {
+          // Remove system message if prompt is deselected
+          newMessages.splice(systemMessageIndex, 1);
+        }
+
+        set({ selectedPromptName, messages: newMessages });
+      },
 
       setError: (error) => {
         if (error) {
@@ -113,9 +142,15 @@ export const useAppStore = create<AppState>()(
       setInitialChatPrompt: (prompt) => set({ initialChatPrompt: prompt }),
       
       loadSession: async (sessionId) => {
+        // This check MUST come first to prevent wiping state during navigation race conditions.
+        if (get().currentSessionId === sessionId && sessionId !== 'new') {
+          return;
+        }
+
         if (get().isStreaming) {
           get().cancelStream();
         }
+
         if (get().currentSessionId === sessionId && sessionId !== 'new') {
           return; // Session is already in memory, no need to load.
         }
@@ -130,11 +165,12 @@ export const useAppStore = create<AppState>()(
         try {
           const session = await loadSession(sessionId);
           if (session) {
+            const systemMessage = session.messages.find(m => m.role === 'system');
             const { prevId, nextId } = await findNeighbourSessionIds(session);
             set({
               messages: session.messages,
               currentSessionId: session.session_id,
-              selectedPromptName: session.prompt_name,
+              selectedPromptName: systemMessage?.prompt_name || null,
               prevSessionId: prevId,
               nextSessionId: nextId,
             });
@@ -150,8 +186,23 @@ export const useAppStore = create<AppState>()(
       
       startNewSession: async () => {
         const mostRecentId = await getMostRecentSessionId();
+        const { systemPrompts, selectedPromptName } = get();
+        const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
+        
+        const initialMessages: Message[] = [];
+        if (systemPrompt) {
+          initialMessages.push({
+            id: uuidv4(),
+            role: 'system',
+            content: systemPrompt.prompt,
+            prompt_name: systemPrompt.name,
+            model_name: null,
+            cost: null,
+          });
+        }
+
         set({
-          messages: [],
+          messages: initialMessages,
           currentSessionId: null,
           prevSessionId: mostRecentId, // The "previous" session from "new" is the most recent one
           nextSessionId: null,
@@ -159,7 +210,7 @@ export const useAppStore = create<AppState>()(
       },
       
       saveCurrentSession: async () => {
-        const { currentSessionId, messages, selectedPromptName } = get();
+        const { currentSessionId, messages } = get();
         if (messages.length === 0 || !currentSessionId) return;
 
         const existingSession = await loadSession(currentSessionId);
@@ -167,7 +218,6 @@ export const useAppStore = create<AppState>()(
         const session: ChatSession = {
           session_id: currentSessionId,
           messages,
-          prompt_name: selectedPromptName,
           created_at_ms: existingSession?.created_at_ms || Date.now(),
           updated_at_ms: Date.now(),
           name: existingSession?.name || null,
@@ -218,10 +268,14 @@ export const useAppStore = create<AppState>()(
         const content = promptOverride || input;
         if (!content || !apiKey) return;
 
+        console.log('[DEBUG] submitMessage START. Content:', content);
+
         let sessionId = get().currentSessionId;
         const isNewSession = !sessionId;
         if (isNewSession) {
             sessionId = uuidv4();
+            // The new session object is created in saveCurrentSession, which is called
+            // in the finally block. We just need to ensure the session ID is set.
             set({ currentSessionId: sessionId });
         }
 
@@ -242,15 +296,19 @@ export const useAppStore = create<AppState>()(
         }
 
         if (newMessages.length > 0) {
-            set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
+          console.log('[DEBUG] submitMessage (existing session): adding user message. Current message count:', get().messages.length);
+          set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
+          console.log('[DEBUG] submitMessage (existing session): after adding user message. New message count:', get().messages.length);
         }
         
         // Navigate after the first message if it's a new session
         if (isNewSession && navigate && sessionId) {
+            console.log(`[DEBUG] submitMessage (new session): Navigating to /chat/${sessionId}`);
             navigate(`/chat/${sessionId}`, { replace: true });
         }
 
         const messagesToSubmit = get().messages;
+        console.log('[DEBUG] submitMessage: messagesToSubmit count:', messagesToSubmit.length, 'Content:', JSON.stringify(messagesToSubmit.map(m => m.content)));
         set({ isStreaming: true, error: null });
 
         const controller = new AbortController();
@@ -300,10 +358,28 @@ export const useAppStore = create<AppState>()(
       },
 
       regenerateMessage: async (index) => {
-        const messagesToRegenerate = get().messages.slice(0, index);
-        const lastUserMessage = messagesToRegenerate.reverse().find((m) => m.role === 'user');
+        console.log(`[DEBUG] regenerateMessage called for index: ${index}`);
+        const { messages, systemPrompts } = get();
+        const messagesToRegenerate = [...messages.slice(0, index)]; // Create a mutable copy
+
+        // Find the system message to check if its prompt needs updating
+        const systemMessageIndex = messagesToRegenerate.findIndex(m => m.role === 'system');
+        if (systemMessageIndex !== -1) {
+          const systemMessage = messagesToRegenerate[systemMessageIndex];
+          const latestPrompt = systemPrompts.find(p => p.name === systemMessage.prompt_name);
+
+          // If the prompt still exists and its content has changed, update the message
+          if (latestPrompt && latestPrompt.prompt !== systemMessage.content) {
+            console.log(`[DEBUG] Found updated prompt "${latestPrompt.name}". Updating content for regeneration.`);
+            messagesToRegenerate[systemMessageIndex] = { ...systemMessage, content: latestPrompt.prompt };
+          }
+        }
+
+        console.log('[DEBUG] regenerateMessage: messagesToRegenerate (after update)', JSON.stringify(messagesToRegenerate.map(m => m.content)));
         
-        set({ messages: get().messages.slice(0, index) }); // Trim history
+        const lastUserMessage = [...messagesToRegenerate].reverse().find((m) => m.role === 'user');
+        
+        set({ messages: messagesToRegenerate }); // Trim history and apply potential prompt update
 
         if (lastUserMessage) {
             // Since this is an internal call, we don't need to navigate.
