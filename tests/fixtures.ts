@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type BrowserContext } from '@playwright/test';
 
 const OPENROUTER_API_KEY = 'TEST_API_KEY';
 
@@ -73,6 +73,12 @@ export const MOCK_MODELS_RESPONSE = {
 
 // Extend basic test by providing a page fixture that logs all console messages.
 export const test = base.extend<{ apiMocks: void }>({
+  context: async ({ browser }, use) => {
+    const context = await browser.newContext();
+    await use(context);
+    await context.close();
+  },
+
   page: async ({ page }, use, testInfo) => {
     // Set mock API key before navigating
     await page.addInitScript((apiKey) => {

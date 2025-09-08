@@ -151,7 +151,6 @@ test('sends first message in a new session from UI', async ({ page }) => {
   // 3. Mock the response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const requestBody = await route.request().postDataJSON();
-    console.log('[DEBUG] API request body:', JSON.stringify(requestBody));
     const responseBody = createStreamResponse('openai/gpt-4o', 'First message response');
     await route.fulfill({
       headers: { 'Content-Type': 'application/json; charset=utf-8' },

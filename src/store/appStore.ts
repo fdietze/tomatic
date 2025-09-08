@@ -65,6 +65,7 @@ interface AppState {
     promptOverride?: string;
     navigate?: NavigateFunction;
     isRegeneration?: boolean;
+    messagesToRegenerate?: Message[];
   }) => Promise<void>;
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
@@ -263,7 +264,7 @@ export const useAppStore = create<AppState>()(
       },
 
       // --- Core Chat Actions ---
-      submitMessage: async ({ promptOverride, navigate, isRegeneration }) => {
+      submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate }) => {
         const { input, apiKey, modelName, systemPrompts, selectedPromptName } = get();
         const content = promptOverride || input;
         if (!content || !apiKey) return;
@@ -307,7 +308,7 @@ export const useAppStore = create<AppState>()(
             navigate(`/chat/${sessionId}`, { replace: true });
         }
 
-        const messagesToSubmit = get().messages;
+        const messagesToSubmit = messagesToRegenerate || get().messages;
         console.log('[DEBUG] submitMessage: messagesToSubmit count:', messagesToSubmit.length, 'Content:', JSON.stringify(messagesToSubmit.map(m => m.content)));
         set({ isStreaming: true, error: null });
 
@@ -321,11 +322,20 @@ export const useAppStore = create<AppState>()(
                 apiKey
             );
 
-            set((state) => ({ 
-                messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-            }));
+            if (isRegeneration) {
+              set({ 
+                  messages: [...messagesToSubmit, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
+              });
+            } else {
+              set((state) => ({ 
+                  messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
+              }));
+            }
+            console.log('[DEBUG] submitMessage: Assistant placeholder added. Total messages:', get().messages.length);
 
+            console.log('[DEBUG] submitMessage: Entering stream processing loop...');
             for await (const chunk of stream) {
+                console.log('[DEBUG] submitMessage: Received stream chunk.');
                 if (controller.signal.aborted) {
                   stream.controller.abort();
                   break;
@@ -333,6 +343,7 @@ export const useAppStore = create<AppState>()(
                 const contentChunk = chunk.choices[0]?.delta?.content || '';
                  set((state) => {
                     if (state.messages.length === 0 || state.messages[state.messages.length - 1].role !== 'assistant') {
+                        console.log('[DEBUG] submitMessage stream: bailing out, no assistant message found at the end.');
                         return state;
                     }
                     const lastMessage = state.messages[state.messages.length - 1];
@@ -340,20 +351,24 @@ export const useAppStore = create<AppState>()(
                     return { messages: [...state.messages.slice(0, -1), updatedMessage] };
                 });
             }
-        } catch (e) {
-            const error = e instanceof Error ? e.message : 'An unknown error occurred.';
-            get().setError(error);
-            // Remove the placeholder assistant message on error
-            set(state => ({ messages: state.messages.filter(m => m.role !== 'assistant' || m.content !== '') }));
-        } finally {
+            
+            // --- Finalization logic moved from finally block ---
+            console.log('[DEBUG] submitMessage stream finished. isStreaming:', get().isStreaming);
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
-            // After saving, we need to update the neighbors
             const currentSession = await loadSession(get().currentSessionId!);
             if (currentSession) {
                 const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
                 set({ prevSessionId: prevId, nextSessionId: nextId });
             }
+        } catch (e) {
+            const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            get().setError(error);
+            console.log(`[DEBUG] submitMessage error: ${error}`);
+            // Remove the placeholder assistant message on error
+            set(state => ({ messages: state.messages.filter(m => m.role !== 'assistant' || m.content !== '') }));
+             // Also need to reset streaming state on error
+            set({ isStreaming: false, streamController: null });
         }
       },
 
@@ -379,11 +394,13 @@ export const useAppStore = create<AppState>()(
         
         const lastUserMessage = [...messagesToRegenerate].reverse().find((m) => m.role === 'user');
         
-        set({ messages: messagesToRegenerate }); // Trim history and apply potential prompt update
-
         if (lastUserMessage) {
             // Since this is an internal call, we don't need to navigate.
-            await get().submitMessage({ promptOverride: lastUserMessage.content, isRegeneration: true });
+            await get().submitMessage({ 
+              promptOverride: lastUserMessage.content, 
+              isRegeneration: true, 
+              messagesToRegenerate 
+            });
         }
       },
 

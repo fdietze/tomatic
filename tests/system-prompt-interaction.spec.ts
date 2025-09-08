@@ -26,6 +26,10 @@ test.describe('System Prompt Interaction', () => {
     // 1. Seed the database and local storage
     await context.addInitScript(
       ({ session, prompts }) => {
+        // This script runs on every navigation. We only want to seed data once.
+        if ((window as any).hasBeenSeeded) return;
+        (window as any).hasBeenSeeded = true;
+
         // Seed localStorage
         const persistedState = {
           state: { systemPrompts: prompts, apiKey: 'TEST_API_KEY' },
@@ -91,8 +95,10 @@ test.describe('System Prompt Interaction', () => {
       await route.fulfill({ status: 200, body: responseBody });
     });
 
+    // Start waiting for the response BEFORE clicking the button
+    const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
     await page.locator('[data-testid="chat-message-2"] button:has-text("regenerate")').click();
-    await page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+    await responsePromise;
 
     // 6. Assert that the messages sent to the API contained the UPDATED prompt
     expect(sentMessages.length).toBe(2); // Should be [system, user]

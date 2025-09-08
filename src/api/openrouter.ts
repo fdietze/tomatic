@@ -122,6 +122,7 @@ export async function requestMessageContentStreamed(
       content: m.content,
     }));
 
+    console.log('[DEBUG] API request body:', JSON.stringify({ model, messages: openAiMessages.map(m => ({ role: m.role, content: m.content.slice(0, 100) + '...' })), stream: true }));
     const stream = await openai.chat.completions.create({
       model: model,
       messages: openAiMessages,
