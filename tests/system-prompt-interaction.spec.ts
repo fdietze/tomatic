@@ -39,7 +39,8 @@ test.describe('System Prompt Interaction', () => {
           request.onupgradeneeded = (event) => {
             const db = (event.target as IDBOpenDBRequest).result;
             if (!db.objectStoreNames.contains('chat_sessions')) {
-              db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
+              const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
+              store.createIndex('updated_at_ms', 'updated_at_ms');
             }
           };
           request.onsuccess = (event) => {

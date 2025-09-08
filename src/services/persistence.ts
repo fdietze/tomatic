@@ -47,12 +47,19 @@ interface TomaticDB extends DBSchema {
 
 async function getDb() {
   return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      if (oldVersion < 1) {
-        const store = db.createObjectStore(SESSIONS_STORE_NAME, {
-          keyPath: SESSION_ID_KEY_PATH,
-        });
-        store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
+    upgrade(db, oldVersion, _newVersion, tx) {
+      if (oldVersion < 2) {
+        if (db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
+            const store = tx.objectStore(SESSIONS_STORE_NAME);
+            if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+                store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
+            }
+        } else {
+             const store = db.createObjectStore(SESSIONS_STORE_NAME, {
+                keyPath: SESSION_ID_KEY_PATH,
+            });
+            store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
+        }
       }
     },
   });
@@ -101,7 +108,8 @@ export async function findNeighbourSessionIds(
   const db = await getDb();
   try {
     const tx = db.transaction(SESSIONS_STORE_NAME, 'readonly');
-    const index = tx.store.index(UPDATED_AT_INDEX);
+    const store = tx.store;
+    const index = store.index(UPDATED_AT_INDEX);
     const currentTimestamp = currentSession.updated_at_ms;
 
     // Query for the previous (older) session ID
