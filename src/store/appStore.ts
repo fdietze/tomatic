@@ -493,6 +493,8 @@ export const useAppStore = create<AppState>()(
                       cost: {
                         prompt: promptCost,
                         completion: completionCost,
+                        prompt_tokens: prompt_tokens,
+                        completion_tokens: completion_tokens,
                       }
                     };
                     return { messages: [...state.messages.slice(0, -1), updatedMessage] };

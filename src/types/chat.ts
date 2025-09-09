@@ -1,6 +1,8 @@
 export interface MessageCost {
   prompt: number;
   completion: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
 }
 
 export interface Message {
