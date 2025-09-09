@@ -37,7 +37,7 @@ const ChatPage: React.FC = () => {
         const initialPrompt = searchParams.get('q');
         if (initialPrompt) {
             useAppStore.getState().setInitialChatPrompt(initialPrompt);
-            setSearchParams({}); // Clear the query param after consuming it
+            setSearchParams({}, { replace: true }); // Clear the query param after consuming it
         }
     }
   }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams]);
