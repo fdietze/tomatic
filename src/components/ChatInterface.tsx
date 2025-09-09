@@ -30,6 +30,7 @@ const ChatInterface: React.FC = () => {
         modelsLoading,
         modelsError,
         apiKey,
+        autoScrollEnabled,
     } = useAppStore(
         useShallow((state) => ({
             messages: state.messages,
@@ -43,6 +44,7 @@ const ChatInterface: React.FC = () => {
             modelsLoading: state.modelsLoading,
             modelsError: state.modelsError,
             apiKey: state.apiKey,
+            autoScrollEnabled: state.autoScrollEnabled,
         }))
     );
     
@@ -59,13 +61,23 @@ const ChatInterface: React.FC = () => {
     // Scroll to the bottom of the chat history when new messages are added.
     useEffect(() => {
         if (historyRef.current) {
-            historyRef.current.scrollTop = historyRef.current.scrollHeight;
+            if (autoScrollEnabled) {
+                historyRef.current.scrollTop = historyRef.current.scrollHeight;
+            } else {
+                const lastMessage = messages[messages.length - 1];
+                if (lastMessage && lastMessage.role === 'user') {
+                    const lastMessageElement = document.querySelector(`[data-message-id="${lastMessage.id}"]`);
+                    if (lastMessageElement) {
+                        lastMessageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            }
         }
-    }, [messages]);
+    }, [messages, autoScrollEnabled]);
 
     // Fetch models if the cache is empty and an API key is present.
     useEffect(() => {
-        if (cachedModels.length === 0 && apiKey) {
+        if (apiKey && cachedModels.length === 0) {
             fetchModelList();
         }
     }, [apiKey, cachedModels.length, fetchModelList]);

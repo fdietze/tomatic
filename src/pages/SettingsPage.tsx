@@ -8,6 +8,8 @@ const SettingsPage: React.FC = () => {
   const setStoreApiKey = useAppStore((state) => state.setApiKey);
   const systemPrompts = useAppStore((state) => state.systemPrompts);
   const setSystemPrompts = useAppStore((state) => state.setSystemPrompts);
+  const autoScrollEnabled = useAppStore((state) => state.autoScrollEnabled);
+  const toggleAutoScroll = useAppStore((state) => state.toggleAutoScroll);
 
   const [localApiKey, setLocalApiKey] = useState(storeApiKey);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
@@ -54,6 +56,21 @@ const SettingsPage: React.FC = () => {
           <button onClick={handleSaveApiKey} data-role="primary" disabled={saveStatus === 'saved'}>
             {saveStatus === 'saved' ? 'Saved!' : 'Save'}
           </button>
+        </div>
+      </div>
+      <div className="settings-section">
+        <div className="settings-label">Chat</div>
+        <div className="settings-item">
+          <label htmlFor="auto-scroll-checkbox" className="checkbox-label">
+            <input
+              type="checkbox"
+              id="auto-scroll-checkbox"
+              checked={autoScrollEnabled}
+              onChange={toggleAutoScroll}
+            />
+            <span className="checkbox-custom"></span>
+            Auto-scroll to bottom
+          </label>
         </div>
       </div>
       <div className="settings-section">

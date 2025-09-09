@@ -312,6 +312,7 @@ header {
     height: 100%;
     min-height: 0;
     overflow-y: auto;
+    padding-bottom: 100px;
 }
 
 .chat-controls {
@@ -632,4 +633,47 @@ header .tabs button[data-active="true"] {
     text-align: center;
     background-color: var(--base01);
     border-radius: 8px;
+}
+
+/* Custom Checkbox Styles */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 8px; /* Spacing between checkbox and label text */
+}
+
+/* Hide the default browser checkbox */
+.checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+/* Custom checkbox design */
+.checkbox-custom {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--base04);
+    border-radius: 4px;
+    display: inline-block;
+    position: relative;
+    background-color: var(--base00);
+}
+
+/* Style for the checkmark */
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--base0D);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Change background when checked */
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+    background-color: var(--base01);
+    border-color: var(--base0D);
 }

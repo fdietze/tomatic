@@ -92,6 +92,7 @@ interface AppState {
   cachedModels: DisplayModelInfo[];
   input: string;
   selectedPromptName: string | null;
+  autoScrollEnabled: boolean;
 
   // --- Session State (in IndexedDB, managed by actions) ---
   messages: Message[];
@@ -113,6 +114,7 @@ interface AppState {
   setModelName: (name: string) => void;
   setInput: (text: string) => void;
   setSelectedPromptName: (name: string | null) => void;
+  toggleAutoScroll: () => void;
 
   setError: (error: string | null) => void;
   setInitialChatPrompt: (prompt: string | null) => void;
@@ -146,6 +148,7 @@ export const useAppStore = create<AppState>()(
       cachedModels: [],
       input: '',
       selectedPromptName: null,
+      autoScrollEnabled: false,
 
       // --- Session State ---
       messages: [],
@@ -510,6 +513,8 @@ export const useAppStore = create<AppState>()(
         get().streamController?.abort();
       },
 
+      toggleAutoScroll: () => set((state) => ({ autoScrollEnabled: !state.autoScrollEnabled })),
+
     }),
     {
       name: STORAGE_KEY,
@@ -530,6 +535,7 @@ export const useAppStore = create<AppState>()(
         cachedModels: state.cachedModels,
         input: state.input,
         selectedPromptName: state.selectedPromptName,
+        autoScrollEnabled: state.autoScrollEnabled,
       }),
     }
   )

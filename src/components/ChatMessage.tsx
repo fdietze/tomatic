@@ -100,6 +100,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     <div
       className={`chat-message ${isSystemMessage && collapsed ? 'collapsed' : ''}`}
       data-role={message.role}
+      data-message-id={message.id}
       data-testid={`chat-message-${messageIndex}`}
     >
       <div style={{ display: 'flex' }} onClick={toggleCollapsed}>
