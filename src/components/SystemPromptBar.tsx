@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SystemPrompt } from '@/types/storage';
+import Combobox, { type ComboboxItem } from './Combobox';
 
 interface SystemPromptBarProps {
   systemPrompts: SystemPrompt[];
@@ -12,27 +13,33 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
   selectedPromptName,
   onSelectPrompt,
 }) => {
+  const items: ComboboxItem[] = systemPrompts.map((prompt) => ({
+    id: prompt.name,
+    display_text: prompt.name,
+    model_info: {
+      provider_name: '',
+      provider_id: '',
+      model_name: '',
+      model_id: '',
+      context_length: 0,
+    },
+  }));
+
+  const handleSelect = (id: string) => {
+    if (selectedPromptName === id) {
+      onSelectPrompt(null);
+    } else {
+      onSelectPrompt(id);
+    }
+  };
+
   return (
-    <>
-      {systemPrompts.map((prompt) => (
-        <button
-          key={prompt.name}
-          data-size="compact"
-          data-role="outline"
-          className="chat-controls-system-prompt"
-          data-selected={selectedPromptName === prompt.name}
-          onClick={() => {
-            if (selectedPromptName === prompt.name) {
-              onSelectPrompt(null); // Deselect if already selected
-            } else {
-              onSelectPrompt(prompt.name);
-            }
-          }}
-        >
-          {prompt.name}
-        </button>
-      ))}
-    </>
+    <Combobox
+      items={items}
+      selectedId={selectedPromptName || ''}
+      onSelect={handleSelect}
+      placeholder="Select a system prompt"
+    />
   );
 };
 
