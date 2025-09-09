@@ -230,12 +230,12 @@ export const useAppStore = create<AppState>()(
           return; // Session is already in memory, no need to load.
         }
 
-        set({ error: null, messages: [], currentSessionId: sessionId });
-
         if (sessionId === 'new') {
           await get().startNewSession();
           return;
         }
+
+        set({ error: null, messages: [], currentSessionId: sessionId });
 
         try {
           const session = await loadSession(sessionId);

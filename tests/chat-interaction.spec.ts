@@ -200,3 +200,33 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
     page.locator('[data-testid="chat-message-0"] .chat-message-content')
   ).toHaveText(/You are a test bot/);
 });
+
+test('sends a message from a URL query parameter', async ({ page }) => {
+  // 1. Mock the response
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const responseBody = createStreamResponse('openai/gpt-4o', 'Response to query');
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: responseBody,
+    });
+  });
+
+  // 2. Navigate to the new chat page with the query parameter
+  const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+  await page.goto('http://localhost:5173/chat/new?q=Hello%20from%20URL');
+  await responsePromise;
+
+  // 3. Assertions
+  // The user message from the URL should be displayed
+  await expect(
+    page.locator('[data-testid="chat-message-0"][data-role="user"] .chat-message-content')
+  ).toHaveText(/Hello from URL/);
+  // The assistant's response should be displayed
+  await expect(
+    page.locator('[data-testid="chat-message-1"][data-role="assistant"] .chat-message-content')
+  ).toHaveText(/Response to query/);
+
+  // The URL should no longer contain the query parameter
+  await expect(page).not.toHaveURL(/q=/);
+});
