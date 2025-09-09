@@ -6,10 +6,11 @@ export interface MessageCost {
 }
 
 export interface Message {
-  id: string;
+  id:string;
   prompt_name?: string | null;
   role: 'user' | 'assistant' | 'system';
   content: string;
+  imageUrl?: string | null;
   model_name?: string | null;
   cost?: MessageCost | null;
 }

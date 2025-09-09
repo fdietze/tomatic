@@ -10,6 +10,8 @@ interface ChatControlsProps {
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   apiKey: string;
+  imagePreviewUrl: string | null;
+  setImagePreviewUrl: (url: string | null) => void;
 }
 
 const ChatControls: React.FC<ChatControlsProps> = ({
@@ -21,8 +23,11 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   isMobile,
   inputRef,
   apiKey,
+  imagePreviewUrl,
+  setImagePreviewUrl,
 }) => {
-  
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isStreaming) {
@@ -36,8 +41,29 @@ const ChatControls: React.FC<ChatControlsProps> = ({
     }
   });
 
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="chat-controls">
+      {imagePreviewUrl && (
+        <div className="image-preview">
+          <img src={imagePreviewUrl} alt="Preview" />
+          <button onClick={() => setImagePreviewUrl(null)}>X</button>
+        </div>
+      )}
       <form onSubmit={handleFormSubmit}>
         <div style={{ display: 'flex', padding: '4px', gap: '4px' }}>
           <textarea
@@ -48,6 +74,13 @@ const ChatControls: React.FC<ChatControlsProps> = ({
             onKeyDown={handleKeyDown}
             disabled={isStreaming || !apiKey}
             data-testid="chat-input"
+          />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+            accept="image/*"
           />
           {isStreaming ? (
             <button
@@ -60,15 +93,25 @@ const ChatControls: React.FC<ChatControlsProps> = ({
               Cancel
             </button>
           ) : (
-            <button
-              type="submit"
-              data-role="primary"
-              style={{ flexShrink: 0 }}
-              disabled={input.trim().length === 0 || !apiKey}
-              data-testid="chat-submit"
-            >
-              Go
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                style={{ flexShrink: 0 }}
+                disabled={!apiKey}
+              >
+                Attach
+              </button>
+              <button
+                type="submit"
+                data-role="primary"
+                style={{ flexShrink: 0 }}
+                disabled={(input.trim().length === 0 && !imagePreviewUrl) || !apiKey}
+                data-testid="chat-submit"
+              >
+                Go
+              </button>
+            </>
           )}
         </div>
       </form>

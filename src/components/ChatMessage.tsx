@@ -134,7 +134,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             </div>
           </>
         ) : (
-          <Markdown markdownText={message.content} />
+          <>
+            {message.imageUrl && <img src={message.imageUrl} alt="attached" style={{ maxWidth: '100%', height: 'auto' }} />}
+            <Markdown markdownText={message.content} />
+          </>
         )}
       </div>
       {message.cost && (
