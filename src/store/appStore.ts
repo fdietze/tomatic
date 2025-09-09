@@ -12,6 +12,7 @@ import {
 import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
 import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const STORAGE_KEY = 'tomatic-storage';
 
@@ -397,7 +398,9 @@ export const useAppStore = create<AppState>()(
             console.log('[DEBUG] submitMessage: Assistant placeholder added. Total messages:', get().messages.length);
 
             console.log('[DEBUG] submitMessage: Entering stream processing loop...');
+            let finalChunk: ChatCompletionChunk | undefined;
             for await (const chunk of stream) {
+                finalChunk = chunk;
                 console.log('[DEBUG] submitMessage: Received stream chunk.');
                 if (controller.signal.aborted) {
                   stream.controller.abort();
@@ -415,6 +418,34 @@ export const useAppStore = create<AppState>()(
                 });
             }
             
+            if (finalChunk?.usage) {
+              console.log('[DEBUG] submitMessage: Final stream chunk:', finalChunk);
+              console.log('[DEBUG] submitMessage: Usage data:', finalChunk.usage);
+              const { prompt_tokens, completion_tokens } = finalChunk.usage;
+              const { cachedModels, modelName } = get();
+              const modelInfo = cachedModels.find(m => m.id === modelName);
+
+              if (modelInfo && prompt_tokens && completion_tokens) {
+                const promptCost = (prompt_tokens / 1_000_000) * (modelInfo.prompt_cost_usd_pm || 0);
+                const completionCost = (completion_tokens / 1_000_000) * (modelInfo.completion_cost_usd_pm || 0);
+
+                set(state => {
+                  const lastMessage = state.messages[state.messages.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    const updatedMessage = {
+                      ...lastMessage,
+                      cost: {
+                        prompt: promptCost,
+                        completion: completionCost,
+                      }
+                    };
+                    return { messages: [...state.messages.slice(0, -1), updatedMessage] };
+                  }
+                  return state;
+                });
+              }
+            }
+
             // --- Finalization logic moved from finally block ---
             console.log('[DEBUG] submitMessage stream finished. isStreaming:', get().isStreaming);
             set({ isStreaming: false, streamController: null });

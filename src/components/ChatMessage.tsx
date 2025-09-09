@@ -4,6 +4,29 @@ import Markdown from './Markdown';
 import CopyButton from './CopyButton';
 import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
 
+interface CostProps {
+  value: number;
+}
+
+const Cost: React.FC<CostProps> = ({ value }) => {
+  const costStr = value.toFixed(6);
+
+  if (value < 0.01) {
+    return <span style={{ color: 'var(--base03)' }}>${costStr}</span>;
+  }
+
+  const parts = costStr.split('.');
+  const dollarsAndCents = parts[0] + '.' + parts[1].substring(0, 2);
+  const fractionsOfCents = parts[1].substring(2);
+
+  return (
+    <span>
+      <span style={{ color: 'var(--base05)' }}>${dollarsAndCents}</span>
+      <span style={{ color: 'var(--base03)' }}>{fractionsOfCents}</span>
+    </span>
+  );
+};
+
 interface ChatMessageProps {
   message: Message;
   messageIndex: number;
@@ -114,8 +137,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
       </div>
       {message.cost && (
-        <div className="chat-message-cost" style={{ textAlign: 'right', fontSize: '0.8em', opacity: 0.6, marginTop: '4px' }}>
-          {`prompt: $${message.cost.prompt.toFixed(6)}, completion: $${message.cost.completion.toFixed(6)}, total: $${(message.cost.prompt + message.cost.completion).toFixed(6)}`}
+        <div className="chat-message-cost" style={{ textAlign: 'right', fontSize: '0.8em', color: 'var(--base03)', marginTop: '4px' }}>
+          prompt: <Cost value={message.cost.prompt} />, completion: <Cost value={message.cost.completion} />, total: <Cost value={message.cost.prompt + message.cost.completion} />
         </div>
       )}
     </div>
