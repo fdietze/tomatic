@@ -15,7 +15,6 @@ import {
 import { listAvailableModels, streamChatCompletion, getGenerationStats } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
 import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
-import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const STORAGE_KEY = 'tomatic-storage';
 

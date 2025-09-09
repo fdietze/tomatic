@@ -1,11 +1,10 @@
 import OpenAI from 'openai';
-import type { Stream } from 'openai/streaming';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 import { z } from 'zod';
 
-import type { DisplayModelInfo, GenerationStats } from '@/types/storage';
+import type { DisplayModelInfo } from '@/types/storage';
 import type { Message } from '@/types/chat';
-import type { ModelInfo } from '@/types/openrouter';
+import type { ModelInfo, GenerationStats } from '@/types/openrouter';
 
 // --- Zod Schemas for Runtime Validation ---
 
