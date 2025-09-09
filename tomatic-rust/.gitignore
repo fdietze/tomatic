@@ -1,5 +1,0 @@
-target/
-/.rustup
-/.envrc.local
-/dist
-/target-rust-analyzer
