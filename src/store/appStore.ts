@@ -139,6 +139,7 @@ interface AppState {
     navigate?: NavigateFunction;
     isRegeneration?: boolean;
     messagesToRegenerate?: Message[];
+    imageUrl?: string | null;
   }) => Promise<void>;
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
@@ -392,10 +393,10 @@ export const useAppStore = create<AppState>()(
       },
 
       // --- Core Chat Actions ---
-      submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate }) => {
+      submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate, imageUrl }) => {
         const { input, apiKey, modelName, systemPrompts, selectedPromptName } = get();
         const content = promptOverride || input;
-        if (!content || !apiKey) return;
+        if ((!content && !imageUrl) || !apiKey) return;
 
         console.log('[DEBUG] submitMessage START. Content:', content);
 
@@ -421,7 +422,7 @@ export const useAppStore = create<AppState>()(
         }
         
         if (!isRegeneration) {
-            newMessages.push({ id: uuidv4(), role: 'user', content, prompt_name: null, model_name: null, cost: null });
+            newMessages.push({ id: uuidv4(), role: 'user', content, imageUrl, prompt_name: null, model_name: null, cost: null });
         }
 
         if (newMessages.length > 0) {

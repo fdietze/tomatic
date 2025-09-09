@@ -10,6 +10,7 @@ import { isMobile as checkIsMobile } from '@/utils/isMobile';
 const ChatInterface: React.FC = () => {
     const historyRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     // State to hold the mobile status, checked once on mount.
     const [isMobile, setIsMobile] = useState(false);
     useEffect(() => {
@@ -141,7 +142,8 @@ const ChatInterface: React.FC = () => {
     };
 
     const handleSubmit = (promptOverride?: string) => {
-        submitMessage({ promptOverride, navigate });
+        submitMessage({ promptOverride, navigate, imageUrl: imagePreviewUrl });
+        setImagePreviewUrl(null);
     };
 
     const handleCancel = () => {
@@ -202,6 +204,8 @@ const ChatInterface: React.FC = () => {
                 isMobile={isMobile}
                 inputRef={inputRef}
                 apiKey={apiKey}
+                imagePreviewUrl={imagePreviewUrl}
+                setImagePreviewUrl={setImagePreviewUrl}
             />
         </div>
     );

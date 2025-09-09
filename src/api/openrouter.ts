@@ -108,6 +108,16 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
   }
 }
 
+type OpenAIMessageContent = string | (
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+)[];
+
+interface OpenAIMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: OpenAIMessageContent;
+}
+
 export async function requestMessageContentStreamed(
   messages: Message[],
   model: string,
@@ -117,12 +127,23 @@ export async function requestMessageContentStreamed(
     const openai = getOpenAIClient(apiKey);
     
     // Map our internal Message type to the type expected by the OpenAI client.
-    const openAiMessages = messages.map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const openAiMessages: OpenAIMessage[] = messages.map(m => {
+      if (m.role === 'user' && m.imageUrl) {
+        return {
+          role: m.role,
+          content: [
+            { type: 'text', text: m.content },
+            { type: 'image_url', image_url: { url: m.imageUrl } },
+          ],
+        };
+      }
+      return {
+        role: m.role,
+        content: m.content,
+      };
+    });
 
-    console.log('[DEBUG] API request body:', JSON.stringify({ model, messages: openAiMessages.map(m => ({ role: m.role, content: m.content.slice(0, 100) + '...' })), stream: true }));
+    console.log('[DEBUG] API request body:', JSON.stringify({ model, messages: openAiMessages.map(m => ({ role: m.role, content: Array.isArray(m.content) ? 'Multipart content' : m.content.slice(0, 100) + '...' })), stream: true }));
     const stream = await openai.chat.completions.create({
       model: model,
       messages: openAiMessages,
