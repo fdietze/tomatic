@@ -506,10 +506,13 @@ export const useAppStore = create<AppState>()(
             console.log('[DEBUG] submitMessage stream finished. isStreaming:', get().isStreaming);
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
-            const currentSession = await loadSession(get().currentSessionId!);
-            if (currentSession) {
-                const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
-                set({ prevSessionId: prevId, nextSessionId: nextId });
+            const sessionId = get().currentSessionId;
+            if (sessionId) {
+                const currentSession = await loadSession(sessionId);
+                if (currentSession) {
+                    const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
+                    set({ prevSessionId: prevId, nextSessionId: nextId });
+                }
             }
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -578,7 +581,7 @@ export const useAppStore = create<AppState>()(
           // In this specific case, the migration from v0 to v1 requires no changes,
           // as the initial migration script already shapes the data correctly for v1.
           // This block is here to establish the pattern for future migrations.
-          const oldState = persistedState as any;
+          const oldState = persistedState as Partial<AppState>;
           if (oldState.systemPrompts && Array.isArray(oldState.systemPrompts)) {
             console.log('[Migration] Migrating system prompts from localStorage to IndexedDB...');
             try {

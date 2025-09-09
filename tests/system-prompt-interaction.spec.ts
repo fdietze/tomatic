@@ -1,5 +1,5 @@
 import { test, expect, createStreamResponse } from './fixtures';
-import type { ChatSession } from '@/types/chat';
+import type { ChatSession, Message } from '@/types/chat';
 import type { SystemPrompt } from '@/types/storage';
 
 const MOCK_PROMPTS: SystemPrompt[] = [
@@ -27,8 +27,8 @@ test.describe('System Prompt Interaction', () => {
     await context.addInitScript(
       ({ session, prompts }) => {
         // This script runs on every navigation. We only want to seed data once.
-        if ((window as any).hasBeenSeeded) return;
-        (window as any).hasBeenSeeded = true;
+        if ((window as { hasBeenSeeded?: boolean }).hasBeenSeeded) return;
+        (window as { hasBeenSeeded?: boolean }).hasBeenSeeded = true;
 
         // Seed localStorage with OLD format for migration testing
         const persistedState = {
@@ -93,9 +93,9 @@ test.describe('System Prompt Interaction', () => {
     );
 
     // 5. Intercept the next API call and regenerate
-    let sentMessages: any[] = [];
+    let sentMessages: Message[] = [];
     await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-      const requestBody = await route.request().postDataJSON();
+      const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
       sentMessages = requestBody.messages;
       const responseBody = createStreamResponse('openai/gpt-4o', 'Bonjour!');
       await route.fulfill({ status: 200, body: responseBody });

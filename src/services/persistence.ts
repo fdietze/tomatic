@@ -4,6 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ChatSession, Message } from '@/types/chat';
 import type { SystemPrompt } from '@/types/storage';
 
+// For DB version < 2
+type V1Message = Omit<Message, 'id' | 'prompt_name'> & { id?: string, prompt_name?: string | null };
+
 // --- Zod Schemas for Runtime Validation ---
 const messageCostSchema = z.object({
   prompt: z.number(),
@@ -89,7 +92,8 @@ async function getDb() {
           const newSession: ChatSession = {
             ...oldSession,
             name: oldSession.name || null,
-            messages: oldSession.messages.map((m: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            messages: (oldSession.messages as any[]).map((m: V1Message) => {
               const newMessage: Message = {
                 ...m,
                 id: m.id || uuidv4(),

@@ -43,9 +43,7 @@ const Combobox: React.FC<ComboboxProps> = ({
 
   // Effect to update internal search_query when external selected_id changes
   useEffect(() => {
-    if (searchQuery !== selectedId) {
-      setSearchQuery(selectedId);
-    }
+    setSearchQuery(selectedId);
   }, [selectedId]);
 
   // Close suggestions when clicking outside
