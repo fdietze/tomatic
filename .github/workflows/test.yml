@@ -31,26 +31,23 @@ jobs:
       with:
         enable-cache: 'true'
 
-    - name: Cache Cargo registry and git dependencies
+    - name: Cache node modules
       uses: actions/cache@v4
+      id: npm-cache
       with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-deps-${{ hashFiles('Cargo.lock') }}
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-deps-
+          ${{ runner.os }}-node-
 
-    - name: Cache Cargo target directory
-      uses: actions/cache@v4
-      with:
-        path: target # Path relative to workspace root
-        key: ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('src/**/*.rs', 'examples/**/*.rs', 'tests/**/*.rs') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-target-${{ github.sha }}-${{ hashFiles('Cargo.lock') }}-
-          ${{ runner.os }}-cargo-target-
+    - name: Install Dependencies
+      run: devbox run -- npm ci
 
-    - name: Run CI Checks (Format, Lint, Test, Debug Build)
-      run: devbox run -- just ci-checks # Changed to use -c tomatic
+    - name: Typecheck
+      run: devbox run -- npm run typecheck
+
+    - name: Lint
+      run: devbox run -- npm run lint
+
+    - name: Test
+      run: devbox run -- npm run test:e2e
