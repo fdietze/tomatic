@@ -241,14 +241,22 @@ export const useAppStore = create<AppState>()(
           const session = await loadSession(sessionId);
           if (session) {
             const systemMessage = session.messages.find(m => m.role === 'system');
+            const lastAssistantMessage = [...session.messages].reverse().find(m => m.role === 'assistant');
             const { prevId, nextId } = await findNeighbourSessionIds(session);
-            set({
-              messages: session.messages,
-              currentSessionId: session.session_id,
-              selectedPromptName: systemMessage?.prompt_name || null,
-              prevSessionId: prevId,
-              nextSessionId: nextId,
-            });
+
+            const newState: Partial<AppState> = {
+                messages: session.messages,
+                currentSessionId: session.session_id,
+                selectedPromptName: systemMessage?.prompt_name || null,
+                prevSessionId: prevId,
+                nextSessionId: nextId,
+            };
+
+            if (lastAssistantMessage?.model_name) {
+                newState.modelName = lastAssistantMessage.model_name;
+            }
+
+            set(newState);
           } else {
             get().setError(`Session ${sessionId} not found.`);
             await get().startNewSession();
