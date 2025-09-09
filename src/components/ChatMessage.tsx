@@ -139,7 +139,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       </div>
       {message.cost && (
         <div className="chat-message-cost" style={{ textAlign: 'right', fontSize: '0.8em', color: 'var(--base03)', marginTop: '4px' }}>
-          prompt: <Cost value={message.cost.prompt} />, completion: <Cost value={message.cost.completion} />, total: <Cost value={message.cost.prompt + message.cost.completion} />
+          prompt: <Cost value={message.cost.prompt} />
+          {message.cost.prompt_tokens && <span> ({message.cost.prompt_tokens} tokens)</span>},
+          completion: <Cost value={message.cost.completion} />
+          {message.cost.completion_tokens && <span> ({message.cost.completion_tokens} tokens)</span>},
+          total: <Cost value={message.cost.prompt + message.cost.completion} />
+          {(message.cost.prompt_tokens && message.cost.completion_tokens) && <span> ({message.cost.prompt_tokens + message.cost.completion_tokens} tokens)</span>}
         </div>
       )}
     </div>
