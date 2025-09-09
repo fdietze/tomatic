@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import CopyButton from './CopyButton';
 
 interface MarkdownProps {
@@ -11,6 +12,7 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
   return (
     <ReactMarkdown
       rehypePlugins={[rehypeRaw]}
+      remarkPlugins={[remarkGfm]}
       components={{
         pre: ({ node, ...props }) => {
           const codeElement = node?.children[0];
