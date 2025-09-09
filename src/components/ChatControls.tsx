@@ -27,6 +27,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   setImagePreviewUrl,
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +46,10 @@ const ChatControls: React.FC<ChatControlsProps> = ({
     fileInputRef.current?.click();
   };
 
+  const handleCameraClick = () => {
+    cameraInputRef.current?.click();
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -54,14 +59,37 @@ const ChatControls: React.FC<ChatControlsProps> = ({
       };
       reader.readAsDataURL(file);
     }
+    // Reset the input value to allow selecting the same file again
+    event.target.value = '';
   };
 
   return (
     <div className="chat-controls">
       {imagePreviewUrl && (
-        <div className="image-preview">
-          <img src={imagePreviewUrl} alt="Preview" />
-          <button onClick={() => setImagePreviewUrl(null)}>X</button>
+        <div style={{ position: 'relative', width: '80px', height: '80px', margin: '4px' }}>
+          <img src={imagePreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+          <button
+            onClick={() => setImagePreviewUrl(null)}
+            style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              background: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '20px',
+              height: '20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0',
+              lineHeight: '20px',
+            }}
+          >
+            X
+          </button>
         </div>
       )}
       <form onSubmit={handleFormSubmit}>
@@ -82,6 +110,14 @@ const ChatControls: React.FC<ChatControlsProps> = ({
             style={{ display: 'none' }}
             accept="image/*"
           />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+            accept="image/*"
+            capture="environment"
+          />
           {isStreaming ? (
             <button
               type="button"
@@ -94,6 +130,14 @@ const ChatControls: React.FC<ChatControlsProps> = ({
             </button>
           ) : (
             <>
+              <button
+                type="button"
+                onClick={handleCameraClick}
+                style={{ flexShrink: 0 }}
+                disabled={!apiKey}
+              >
+                Camera
+              </button>
               <button
                 type="button"
                 onClick={handleAttachClick}
