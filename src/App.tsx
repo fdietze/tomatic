@@ -18,14 +18,14 @@ const Header: React.FC = () => {
 
   const onChat = () => {
     if (currentSessionId) {
-      navigate(`/chat/${currentSessionId}`);
+      void navigate(`/chat/${currentSessionId}`);
     } else {
-      navigate('/chat/new');
+      void navigate('/chat/new');
     }
   };
 
   const onSettings = () => {
-    navigate('/settings');
+    void navigate('/settings');
   };
 
   const isChatActive = location.pathname.startsWith('/chat');
@@ -60,7 +60,7 @@ const App: React.FC = () => {
       }
     }
 
-    loadSystemPrompts();
+    void loadSystemPrompts();
   }, [loadSystemPrompts]);
 
   return (

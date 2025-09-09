@@ -31,7 +31,7 @@ const ChatPage: React.FC = () => {
   // Effect to load session when URL parameter changes
   useEffect(() => {
     const idToLoad = sessionIdFromUrl || 'new';
-    loadSession(idToLoad);
+    void loadSession(idToLoad);
 
     if (idToLoad === 'new') {
         const initialPrompt = searchParams.get('q');
@@ -47,13 +47,13 @@ const ChatPage: React.FC = () => {
 
   const onPrev = () => {
     if (prevSessionId) {
-      navigate(`/chat/${prevSessionId}`);
+      void navigate(`/chat/${prevSessionId}`);
     }
   };
 
   const onNext = () => {
     if (nextSessionId) {
-      navigate(`/chat/${nextSessionId}`);
+      void navigate(`/chat/${nextSessionId}`);
     }
   };
 

@@ -19,7 +19,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   onCancel,
 }) => {
   console.log(
-    `[DEBUG] SystemPromptItem render. Index: ${prompt.name}, Name: "${prompt.name}", isEditing initially: ${isInitiallyEditing}`
+    `[DEBUG] SystemPromptItem render. Index: ${prompt.name}, Name: "${prompt.name}", isEditing initially: ${String(isInitiallyEditing)}`
   );
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(prompt.name);
@@ -92,7 +92,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
           {nameError && <div className="error-message">{nameError}</div>}
           <textarea
             value={editingPrompt}
-            onChange={(e) => setEditingPrompt(e.target.value)}
+            onChange={(e) => { setEditingPrompt(e.target.value); }}
             placeholder="system prompt"
             data-testid="system-prompt-prompt-input"
           />
@@ -125,7 +125,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
       <span className="system-prompt-text">{prompt.prompt}</span>
       <div className="system-prompt-buttons">
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={() => { setIsEditing(true); }}
           data-size="compact"
           data-testid="system-prompt-edit-button"
         >

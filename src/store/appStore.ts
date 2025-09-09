@@ -19,6 +19,15 @@ import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const STORAGE_KEY = 'tomatic-storage';
 
+interface OldState {
+  apiKey: string;
+  modelName: string;
+  systemPrompts: unknown[];
+  cachedModels: unknown[];
+  input: string;
+  selectedPromptName: unknown;
+}
+
 // --- One-Time LocalStorage Migration ---
 // This function checks for data from the old, non-Zustand version of the app
 // and migrates it to the new Zustand-managed format.
@@ -37,13 +46,13 @@ const runLocalStorageMigration = () => {
   console.log('[Migration] Migrating old localStorage data to new format...');
 
   try {
-    const oldState = {
+    const oldState: OldState = {
       apiKey: oldApiKey || '',
       modelName: localStorage.getItem('MODEL_NAME') || 'google/gemini-2.5-pro',
-      systemPrompts: JSON.parse(localStorage.getItem('system_prompts') || '[]'),
-      cachedModels: JSON.parse(localStorage.getItem('cached_models') || '[]'),
+      systemPrompts: JSON.parse(localStorage.getItem('system_prompts') || '[]') as unknown[],
+      cachedModels: JSON.parse(localStorage.getItem('cached_models') || '[]') as unknown[],
       input: localStorage.getItem('input') || '',
-      selectedPromptName: JSON.parse(localStorage.getItem('selected_prompt_name') || 'null'),
+      selectedPromptName: JSON.parse(localStorage.getItem('selected_prompt_name') || 'null') as unknown,
     };
 
     const newState = {
@@ -122,8 +131,8 @@ interface AppState {
   setError: (error: string | null) => void;
   setInitialChatPrompt: (prompt: string | null) => void;
   
-  loadSession: (sessionId: string | 'new') => Promise<void>;
-  startNewSession: () => void;
+  loadSession: (sessionId: string) => Promise<void>;
+  startNewSession: () => Promise<void>;
   saveCurrentSession: () => Promise<void>;
   deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
   loadSystemPrompts: () => Promise<void>;
@@ -320,13 +329,13 @@ export const useAppStore = create<AppState>()(
 
         if (get().currentSessionId === sessionId) {
           // Navigate to the next older session, or to 'new' if it was the oldest.
-          navigate(prevId ? `/chat/${prevId}` : '/chat/new');
+          void navigate(prevId ? `/chat/${prevId}` : '/chat/new');
         } else {
           // If we deleted a background session, we might need to update the
           // current session's neighbor state if the deleted one was a neighbor.
           const currentId = get().currentSessionId;
           if (currentId) {
-            await get().loadSession(currentId);
+            void get().loadSession(currentId);
           }
         }
       },
@@ -433,7 +442,7 @@ export const useAppStore = create<AppState>()(
         // Navigate after the first message if it's a new session
         if (isNewSession && navigate && sessionId) {
             console.log(`[DEBUG] submitMessage (new session): Navigating to /chat/${sessionId}`);
-            navigate(`/chat/${sessionId}`, { replace: true });
+            void navigate(`/chat/${sessionId}`, { replace: true });
         }
 
         const messagesToSubmit = messagesToRegenerate || get().messages;
@@ -495,7 +504,7 @@ export const useAppStore = create<AppState>()(
 
                 set(state => {
                   const lastMessage = state.messages[state.messages.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant') {
+                  if (lastMessage.role === 'assistant') {
                     const updatedMessage = {
                       ...lastMessage,
                       cost: {
@@ -536,7 +545,7 @@ export const useAppStore = create<AppState>()(
       },
 
       regenerateMessage: async (index) => {
-        console.log(`[DEBUG] regenerateMessage called for index: ${index}`);
+        console.log(`[DEBUG] regenerateMessage called for index: ${String(index)}`);
         const { messages, systemPrompts } = get();
         const messagesToRegenerate = [...messages.slice(0, index)]; // Create a mutable copy
 
@@ -600,7 +609,7 @@ export const useAppStore = create<AppState>()(
                 // This will overwrite existing prompts with the same name if any.
                 await saveSystemPrompt(prompt);
               }
-              console.log(`[Migration] Successfully migrated ${promptsToMigrate.length} prompts.`);
+              console.log(`[Migration] Successfully migrated ${String(promptsToMigrate.length)} prompts.`);
               // We don't need to remove systemPrompts from oldState because
               // the `partialize` function below will prevent it from being
               // re-persisted into localStorage on the next save.

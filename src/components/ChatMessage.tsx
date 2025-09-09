@@ -81,14 +81,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const renderButtons = () => {
     if (message.role === 'assistant') {
       return (
-        <button data-size="compact" onClick={() => onRegenerate(messageIndex)}>
+        <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }}>
           regenerate
         </button>
       );
     }
     if (message.role === 'user') {
       return (
-        <button data-size="compact" onClick={() => setIsEditing(!isEditing)}>
+        <button data-size="compact" onClick={() => { setIsEditing(!isEditing); }}>
           edit
         </button>
       );
@@ -101,7 +101,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       className={`chat-message ${isSystemMessage && collapsed ? 'collapsed' : ''}`}
       data-role={message.role}
       data-message-id={message.id}
-      data-testid={`chat-message-${messageIndex}`}
+      data-testid={`chat-message-${String(messageIndex)}`}
     >
       <div style={{ display: 'flex' }} onClick={toggleCollapsed}>
         <div className="chat-message-role">{roleDisplay}</div>
@@ -116,7 +116,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             <textarea
               style={{ width: '100%' }}
               value={editInput}
-              onInput={(e) => setEditInput(e.currentTarget.value)}
+              onInput={(e) => { setEditInput(e.currentTarget.value); }}
               onKeyDown={handleKeyDown}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>

@@ -43,7 +43,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
           <textarea
             ref={inputRef}
             value={input}
-            onInput={(e) => setInput(e.currentTarget.value)}
+            onInput={(e) => { setInput(e.currentTarget.value); }}
             placeholder="Message"
             onKeyDown={handleKeyDown}
             disabled={isStreaming || !apiKey}

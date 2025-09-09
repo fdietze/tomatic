@@ -80,7 +80,7 @@ async function getDb() {
         }
         
         // Migrate data
-        (tx.objectStore(SESSIONS_STORE_NAME).openCursor()).then(async function migrate(cursor) {
+        void (tx.objectStore(SESSIONS_STORE_NAME).openCursor()).then(function migrate(cursor) {
           if (!cursor) {
             console.log('[DB] Migration complete.');
             return;
@@ -103,8 +103,8 @@ async function getDb() {
             }),
           };
           
-          cursor.update(newSession);
-          cursor.continue().then(migrate);
+          void cursor.update(newSession);
+          void cursor.continue().then(migrate);
         });
       }
     },
@@ -163,14 +163,14 @@ export async function findNeighbourSessionIds(
       IDBKeyRange.upperBound(currentTimestamp, true), // keys < currentTimestamp
       'prev', // Go backwards from the upper bound to get the newest of the older sessions
     );
-    const prevId = prevCursor ? (prevCursor.primaryKey as string) : null;
+    const prevId = prevCursor ? prevCursor.primaryKey : null;
 
     // Query for the next (newer) session ID
     const nextCursor = await index.openKeyCursor(
       IDBKeyRange.lowerBound(currentTimestamp, true), // keys > currentTimestamp
       'next', // Go forwards from the lower bound to get the oldest of the newer sessions
     );
-    const nextId = nextCursor ? (nextCursor.primaryKey as string) : null;
+    const nextId = nextCursor ? nextCursor.primaryKey : null;
 
     await tx.done;
     return { prevId, nextId };
@@ -193,7 +193,7 @@ export async function getMostRecentSessionId(): Promise<string | null> {
       .store.index(UPDATED_AT_INDEX)
       .openKeyCursor(null, 'prev'); // 'prev' direction gets the newest item first
 
-    return cursor ? (cursor.primaryKey as string) : null;
+    return cursor ? cursor.primaryKey : null;
   } catch (error) {
     console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
     return null;

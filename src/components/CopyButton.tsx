@@ -45,7 +45,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ textToCopy }) => {
 
 
   return (
-    <button className="copy-button" data-size="compact" onClick={handleCopy}>
+    <button className="copy-button" data-size="compact" onClick={() => { void handleCopy(); }}>
       {buttonText}
     </button>
   );

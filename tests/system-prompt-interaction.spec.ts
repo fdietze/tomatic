@@ -1,6 +1,7 @@
 import { test, expect, createStreamResponse } from './fixtures';
 import type { ChatSession, Message } from '@/types/chat';
 import type { SystemPrompt } from '@/types/storage';
+import type { Buffer } from 'buffer';
 
 const MOCK_PROMPTS: SystemPrompt[] = [
   { name: 'Chef', prompt: 'You are a master chef.' },
@@ -97,7 +98,7 @@ test.describe('System Prompt Interaction', () => {
     await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
       const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
       sentMessages = requestBody.messages;
-      const responseBody = createStreamResponse('openai/gpt-4o', 'Bonjour!');
+      const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Bonjour!');
       await route.fulfill({ status: 200, body: responseBody });
     });
 

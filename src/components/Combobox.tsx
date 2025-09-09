@@ -172,8 +172,8 @@ const Combobox: React.FC<ComboboxProps> = ({
                 <li
                   key={item.id}
                   className={`combobox-item ${index === highlightedIndex ? 'combobox-item-highlighted' : ''}`}
-                  onClick={() => handleSelectItem(item)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
+                  onClick={() => { handleSelectItem(item); }}
+                  onMouseEnter={() => { setHighlightedIndex(index); }}
                   role="option"
                   aria-selected={index === highlightedIndex}
                 >

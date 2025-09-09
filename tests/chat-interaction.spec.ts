@@ -1,4 +1,9 @@
 import { test, expect, createStreamResponse } from './fixtures';
+import type { Buffer } from 'buffer';
+
+interface ChatRequestBody {
+  model: string;
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto('http://localhost:5173/chat/new');
@@ -6,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 test('sends a message and sees the response', async ({ page }) => {
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody = createStreamResponse('openai/gpt-4o', 'Hello!');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
     await route.fulfill({
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       status: 200,
@@ -42,7 +47,7 @@ test('sends a message and sees the response', async ({ page }) => {
 
 test('can select a model and get a model-specific response', async ({ page }) => {
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const requestBody = await route.request().postDataJSON();
+    const requestBody = (await route.request().postDataJSON()) as ChatRequestBody;
     const model = requestBody.model;
 
     let responseBody: Buffer;
@@ -94,7 +99,7 @@ test('can select a model and get a model-specific response', async ({ page }) =>
 test('can regenerate an assistant response', async ({ page }) => {
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody = createStreamResponse('openai/gpt-4o', 'Hello!');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
     await route.fulfill({
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       status: 200,
@@ -114,7 +119,7 @@ test('can regenerate an assistant response', async ({ page }) => {
   // 2. Mock the next response to be different.
   await page.unroute('https://openrouter.ai/api/v1/chat/completions');
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody = createStreamResponse('openai/gpt-4o', 'This is a regenerated response.');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'This is a regenerated response.');
     await route.fulfill({
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       status: 200,
@@ -150,7 +155,7 @@ test('sends first message in a new session from UI', async ({ page }) => {
 
   // 3. Mock the response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody = createStreamResponse('openai/gpt-4o', 'First message response');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'First message response');
     await route.fulfill({
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       status: 200,

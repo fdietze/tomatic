@@ -36,6 +36,6 @@ export interface ModelInfo {
   architecture: ArchitectureDetails;
   pricing: PricingInfo;
   top_provider: TopProviderInfo;
-  per_request_limits?: unknown | null;
+  per_request_limits?: unknown;
   supported_parameters?: string[] | null;
 }

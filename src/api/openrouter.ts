@@ -83,9 +83,9 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     const response = await fetch('https://openrouter.ai/api/v1/models');
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch models: ${response.status} ${errorText}`);
+      throw new Error(`Failed to fetch models: ${String(response.status)} ${errorText}`);
     }
-    const jsonResponse = await response.json();
+    const jsonResponse = await response.json() as unknown;
     
     // Validate the structure of the full API response.
     const validation = apiModelsResponseSchema.safeParse(jsonResponse);

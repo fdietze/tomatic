@@ -39,7 +39,7 @@ const SettingsPage: React.FC = () => {
   const handleSaveApiKey = () => {
     setApiKey(localApiKey);
     setSaveStatus('saved');
-    setTimeout(() => setSaveStatus('idle'), 2000);
+    setTimeout(() => { setSaveStatus('idle'); }, 2000);
   };
 
   const handleNewPrompt = () => {
@@ -71,7 +71,7 @@ const SettingsPage: React.FC = () => {
           <input
             type="text"
             value={localApiKey}
-            onChange={(e) => setLocalApiKey(e.currentTarget.value)}
+            onChange={(e) => { setLocalApiKey(e.currentTarget.value); }}
             placeholder="OPENROUTER_API_KEY"
             style={{ flexGrow: 1 }}
           />
@@ -88,7 +88,7 @@ const SettingsPage: React.FC = () => {
               type="checkbox"
               id="auto-scroll-checkbox"
               checked={autoScrollEnabled}
-              onChange={toggleAutoScroll}
+              onChange={() => { toggleAutoScroll(); }}
             />
             <span className="checkbox-custom"></span>
             Auto-scroll to bottom
@@ -112,7 +112,7 @@ const SettingsPage: React.FC = () => {
               prompt={{ name: '', prompt: '' }}
               isInitiallyEditing={true}
               allPrompts={systemPrompts}
-              onUpdate={handleCreatePrompt}
+              onUpdate={(prompt) => { void handleCreatePrompt(prompt); }}
               onRemove={handleCancelNew}
               onCancel={handleCancelNew}
             />
@@ -123,8 +123,8 @@ const SettingsPage: React.FC = () => {
               prompt={prompt}
               isInitiallyEditing={false}
               allPrompts={systemPrompts}
-              onUpdate={(updatedPrompt) => handleUpdatePrompt(prompt.name, updatedPrompt)}
-              onRemove={() => handleRemovePrompt(prompt.name)}
+              onUpdate={(updatedPrompt) => { void handleUpdatePrompt(prompt.name, updatedPrompt); }}
+              onRemove={() => { void handleRemovePrompt(prompt.name); }}
             />
           ))}
         </div>

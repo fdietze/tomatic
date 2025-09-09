@@ -25,7 +25,7 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
             codeElement.children[0] &&
             'value' in codeElement.children[0]
           ) {
-            codeText = codeElement.children[0].value as string;
+            codeText = codeElement.children[0].value;
           }
           return (
             <pre {...props}>

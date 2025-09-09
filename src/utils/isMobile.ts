@@ -1,9 +1,12 @@
+function hasUserAgentData(navigator: Navigator): navigator is Navigator & { userAgentData: { mobile: boolean } } {
+  const uaData = (navigator as { userAgentData?: { mobile?: unknown } }).userAgentData;
+  return typeof uaData?.mobile === 'boolean';
+}
+
 export function isMobile(): boolean {
   // Use the modern, reliable userAgentData API if available
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nav = navigator as any;
-  if (nav.userAgentData && typeof nav.userAgentData.mobile !== 'undefined') {
-    return nav.userAgentData.mobile;
+  if (hasUserAgentData(navigator)) {
+    return navigator.userAgentData.mobile;
   }
 
   // Fallback to checking for touch events, a strong indicator of mobile

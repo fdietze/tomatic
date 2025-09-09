@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { Buffer } from 'buffer';
 
 const OPENROUTER_API_KEY = 'TEST_API_KEY';
 
@@ -107,7 +108,7 @@ export const test = base.extend<{ apiMocks: Record<string, unknown> }>({
     if (testInfo.status !== testInfo.expectedStatus) {
       console.log(`[TEST FAILED]: ${testInfo.title}`);
       console.log('[BROWSER CONSOLE LOGS]:');
-      consoleMessages.forEach((msg) => console.log(msg));
+      consoleMessages.forEach((msg) => { console.log(msg); });
     }
   },
 

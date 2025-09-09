@@ -65,6 +65,7 @@ const ChatInterface: React.FC = () => {
                 historyRef.current.scrollTop = historyRef.current.scrollHeight;
             } else {
                 const lastMessage = messages[messages.length - 1];
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                 if (lastMessage && lastMessage.role === 'user') {
                     const lastMessageElement = document.querySelector(`[data-message-id="${lastMessage.id}"]`);
                     if (lastMessageElement) {
@@ -78,7 +79,7 @@ const ChatInterface: React.FC = () => {
     // Fetch models if the cache is empty and an API key is present.
     useEffect(() => {
         if (apiKey && cachedModels.length === 0) {
-            fetchModelList();
+            void fetchModelList();
         }
     }, [apiKey, cachedModels.length, fetchModelList]);
 
@@ -98,7 +99,7 @@ const ChatInterface: React.FC = () => {
     useEffect(() => {
         const { initialChatPrompt, setInitialChatPrompt } = useAppStore.getState();
         if (initialChatPrompt && messages.length === 0 && !isStreaming) {
-            submitMessage({ promptOverride: initialChatPrompt, navigate });
+            void submitMessage({ promptOverride: initialChatPrompt, navigate });
             setInitialChatPrompt(null); // Consume the prompt
         }
     }, [messages.length, isStreaming, submitMessage, navigate]);
@@ -133,15 +134,15 @@ const ChatInterface: React.FC = () => {
     }, [cachedModels]);
 
     const handleRegenerate = (index: number) => {
-        regenerateMessage(index);
+        void regenerateMessage(index);
     };
 
     const handleEditAndResubmit = (index: number, newContent: string) => {
-        editAndResubmitMessage(index, newContent);
+        void editAndResubmitMessage(index, newContent);
     };
 
     const handleSubmit = (promptOverride?: string) => {
-        submitMessage({ promptOverride, navigate });
+        void submitMessage({ promptOverride, navigate });
     };
 
     const handleCancel = () => {
@@ -161,7 +162,7 @@ const ChatInterface: React.FC = () => {
                                 onSelect={setModelName}
                                 placeholder="Select or type model ID (e.g. openai/gpt-4o)"
                                 loading={modelsLoading}
-                                onReload={fetchModelList}
+                                onReload={() => { void fetchModelList(); }}
                                 errorMessage={modelsError}
                             />
                         </div>
@@ -171,7 +172,7 @@ const ChatInterface: React.FC = () => {
                 {!apiKey && messages.length === 0 && (
                     <div className="onboarding-message">
                         <p style={{ marginBottom: '1em' }}>To get started, please add your API key in the settings.</p>
-                        <button data-role="primary" onClick={() => navigate('/settings')}>Go to Settings</button>
+                        <button data-role="primary" onClick={() => { void navigate('/settings'); }}>Go to Settings</button>
                     </div>
                 )}
 
