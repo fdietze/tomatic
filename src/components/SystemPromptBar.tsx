@@ -17,11 +17,10 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
     id: prompt.name,
     display_text: prompt.name,
     model_info: {
-      provider_name: '',
-      provider_id: '',
-      model_name: '',
-      model_id: '',
-      context_length: 0,
+      id: '',
+      name: '',
+      prompt_cost_usd_pm: null,
+      completion_cost_usd_pm: null,
     },
   }));
 
