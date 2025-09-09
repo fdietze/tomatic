@@ -54,6 +54,15 @@ jobs:
     - name: Build
       run: devbox run -- npm run build
 
+    # Workaround for SPAs on GitHub Pages. By copying index.html to 404.html, we ensure that
+    # any direct navigation or page refresh on a client-side route (e.g., /session/123)
+    # will serve the main app, allowing the client-side router to take over.
+    - name: Prepare for GitHub Pages SPA
+      run: cp dist/index.html dist/404.html
+
+    - name: List build artifacts
+      run: ls -lh dist
+
     - name: Deploy to GitHub Pages 🚀
       uses: JamesIves/github-pages-deploy-action@920cbb300dcd3f0568dbc42700c61e2fd9e6139c # v4 specific commit
       with:
