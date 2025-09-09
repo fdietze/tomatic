@@ -3,7 +3,7 @@ import type { Stream } from 'openai/streaming';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 import { z } from 'zod';
 
-import type { DisplayModelInfo } from '@/types/storage';
+import type { DisplayModelInfo, GenerationStats } from '@/types/storage';
 import type { Message } from '@/types/chat';
 import type { ModelInfo } from '@/types/openrouter';
 
@@ -108,30 +108,97 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
   }
 }
 
-export async function requestMessageContentStreamed(
+export async function streamChatCompletion(
   messages: Message[],
   model: string,
   apiKey: string
-): Promise<Stream<ChatCompletionChunk>> {
+): Promise<{ stream: AsyncGenerator<ChatCompletionChunk, void, unknown>; id: string }> {
   try {
     const openai = getOpenAIClient(apiKey);
-    
-    // Map our internal Message type to the type expected by the OpenAI client.
-    const openAiMessages = messages.map(m => ({
+
+    const openAiMessages = messages.map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
-    console.log('[DEBUG] API request body:', JSON.stringify({ model, messages: openAiMessages.map(m => ({ role: m.role, content: m.content.slice(0, 100) + '...' })), stream: true }));
-    const stream = await openai.chat.completions.create({
+    const rawStream = await openai.chat.completions.create({
       model: model,
       messages: openAiMessages,
       stream: true,
     });
-    
-    return stream;
+
+    // We need to extract the ID from the first chunk without consuming the stream
+    // for the caller. We can do this by creating a new async generator.
+    const iterator = rawStream[Symbol.asyncIterator]();
+    const firstResult = await iterator.next();
+
+    if (firstResult.done) {
+      throw new Error('Stream was empty, no ID could be determined.');
+    }
+
+    const firstChunk = firstResult.value;
+    const generationId = firstChunk.id;
+
+    async function* newStream(): AsyncGenerator<ChatCompletionChunk, void, unknown> {
+      // Yield the first chunk that we've already read
+      yield firstChunk;
+      // Now, yield the rest of the original stream
+      yield* {
+        [Symbol.asyncIterator]: () => iterator,
+      };
+    }
+
+    return { stream: newStream(), id: generationId };
   } catch (error) {
-    console.error('[API] requestMessageContentStreamed error:', error);
-    throw error; // Re-throw to be handled by the caller
+    console.error('[API] streamChatCompletion error:', error);
+    throw error;
   }
+}
+
+export async function getGenerationStats(apiKey: string, generationId: string): Promise<GenerationStats | null> {
+  // According to OpenRouter docs, it can take some time for stats to be available.
+  // We will retry a few times with a delay.
+  const MAX_RETRIES = 4;
+  const RETRY_DELAY_MS = 500;
+
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      const response = await fetch(`https://openrouter.ai/api/v1/generation?id=${generationId}`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status === 404 && i < MAX_RETRIES - 1) {
+        // Generation not found yet, wait and retry
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * (i + 1)));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch generation stats: ${response.status} ${errorText}`);
+      }
+
+      const jsonResponse = await response.json();
+      const stats = jsonResponse.data;
+
+      return {
+        cost: stats.cost,
+        native_tokens_prompt: stats.native_tokens_prompt,
+        native_tokens_completion: stats.native_tokens_completion,
+      };
+
+    } catch (error) {
+      // If it's the last retry and it still fails, we log it but don't re-throw,
+      // as failing to get the cost shouldn't break the chat flow.
+      if (i === MAX_RETRIES - 1) {
+        console.error(`[API] getGenerationStats failed after ${MAX_RETRIES} retries for id ${generationId}:`, error);
+        return null;
+      }
+    }
+  }
+
+  return null; // Should be unreachable, but here for safety
 }

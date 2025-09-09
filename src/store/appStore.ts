@@ -12,7 +12,7 @@ import {
   loadAllSystemPrompts,
   deleteSystemPrompt as dbDeleteSystemPrompt,
 } from '@/services/persistence';
-import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
+import { listAvailableModels, streamChatCompletion, getGenerationStats } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
 import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
@@ -436,78 +436,86 @@ export const useAppStore = create<AppState>()(
         set({ streamController: controller });
 
         try {
-            const stream = await requestMessageContentStreamed(
+            const { stream, id: generationId } = await streamChatCompletion(
                 messagesToSubmit,
                 modelName,
                 apiKey
             );
 
+            // Create a placeholder for the assistant's message
+            const assistantMessageId = uuidv4();
+            const placeholder: Message = {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: '',
+                model_name: modelName,
+                cost: null,
+                prompt_name: null
+            };
+
             if (isRegeneration) {
-              set({ 
-                  messages: [...messagesToSubmit, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-              });
+                set({ messages: [...messagesToSubmit, placeholder] });
             } else {
-              set((state) => ({ 
-                  messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-              }));
+                set((state) => ({ messages: [...state.messages, placeholder] }));
             }
             console.log('[DEBUG] submitMessage: Assistant placeholder added. Total messages:', get().messages.length);
 
             console.log('[DEBUG] submitMessage: Entering stream processing loop...');
-            let finalChunk: ChatCompletionChunk | undefined;
             for await (const chunk of stream) {
-                finalChunk = chunk;
-                console.log('[DEBUG] submitMessage: Received stream chunk.');
                 if (controller.signal.aborted) {
-                  stream.controller.abort();
-                  break;
+                    // The stream in streamChatCompletion is a custom generator, it doesn't have a .controller.abort()
+                    // The break is sufficient to stop processing.
+                    break;
                 }
                 const contentChunk = chunk.choices[0]?.delta?.content || '';
-                 set((state) => {
-                    if (state.messages.length === 0 || state.messages[state.messages.length - 1].role !== 'assistant') {
-                        console.log('[DEBUG] submitMessage stream: bailing out, no assistant message found at the end.');
+                set((state) => {
+                    const assistantMessageIndex = state.messages.findIndex(m => m.id === assistantMessageId);
+                    if (assistantMessageIndex === -1) {
+                        console.log('[DEBUG] submitMessage stream: bailing out, assistant message not found.');
                         return state;
                     }
-                    const lastMessage = state.messages[state.messages.length - 1];
-                    const updatedMessage = { ...lastMessage, content: lastMessage.content + contentChunk };
-                    return { messages: [...state.messages.slice(0, -1), updatedMessage] };
+                    const assistantMessage = state.messages[assistantMessageIndex];
+                    const updatedMessage = { ...assistantMessage, content: assistantMessage.content + contentChunk };
+
+                    const newMessages = [...state.messages];
+                    newMessages[assistantMessageIndex] = updatedMessage;
+
+                    return { messages: newMessages };
                 });
             }
             
-            if (finalChunk?.usage) {
-              console.log('[DEBUG] submitMessage: Final stream chunk:', finalChunk);
-              console.log('[DEBUG] submitMessage: Usage data:', finalChunk.usage);
-              const { prompt_tokens, completion_tokens } = finalChunk.usage;
-              const { cachedModels, modelName } = get();
-              const modelInfo = cachedModels.find(m => m.id === modelName);
-
-              if (modelInfo && prompt_tokens && completion_tokens) {
-                const promptCost = (prompt_tokens / 1_000_000) * (modelInfo.prompt_cost_usd_pm || 0);
-                const completionCost = (completion_tokens / 1_000_000) * (modelInfo.completion_cost_usd_pm || 0);
-
-                set(state => {
-                  const lastMessage = state.messages[state.messages.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant') {
-                    const updatedMessage = {
-                      ...lastMessage,
-                      cost: {
-                        prompt: promptCost,
-                        completion: completionCost,
-                        prompt_tokens: prompt_tokens,
-                        completion_tokens: completion_tokens,
-                      }
-                    };
-                    return { messages: [...state.messages.slice(0, -1), updatedMessage] };
-                  }
-                  return state;
-                });
-              }
-            }
-
-            // --- Finalization logic moved from finally block ---
-            console.log('[DEBUG] submitMessage stream finished. isStreaming:', get().isStreaming);
+            // --- Finalization and Cost Fetching ---
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
+
+            // Now, fetch the accurate cost information.
+            console.log(`[DEBUG] Fetching generation stats for ID: ${generationId}`);
+            const stats = await getGenerationStats(apiKey, generationId);
+            if (stats) {
+                console.log('[DEBUG] Received generation stats:', stats);
+                set(state => {
+                    const assistantMessageIndex = state.messages.findIndex(m => m.id === assistantMessageId);
+                    if (assistantMessageIndex === -1) return state;
+
+                    const assistantMessage = state.messages[assistantMessageIndex];
+                    const updatedMessage = {
+                        ...assistantMessage,
+                        cost: {
+                            prompt: stats.cost, // The 'cost' field from the API is the total cost
+                            completion: 0, // The breakdown is not provided, so we put it all in prompt
+                            prompt_tokens: stats.native_tokens_prompt,
+                            completion_tokens: stats.native_tokens_completion,
+                        }
+                    };
+
+                    const newMessages = [...state.messages];
+                    newMessages[assistantMessageIndex] = updatedMessage;
+                    return { messages: newMessages };
+                });
+                // Save the session again to persist the cost information
+                await get().saveCurrentSession();
+            }
+
             const sessionId = get().currentSessionId;
             if (sessionId) {
                 const currentSession = await loadSession(sessionId);

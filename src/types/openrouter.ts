@@ -39,3 +39,9 @@ export interface ModelInfo {
   per_request_limits?: unknown | null;
   supported_parameters?: string[] | null;
 }
+
+export interface GenerationStats {
+  cost: number;
+  native_tokens_prompt: number;
+  native_tokens_completion: number;
+}
