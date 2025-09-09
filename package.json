@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e": "docker build --progress=plain -f Dockerfile .",
+    "test:e2e": "npx playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,7 +25,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "1.54.1",
     "@eslint/js": "^9.33.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",

@@ -2,6 +2,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/jetpack-io/devbox/0.10.1/.schema/devbox.schema.json",
   "packages": {
+    "nodejs": "24",
+    "github:nixos/nixpkgs/648f70160c03151bc2121d179291337ad6bc564b#playwright-driver.browsers": "", // playwright 1.54.1, must be the same as in package.json, https://www.nixhub.io/packages/playwright
     "rustup": "latest",
     "openssl": {
       "version": "latest",
@@ -9,19 +11,19 @@
         "dev",
       ],
     },
-    "pkg-config":   "latest",
-    "cargo-watch":  "latest",
-    "just":         "latest",
-    "trunk":        "latest",
-    "leptosfmt":    "latest",
-    "cargo-chef":   "latest",
-    "bacon":        "latest",
+    "pkg-config": "latest",
+    "cargo-watch": "latest",
+    "just": "latest",
+    "trunk": "latest",
+    "leptosfmt": "latest",
+    "cargo-chef": "latest",
+    "bacon": "latest",
     "cargo-leptos": "latest",
-    "cargo-udeps":  "latest",
-    "nodejs":       "latest",
+    "cargo-udeps": "latest",
   },
   "shell": {
     "init_hook": [
+      "export PLAYWRIGHT_BROWSERS_PATH=$(nix build --print-out-paths github:nixos/nixpkgs/648f70160c03151bc2121d179291337ad6bc564b#playwright-driver.browsers)",
       "projectDir=$PWD",
       "rustupHomeDir=\"$projectDir\"/.rustup",
       "mkdir -p $rustupHomeDir",

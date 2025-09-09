@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .rustup/
 target-rust-analyzer/
+/playwright-report/
+/test-results/
+/result
