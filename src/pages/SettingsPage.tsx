@@ -2,44 +2,66 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import type { SystemPrompt } from '@/types/storage';
+import { useShallow } from 'zustand/react/shallow';
 
 const SettingsPage: React.FC = () => {
-  const storeApiKey = useAppStore((state) => state.apiKey);
-  const setStoreApiKey = useAppStore((state) => state.setApiKey);
-  const systemPrompts = useAppStore((state) => state.systemPrompts);
-  const setSystemPrompts = useAppStore((state) => state.setSystemPrompts);
-  const autoScrollEnabled = useAppStore((state) => state.autoScrollEnabled);
-  const toggleAutoScroll = useAppStore((state) => state.toggleAutoScroll);
+  const {
+    apiKey: storeApiKey,
+    setApiKey,
+    systemPrompts,
+    autoScrollEnabled,
+    toggleAutoScroll,
+    addSystemPrompt,
+    updateSystemPrompt,
+    deleteSystemPrompt,
+  } = useAppStore(
+    useShallow((state) => ({
+      apiKey: state.apiKey,
+      setApiKey: state.setApiKey,
+      systemPrompts: state.systemPrompts,
+      autoScrollEnabled: state.autoScrollEnabled,
+      toggleAutoScroll: state.toggleAutoScroll,
+      addSystemPrompt: state.addSystemPrompt,
+      updateSystemPrompt: state.updateSystemPrompt,
+      deleteSystemPrompt: state.deleteSystemPrompt,
+    }))
+  );
 
   const [localApiKey, setLocalApiKey] = useState(storeApiKey);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  // Local state to manage the creation of a new, unsaved prompt
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   useEffect(() => {
     setLocalApiKey(storeApiKey);
   }, [storeApiKey]);
 
   const handleSaveApiKey = () => {
-    setStoreApiKey(localApiKey);
+    setApiKey(localApiKey);
     setSaveStatus('saved');
     setTimeout(() => setSaveStatus('idle'), 2000);
   };
 
   const handleNewPrompt = () => {
-    const newPrompts = [{ name: '', prompt: '' }, ...systemPrompts];
-    console.log('[DEBUG] new prompts list in handleNewPrompt:', newPrompts);
-    setSystemPrompts(newPrompts);
+    setIsCreatingNew(true);
   };
 
-  const handleUpdatePrompt = (index: number, updatedPrompt: SystemPrompt) => {
-    const newPrompts = [...systemPrompts];
-    newPrompts[index] = updatedPrompt;
-    setSystemPrompts(newPrompts);
+  const handleCreatePrompt = async (newPrompt: SystemPrompt) => {
+    await addSystemPrompt(newPrompt);
+    setIsCreatingNew(false);
   };
 
-  const handleRemovePrompt = (index: number) => {
-    const newPrompts = systemPrompts.filter((_, i) => i !== index);
-    setSystemPrompts(newPrompts);
+  const handleUpdatePrompt = async (oldName: string, updatedPrompt: SystemPrompt) => {
+    await updateSystemPrompt(oldName, updatedPrompt);
   };
+
+  const handleRemovePrompt = async (name: string) => {
+    await deleteSystemPrompt(name);
+  };
+
+  const handleCancelNew = () => {
+    setIsCreatingNew(false);
+  }
 
   return (
     <div style={{ marginBottom: '50px' }}>
@@ -80,18 +102,29 @@ const SettingsPage: React.FC = () => {
           data-size="compact"
           onClick={handleNewPrompt}
           style={{ marginBottom: '20px' }}
+          disabled={isCreatingNew}
         >
           New
         </button>
         <div className="system-prompt-list">
-          {systemPrompts.map((prompt, index) => (
-            <SystemPromptItem
-              key={prompt.name || `new-prompt-${index}`} // Use a more stable key
-              prompt={prompt}
-              promptIndex={index}
+          {isCreatingNew && (
+             <SystemPromptItem
+              prompt={{ name: '', prompt: '' }}
+              isInitiallyEditing={true}
               allPrompts={systemPrompts}
-              onUpdate={(updatedPrompt) => handleUpdatePrompt(index, updatedPrompt)}
-              onRemove={() => handleRemovePrompt(index)}
+              onUpdate={handleCreatePrompt}
+              onRemove={handleCancelNew}
+              onCancel={handleCancelNew}
+            />
+          )}
+          {systemPrompts.map((prompt) => (
+            <SystemPromptItem
+              key={prompt.name}
+              prompt={prompt}
+              isInitiallyEditing={false}
+              allPrompts={systemPrompts}
+              onUpdate={(updatedPrompt) => handleUpdatePrompt(prompt.name, updatedPrompt)}
+              onRemove={() => handleRemovePrompt(prompt.name)}
             />
           ))}
         </div>

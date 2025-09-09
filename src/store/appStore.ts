@@ -8,6 +8,9 @@ import {
   loadSession,
   saveSession,
   deleteSession as dbDeleteSession,
+  saveSystemPrompt,
+  loadAllSystemPrompts,
+  deleteSystemPrompt as dbDeleteSystemPrompt,
 } from '@/services/persistence';
 import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
@@ -123,6 +126,10 @@ interface AppState {
   startNewSession: () => void;
   saveCurrentSession: () => Promise<void>;
   deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
+  loadSystemPrompts: () => Promise<void>;
+  addSystemPrompt: (prompt: SystemPrompt) => Promise<void>;
+  updateSystemPrompt: (oldName: string, prompt: SystemPrompt) => Promise<void>;
+  deleteSystemPrompt: (name: string) => Promise<void>;
 
   fetchModelList: () => Promise<void>;
   
@@ -313,6 +320,52 @@ export const useAppStore = create<AppState>()(
           if (currentId) {
             await get().loadSession(currentId);
           }
+        }
+      },
+
+      loadSystemPrompts: async () => {
+        try {
+          const prompts = await loadAllSystemPrompts();
+          set({ systemPrompts: prompts });
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to load system prompts: ${error}`);
+        }
+      },
+
+      addSystemPrompt: async (prompt) => {
+        try {
+          await saveSystemPrompt(prompt);
+          // Refresh the prompts from the source of truth
+          await get().loadSystemPrompts();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to add system prompt: ${error}`);
+        }
+      },
+      
+      updateSystemPrompt: async (oldName, prompt) => {
+        try {
+          // In IndexedDB with a keyPath, updating an item with a new key
+          // requires deleting the old one and adding the new one.
+          if (oldName !== prompt.name) {
+            await dbDeleteSystemPrompt(oldName);
+          }
+          await saveSystemPrompt(prompt);
+          await get().loadSystemPrompts();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to update system prompt: ${error}`);
+        }
+      },
+
+      deleteSystemPrompt: async (name) => {
+        try {
+          await dbDeleteSystemPrompt(name);
+          await get().loadSystemPrompts();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to delete system prompt: ${error}`);
         }
       },
 
@@ -520,17 +573,33 @@ export const useAppStore = create<AppState>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       version: 1, // Start versioning our state
-      migrate: (persistedState, version) => {
+      migrate: async (persistedState, version) => {
         if (version === 0) {
           // In this specific case, the migration from v0 to v1 requires no changes,
           // as the initial migration script already shapes the data correctly for v1.
           // This block is here to establish the pattern for future migrations.
+          const oldState = persistedState as any;
+          if (oldState.systemPrompts && Array.isArray(oldState.systemPrompts)) {
+            console.log('[Migration] Migrating system prompts from localStorage to IndexedDB...');
+            try {
+              const promptsToMigrate = oldState.systemPrompts;
+              for (const prompt of promptsToMigrate) {
+                // This will overwrite existing prompts with the same name if any.
+                await saveSystemPrompt(prompt);
+              }
+              console.log(`[Migration] Successfully migrated ${promptsToMigrate.length} prompts.`);
+              // We don't need to remove systemPrompts from oldState because
+              // the `partialize` function below will prevent it from being
+              // re-persisted into localStorage on the next save.
+            } catch (error) {
+              console.error('[Migration] Failed to migrate system prompts:', error);
+            }
+          }
         }
         return persistedState as AppState;
       },
       partialize: (state) => ({
         apiKey: state.apiKey,
-        systemPrompts: state.systemPrompts,
         modelName: state.modelName,
         cachedModels: state.cachedModels,
         input: state.input,

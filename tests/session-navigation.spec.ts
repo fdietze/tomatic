@@ -36,6 +36,9 @@ test.describe('Chat Session Navigation', () => {
             const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
             store.createIndex('updated_at_ms', 'updated_at_ms');
           }
+          if (!db.objectStoreNames.contains('system_prompts')) {
+            db.createObjectStore('system_prompts', { keyPath: 'name' });
+          }
         };
         request.onsuccess = (event) => {
           const db = (event.target as IDBOpenDBRequest).result;

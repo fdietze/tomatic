@@ -183,7 +183,7 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
         apiKey: 'TEST_API_KEY',
         selectedPromptName: 'TestPrompt',
       },
-      version: 0,
+      version: 0, // Set to 0 to trigger migration
     };
     window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
   });

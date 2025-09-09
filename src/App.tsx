@@ -47,6 +47,8 @@ const Header: React.FC = () => {
 
 
 const App: React.FC = () => {
+  const loadSystemPrompts = useAppStore((state) => state.loadSystemPrompts);
+
   // Fetch initial data on app load
   useEffect(() => {
     // Check for stale selected prompt on startup
@@ -57,7 +59,9 @@ const App: React.FC = () => {
         setSelectedPromptName(null);
       }
     }
-  }, []);
+
+    loadSystemPrompts();
+  }, [loadSystemPrompts]);
 
   return (
     <Router>

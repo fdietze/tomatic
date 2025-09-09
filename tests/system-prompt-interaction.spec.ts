@@ -30,10 +30,13 @@ test.describe('System Prompt Interaction', () => {
         if ((window as any).hasBeenSeeded) return;
         (window as any).hasBeenSeeded = true;
 
-        // Seed localStorage
+        // Seed localStorage with OLD format for migration testing
         const persistedState = {
-          state: { systemPrompts: prompts, apiKey: 'TEST_API_KEY' },
-          version: 0,
+          state: { 
+            systemPrompts: prompts, 
+            apiKey: 'TEST_API_KEY' 
+          },
+          version: 0, // Trigger migration
         };
         window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
 
@@ -45,6 +48,9 @@ test.describe('System Prompt Interaction', () => {
             if (!db.objectStoreNames.contains('chat_sessions')) {
               const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
               store.createIndex('updated_at_ms', 'updated_at_ms');
+            }
+            if (!db.objectStoreNames.contains('system_prompts')) {
+              db.createObjectStore('system_prompts', { keyPath: 'name' });
             }
           };
           request.onsuccess = (event) => {

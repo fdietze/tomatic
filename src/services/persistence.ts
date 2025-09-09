@@ -2,6 +2,7 @@ import { openDB, DBSchema } from 'idb';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatSession, Message } from '@/types/chat';
+import type { SystemPrompt } from '@/types/storage';
 
 // --- Zod Schemas for Runtime Validation ---
 const messageCostSchema = z.object({
@@ -24,13 +25,22 @@ const chatSessionSchema = z.object({
   name: z.string().nullable().optional(),
   created_at_ms: z.number(),
   updated_at_ms: z.number(),
+  prompt_name: z.string().nullable().optional(), // Added from session-navigation.spec.ts
 });
+
+const systemPromptSchema = z.object({
+  name: z.string(),
+  prompt: z.string(),
+});
+
 
 // --- IndexedDB Constants ---
 const DB_NAME = 'tomatic_chat_db';
 const DB_VERSION = 2;
 const SESSIONS_STORE_NAME = 'chat_sessions';
+const SYSTEM_PROMPTS_STORE_NAME = 'system_prompts';
 const SESSION_ID_KEY_PATH = 'session_id';
+const PROMPT_NAME_KEY_PATH = 'name';
 const UPDATED_AT_INDEX = 'updated_at_ms';
 
 // --- IDB Schema Definition ---
@@ -42,6 +52,10 @@ interface TomaticDB extends DBSchema {
       [UPDATED_AT_INDEX]: number;
     };
   };
+  [SYSTEM_PROMPTS_STORE_NAME]: {
+    key: string;
+    value: SystemPrompt;
+  };
 }
 
 // --- Database Interaction Functions ---
@@ -51,18 +65,19 @@ async function getDb() {
     upgrade(db, oldVersion, _newVersion, tx) {
       if (oldVersion < 2) {
         console.log('[DB] Upgrading database from version 1 to 2...');
-        // Create store if it doesn't exist
-        const store = db.objectStoreNames.contains(SESSIONS_STORE_NAME)
-          ? tx.objectStore(SESSIONS_STORE_NAME)
-          : db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
-        
-        // Create index if it doesn't exist
-        if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+        // Create sessions store
+        if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
+          const store = db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
           store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
         }
 
+        // Create system prompts store
+        if (!db.objectStoreNames.contains(SYSTEM_PROMPTS_STORE_NAME)) {
+          db.createObjectStore(SYSTEM_PROMPTS_STORE_NAME, { keyPath: PROMPT_NAME_KEY_PATH });
+        }
+        
         // Migrate data
-        (store.openCursor()).then(async function migrate(cursor) {
+        (tx.objectStore(SESSIONS_STORE_NAME).openCursor()).then(async function migrate(cursor) {
           if (!cursor) {
             console.log('[DB] Migration complete.');
             return;
@@ -190,6 +205,53 @@ export async function deleteSession(sessionId: string): Promise<void> {
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete session '${sessionId}':`, error);
     throw new Error('Failed to delete session.');
+  } finally {
+    db.close();
+  }
+}
+
+
+// --- System Prompt CRUD ---
+
+export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
+  const db = await getDb();
+  try {
+    await db.put(SYSTEM_PROMPTS_STORE_NAME, prompt);
+  } catch (error) {
+    console.error('[DB] Save: Failed to save system prompt:', error);
+    throw new Error('Failed to save system prompt.');
+  } finally {
+    db.close();
+  }
+}
+
+export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
+  const db = await getDb();
+  try {
+    const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
+    // Validate each prompt
+    const validation = z.array(systemPromptSchema).safeParse(prompts);
+    if (validation.success) {
+      return validation.data;
+    } else {
+      console.error('[DB] Load: Zod validation failed for system prompts:', validation.error);
+      return [];
+    }
+  } catch (error) {
+    console.error('[DB] Load: Failed to load system prompts:', error);
+    throw new Error('Failed to load system prompts.');
+  } finally {
+    db.close();
+  }
+}
+
+export async function deleteSystemPrompt(promptName: string): Promise<void> {
+  const db = await getDb();
+  try {
+    await db.delete(SYSTEM_PROMPTS_STORE_NAME, promptName);
+  } catch (error) {
+    console.error(`[DB] Delete: Failed to delete system prompt '${promptName}':`, error);
+    throw new Error('Failed to delete system prompt.');
   } finally {
     db.close();
   }

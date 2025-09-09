@@ -3,23 +3,25 @@ import type { SystemPrompt } from '@/types/storage';
 
 interface SystemPromptItemProps {
   prompt: SystemPrompt;
-  promptIndex: number;
+  isInitiallyEditing: boolean;
   allPrompts: SystemPrompt[];
   onUpdate: (updatedPrompt: SystemPrompt) => void;
   onRemove: () => void;
+  onCancel?: () => void;
 }
 
 const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   prompt,
-  promptIndex,
+  isInitiallyEditing,
   allPrompts,
   onUpdate,
   onRemove,
+  onCancel,
 }) => {
   console.log(
-    `[DEBUG] SystemPromptItem render. Index: ${promptIndex}, Name: "${prompt.name}", isEditing initially: ${!prompt.name && !prompt.prompt}`
+    `[DEBUG] SystemPromptItem render. Index: ${prompt.name}, Name: "${prompt.name}", isEditing initially: ${isInitiallyEditing}`
   );
-  const [isEditing, setIsEditing] = useState(!prompt.name && !prompt.prompt);
+  const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(prompt.name);
   const [editingPrompt, setEditingPrompt] = useState(prompt.prompt);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -37,31 +39,36 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
       setNameError('Name cannot be empty.');
       return;
     }
+    
+    // For existing prompts, the original name is `prompt.name`.
+    // For new prompts, `prompt.name` is empty.
+    const originalName = prompt.name;
 
     const isDuplicate = allPrompts.some(
-      (p, i) => p.name.trim().toLowerCase() === trimmedName.toLowerCase() && i !== promptIndex
+      (p) => p.name.trim().toLowerCase() === trimmedName.toLowerCase() && p.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
     );
+
     if (isDuplicate) {
       setNameError('A prompt with this name already exists.');
       return;
     }
 
-    onUpdate({ name: editingName, prompt: editingPrompt });
+    onUpdate({ name: trimmedName, prompt: editingPrompt });
     setIsEditing(false);
     setNameError(null);
   };
 
-  const handleCancel = () => {
-    setEditingName(prompt.name);
-    setEditingPrompt(prompt.prompt);
-    setNameError(null);
-    // If the prompt was new and empty, cancel should remove it.
-    if (!prompt.name && !prompt.prompt) {
-      onRemove();
+  const handleCancelEditing = () => {
+    if (onCancel) {
+      onCancel();
     } else {
+      setEditingName(prompt.name);
+      setEditingPrompt(prompt.prompt);
+      setNameError(null);
       setIsEditing(false);
     }
   };
+
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditingName(e.target.value);
@@ -101,7 +108,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             Save
           </button>
           <button
-            onClick={handleCancel}
+            onClick={handleCancelEditing}
             data-size="compact"
             data-testid="system-prompt-cancel-button"
           >

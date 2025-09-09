@@ -7,14 +7,14 @@ const MOCK_PROMPTS: SystemPrompt[] = [
 ];
 
 test.beforeEach(async ({ page }) => {
-  // Seed the localStorage with some system prompts before each test
+  // Seed the OLD localStorage format to test the migration
   await page.addInitScript((prompts) => {
     const persistedState = {
       state: {
-        systemPrompts: prompts,
+        systemPrompts: prompts, // This is the old way
         apiKey: 'TEST_API_KEY',
       },
-      version: 0,
+      version: 0, // IMPORTANT: Set version to 0 to trigger migration
     };
     window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
   }, MOCK_PROMPTS);
@@ -33,7 +33,6 @@ test.describe('System Prompt CRUD', () => {
     await page.getByRole('button', { name: 'New' }).click();
 
     // The new prompt item should be in edit mode
-    await page.screenshot({ path: 'test-results/creates-a-new-system-prompt-debug.png' });
     await expect(page.getByTestId('system-prompt-name-input')).toBeVisible();
     await expect(page.getByTestId('system-prompt-name-input')).toBeFocused();
 
@@ -53,7 +52,9 @@ test.describe('System Prompt CRUD', () => {
 
     // Edit the fields
     await page.getByTestId('system-prompt-name-input').fill('Master Chef');
-    await page.getByTestId('system-prompt-prompt-input').fill('You are the greatest chef in the world.');
+    await page
+      .getByTestId('system-prompt-prompt-input')
+      .fill('You are the greatest chef in the world.');
     await page.getByTestId('system-prompt-save-button').click();
 
     // Verify the update
