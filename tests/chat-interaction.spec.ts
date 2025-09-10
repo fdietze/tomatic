@@ -205,3 +205,112 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
     page.locator('[data-testid="chat-message-0"] .chat-message-content')
   ).toHaveText(/You are a test bot/);
 });
+
+test('can edit a user message and resubmit', async ({ page }) => {
+  // 1. Send an initial message and get a response
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: responseBody,
+    });
+  });
+  await page.getByTestId('chat-input').fill('Initial message');
+  const responsePromise1 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+  await page.getByTestId('chat-submit').click();
+  await responsePromise1;
+
+  // Verify initial messages
+  await expect(
+    page.locator('[data-testid="chat-message-0"] .chat-message-content')
+  ).toHaveText(/Initial message/);
+  await expect(
+    page.locator('[data-testid="chat-message-1"] .chat-message-content')
+  ).toHaveText(/Initial response/);
+  await expect(page.locator('[data-testid^="chat-message-"]')).toHaveCount(2);
+
+  // 2. Mock the next response for the edited message.
+  await page.unroute('https://openrouter.ai/api/v1/chat/completions');
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const responseBody: Buffer = createStreamResponse(
+      'openai/gpt-4o',
+      'Response to edited message.'
+    );
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: responseBody,
+    });
+  });
+
+  // 3. Click the edit button on the user's message, edit it, and save.
+  const userMessage = page.locator('[data-testid="chat-message-0"][data-role="user"]');
+  await userMessage.getByRole('button', { name: 'edit' }).click();
+
+  const editTextArea = userMessage.locator('textarea');
+  await editTextArea.fill('Edited message');
+
+  const responsePromise2 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+  await userMessage.getByRole('button', { name: 'Re-submit' }).click();
+  await responsePromise2;
+
+  // 4. Assertions
+  // The user message should be updated.
+  await expect(
+    page.locator('[data-testid="chat-message-0"] .chat-message-content')
+  ).toHaveText(/Edited message/);
+
+  // The new assistant message should have the new content, replacing the old one.
+  await expect(
+    page.locator('[data-testid="chat-message-1"] .chat-message-content')
+  ).toHaveText(/Response to edited message./);
+
+  // The total number of messages should still be 2.
+  await expect(page.locator('[data-testid^="chat-message-"]')).toHaveCount(2);
+});
+
+test('can edit a user message and discard changes', async ({ page }) => {
+  // 1. Send an initial message and get a response
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: responseBody,
+    });
+  });
+  await page.getByTestId('chat-input').fill('Initial message');
+  const responsePromise1 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+  await page.getByTestId('chat-submit').click();
+  await responsePromise1;
+
+  // Verify initial messages
+  await expect(
+    page.locator('[data-testid="chat-message-0"] .chat-message-content')
+  ).toHaveText(/Initial message/);
+  await expect(
+    page.locator('[data-testid="chat-message-1"] .chat-message-content')
+  ).toHaveText(/Initial response/);
+
+  // 2. Click the edit button, change the text, then cancel.
+  const userMessage = page.locator('[data-testid="chat-message-0"][data-role="user"]');
+  await userMessage.getByRole('button', { name: 'edit' }).click();
+
+  const editTextArea = userMessage.locator('textarea');
+  await editTextArea.fill('This change should be discarded');
+
+  await userMessage.getByRole('button', { name: 'Discard' }).click();
+
+  // 3. Assertions
+  // The user message should NOT be updated.
+  await expect(
+    page.locator('[data-testid="chat-message-0"] .chat-message-content')
+  ).toHaveText(/Initial message/);
+  // The textarea should be gone.
+  await expect(userMessage.locator('textarea')).not.toBeVisible();
+  // The assistant message should be unchanged.
+  await expect(
+    page.locator('[data-testid="chat-message-1"] .chat-message-content')
+  ).toHaveText(/Initial response/);
+});
