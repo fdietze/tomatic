@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, Page } from '@playwright/test';
 import { Buffer } from 'buffer';
 
 const OPENROUTER_API_KEY = 'TEST_API_KEY';
@@ -72,8 +72,21 @@ export const MOCK_MODELS_RESPONSE = {
 };
 
 
+// A function to set up common API mocks
+export async function mockApis(page: Page): Promise<void> {
+  // Mock the /models endpoint
+  await page.route('https://openrouter.ai/api/v1/models', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_MODELS_RESPONSE),
+    });
+  });
+}
+
+
 // Extend basic test by providing a page fixture that logs all console messages.
-export const test = base.extend<{ apiMocks: Record<string, unknown> }>({
+export const test = base.extend({
   context: async ({ browser }, use) => {
     const context = await browser.newContext();
     await use(context);
@@ -111,20 +124,6 @@ export const test = base.extend<{ apiMocks: Record<string, unknown> }>({
       consoleMessages.forEach((msg) => { console.log(msg); });
     }
   },
-
-  // Fixture for mocking API endpoints
-  apiMocks: [async ({ page }, use) => {
-    // Mock the /models endpoint
-    await page.route('https://openrouter.ai/api/v1/models', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_MODELS_RESPONSE),
-      });
-    });
-
-    await use(page);
-  }, { auto: true }],
 });
 
 export function createStreamResponse(model: string, content: string): Buffer {

@@ -119,6 +119,7 @@ interface AppState {
   isStreaming: boolean;
   streamController: AbortController | null;
   initialChatPrompt: string | null;
+  isInitializing: boolean;
 
   // --- Actions ---
   setApiKey: (key: string) => void;
@@ -152,6 +153,7 @@ interface AppState {
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
   cancelStream: () => void;
+  init: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -179,6 +181,7 @@ export const useAppStore = create<AppState>()(
       isStreaming: false,
       streamController: null,
       initialChatPrompt: null,
+      isInitializing: true,
 
       // --- Actions ---
       setApiKey: (apiKey) => set({ apiKey }),
@@ -590,6 +593,11 @@ export const useAppStore = create<AppState>()(
 
       toggleAutoScroll: () => set((state) => ({ autoScrollEnabled: !state.autoScrollEnabled })),
 
+      init: async () => {
+        await get().loadSystemPrompts();
+        set({ isInitializing: false });
+      },
+
     }),
     {
       name: STORAGE_KEY,
@@ -599,7 +607,6 @@ export const useAppStore = create<AppState>()(
         if (version === 0) {
           // In this specific case, the migration from v0 to v1 requires no changes,
           // as the initial migration script already shapes the data correctly for v1.
-          // This block is here to establish the pattern for future migrations.
           const oldState = persistedState as Partial<AppState>;
           if (oldState.systemPrompts && Array.isArray(oldState.systemPrompts)) {
             console.log('[Migration] Migrating system prompts from localStorage to IndexedDB...');

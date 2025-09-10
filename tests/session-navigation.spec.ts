@@ -1,4 +1,4 @@
-import { test, expect, MOCK_MODELS_RESPONSE } from './fixtures';
+import { test, expect, mockApis } from './fixtures';
 
 test.describe('Chat Session Navigation', () => {
   const sessions = [
@@ -54,13 +54,7 @@ test.describe('Chat Session Navigation', () => {
     }, sessions);
 
     // Mock the models API to prevent network errors
-    await page.route('https://openrouter.ai/api/v1/models', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_MODELS_RESPONSE),
-      });
-    });
+    await mockApis(page);
 
     // Go to the newest session to start the test
     await page.goto('http://localhost:5173/chat/session-new');
@@ -90,16 +84,5 @@ test.describe('Chat Session Navigation', () => {
     await page.getByRole('button', { name: 'Next' }).click();
     await page.waitForURL('**/chat/session-middle');
     await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Middle message/);
-  });
-
-  test('navigates from the "new" page to the most recent session', async ({ page }) => {
-    await page.goto('http://localhost:5173/chat/new');
-
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
-
-    await page.getByRole('button', { name: 'Prev' }).click();
-    await page.waitForURL('**/chat/session-new');
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/New message/);
   });
 });

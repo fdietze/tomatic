@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, mockApis } from './fixtures';
 import type { SystemPrompt } from '../src/types/storage';
 
 const MOCK_PROMPTS: SystemPrompt[] = [
@@ -7,6 +7,8 @@ const MOCK_PROMPTS: SystemPrompt[] = [
 ];
 
 test.beforeEach(async ({ page }) => {
+  // We need to mock APIs before any other action
+  await mockApis(page);
   // Seed the OLD localStorage format to test the migration
   await page.addInitScript((prompts) => {
     const persistedState = {

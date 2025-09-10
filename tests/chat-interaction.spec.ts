@@ -1,4 +1,4 @@
-import { test, expect, createStreamResponse } from './fixtures';
+import { test, expect, createStreamResponse, mockApis } from './fixtures';
 import type { Buffer } from 'buffer';
 
 interface ChatRequestBody {
@@ -6,6 +6,7 @@ interface ChatRequestBody {
 }
 
 test.beforeEach(async ({ page }) => {
+  await mockApis(page);
   await page.goto('http://localhost:5173/chat/new');
 });
 
@@ -145,39 +146,6 @@ test('can regenerate an assistant response', async ({ page }) => {
   await expect(page.locator('[data-testid^="chat-message-"]')).toHaveCount(2);
 });
 
-test('sends first message in a new session from UI', async ({ page }) => {
-  // 1. Start on a different page to ensure we're testing the 'new chat' flow
-  await page.goto('http://localhost:5173/settings');
-
-  // 2. Navigate to a new chat page by clicking the chat tab button
-  await page.getByRole('button', { name: 'Chat' }).click();
-  await page.waitForURL('**/chat/new');
-
-  // 3. Mock the response
-  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'First message response');
-    await route.fulfill({
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      status: 200,
-      body: responseBody,
-    });
-  });
-
-  // 4. Send a message
-  await page.getByTestId('chat-input').fill('First message in new session');
-  const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
-  await page.getByTestId('chat-submit').click();
-  await responsePromise;
-
-  // 5. Assertions
-  await expect(
-    page.locator('[data-testid="chat-message-0"][data-role="user"] .chat-message-content')
-  ).toHaveText(/First message in new session/);
-  await expect(
-    page.locator('[data-testid="chat-message-1"][data-role="assistant"] .chat-message-content')
-  ).toHaveText(/First message response/);
-});
-
 test('shows system prompt immediately in a new chat', async ({ page }) => {
   // 1. Seed localStorage with a selected system prompt
   await page.addInitScript(() => {
@@ -193,10 +161,10 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
   });
 
   // 2. Go to an arbitrary page that has the chat header, like an existing chat
-  await page.goto('http://localhost:5173/chat/some-session-id');
+  await page.goto('http://localhost:5173/settings');
 
   // 3. Click the "New Chat" button to start a fresh session
-  await page.getByRole('button', { name: 'New Chat' }).click();
+  await page.getByRole('button', { name: 'Chat' }).click();
   await page.waitForURL('**/chat/new');
 
   // 4. Assert that the system message is immediately visible

@@ -10,6 +10,7 @@ import {
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
 import { useAppStore } from './store/appStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -47,21 +48,20 @@ const Header: React.FC = () => {
 
 
 const App: React.FC = () => {
-  const loadSystemPrompts = useAppStore((state) => state.loadSystemPrompts);
+  const { isInitializing, init } = useAppStore(
+    useShallow((state) => ({
+      isInitializing: state.isInitializing,
+      init: state.init,
+    }))
+  );
 
-  // Fetch initial data on app load
   useEffect(() => {
-    // Check for stale selected prompt on startup
-    const { systemPrompts, selectedPromptName, setSelectedPromptName } = useAppStore.getState();
-    if (selectedPromptName) {
-      const isStale = !systemPrompts.some(p => p.name === selectedPromptName);
-      if (isStale) {
-        setSelectedPromptName(null);
-      }
-    }
+    void init();
+  }, [init]);
 
-    void loadSystemPrompts();
-  }, [loadSystemPrompts]);
+  if (isInitializing) {
+    return <div className="loading-spinner">Loading...</div>;
+  }
 
   return (
     <Router>
