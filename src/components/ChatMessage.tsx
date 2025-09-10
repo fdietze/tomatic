@@ -91,7 +91,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   return (
     <div
-      className={`chat-message ${isSystemMessage && collapsed ? 'collapsed' : ''}`}
+      className={`chat-message ${collapsed ? 'collapsed' : ''}`}
       data-role={message.role}
       data-message-id={message.id}
       data-testid={`chat-message-${String(messageIndex)}`}
