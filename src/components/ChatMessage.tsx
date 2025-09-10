@@ -64,18 +64,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     } else if (message.role === 'system' && message.prompt_name) {
       displayString = `system @${message.prompt_name}`;
     }
-
-    if (isSystemMessage) {
-      const indicator = collapsed ? '▶' : '▼';
-      return `${indicator} ${displayString}`;
-    }
     return displayString;
-  }, [message, isSystemMessage, collapsed]);
+  }, [message]);
 
   const toggleCollapsed = () => {
-    if (isSystemMessage) {
-      setCollapsed((c) => !c);
-    }
+    setCollapsed((c) => !c);
   };
 
   const renderButtons = () => {
@@ -103,8 +96,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       data-message-id={message.id}
       data-testid={`chat-message-${String(messageIndex)}`}
     >
-      <div style={{ display: 'flex' }} onClick={toggleCollapsed}>
-        <div className="chat-message-role">{roleDisplay}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div className="chat-message-role">{roleDisplay}</div>
+          <button onClick={toggleCollapsed} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}>
+            {collapsed ? '▶' : '▼'}
+          </button>
+        </div>
         <div className="chat-message-buttons">
           <CopyButton textToCopy={textForCopyButton} />
           {renderButtons()}
