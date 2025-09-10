@@ -12,49 +12,26 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
   selectedPromptName,
   onSelectPrompt,
 }) => {
-  const selectedPrompt = systemPrompts.find((p) => p.name === selectedPromptName);
-  const unselectedPrompts = systemPrompts.filter((p) => p.name !== selectedPromptName);
-
-  const handleSelectPrompt = (name: string) => {
-    if (selectedPromptName === name) {
-      onSelectPrompt(null); // Deselect if already selected
-    } else {
-      onSelectPrompt(name);
-    }
-  };
-
   return (
     <>
-      {selectedPrompt && (
+      {systemPrompts.map((prompt) => (
         <button
-          key={selectedPrompt.name}
+          key={prompt.name}
           data-size="compact"
           data-role="outline"
           className="chat-controls-system-prompt"
-          data-selected={true}
+          data-selected={selectedPromptName === prompt.name}
           onClick={() => {
-            handleSelectPrompt(selectedPrompt.name);
+            if (selectedPromptName === prompt.name) {
+              onSelectPrompt(null); // Deselect if already selected
+            } else {
+              onSelectPrompt(prompt.name);
+            }
           }}
         >
-          {selectedPrompt.name}
+          {prompt.name}
         </button>
-      )}
-      <div className="unselected-prompts">
-        {unselectedPrompts.map((prompt) => (
-          <button
-            key={prompt.name}
-            data-size="compact"
-            data-role="outline"
-            className="chat-controls-system-prompt"
-            data-selected={false}
-            onClick={() => {
-              handleSelectPrompt(prompt.name);
-            }}
-          >
-            {prompt.name}
-          </button>
-        ))}
-      </div>
+      ))}
     </>
   );
 };
