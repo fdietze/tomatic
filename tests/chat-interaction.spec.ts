@@ -5,12 +5,13 @@ interface ChatRequestBody {
   model: string;
 }
 
-test.beforeEach(async ({ page }) => {
-  await mockApis(page);
-  await page.goto('http://localhost:5173/chat/new');
+test.beforeEach(async ({ context }) => {
+  // Mock APIs before each test execution to ensure a clean slate
+  await mockApis(context);
 });
 
 test('sends a message and sees the response', async ({ page }) => {
+  await page.goto('http://localhost:5173/chat/new');
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
     await route.fulfill({
@@ -47,6 +48,7 @@ test('sends a message and sees the response', async ({ page }) => {
 });
 
 test('can select a model and get a model-specific response', async ({ page }) => {
+  await page.goto('http://localhost:5173/chat/new');
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const requestBody = (await route.request().postDataJSON()) as ChatRequestBody;
     const model = requestBody.model;
@@ -98,6 +100,7 @@ test('can select a model and get a model-specific response', async ({ page }) =>
 });
 
 test('can regenerate an assistant response', async ({ page }) => {
+  await page.goto('http://localhost:5173/chat/new');
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
@@ -161,11 +164,19 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
   });
 
   // 2. Go to an arbitrary page that has the chat header, like an existing chat
+  console.debug('[TEST] Navigating to settings page...');
   await page.goto('http://localhost:5173/settings');
+  console.debug('[TEST] Navigation to settings page complete.');
+
+  // This test has a unique navigation flow that can cause a race condition.
+  // We re-apply the mock after the navigation to ensure it's ready.
+  // await mockApis(context); // This is no longer needed as it's done at the start.
 
   // 3. Click the "New Chat" button to start a fresh session
+  console.debug('[TEST] Clicking "New Chat" button...');
   await page.getByRole('button', { name: 'Chat' }).click();
   await page.waitForURL('**/chat/new');
+  console.debug('[TEST] Navigation to new chat page complete.');
 
   // 4. Assert that the system message is immediately visible
   await expect(page.locator('[data-testid="chat-message-0"][data-role="system"]')).toBeVisible();
@@ -175,6 +186,7 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
 });
 
 test('can edit a user message and resubmit', async ({ page }) => {
+  await page.goto('http://localhost:5173/chat/new');
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');
@@ -239,6 +251,7 @@ test('can edit a user message and resubmit', async ({ page }) => {
 });
 
 test('can edit a user message and discard changes', async ({ page }) => {
+  await page.goto('http://localhost:5173/chat/new');
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');

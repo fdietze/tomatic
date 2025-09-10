@@ -20,13 +20,9 @@ const SESSION_WITH_PROMPT: ChatSession = {
 };
 
 test.describe('System Prompt Interaction', () => {
-  test('uses the updated system prompt when regenerating a response', async ({
-    page,
-    context,
-  }) => {
-    // 1. Mock APIs before any other action
-    await mockApis(page);
-    // 2. Seed the database and local storage
+  test.beforeEach(async ({ context, page }) => {
+    // Mock APIs, seed the database, and navigate to the starting page
+    await mockApis(context);
     await context.addInitScript(
       ({ session, prompts }) => {
         // This script runs on every navigation. We only want to seed data once.
@@ -69,14 +65,16 @@ test.describe('System Prompt Interaction', () => {
       },
       { session: SESSION_WITH_PROMPT, prompts: MOCK_PROMPTS }
     );
-
-    // 3. Navigate to the chat page
     await page.goto(`http://localhost:5173/chat/${SESSION_WITH_PROMPT.session_id}`);
+  });
+
+  test('uses the updated system prompt when regenerating a response', async ({ page }) => {
+    // 1. Verify initial state
     await expect(page.locator('[data-role="system"] .chat-message-content')).toHaveText(
       /You are a master chef/
     );
 
-    // 4. Go to settings and edit the prompt
+    // 2. Go to settings and edit the prompt
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.waitForURL('**/settings');
     const chefPrompt = page.getByTestId('system-prompt-item-Chef');
@@ -86,7 +84,7 @@ test.describe('System Prompt Interaction', () => {
       .fill('You are a world-renowned French chef.');
     await page.getByTestId('system-prompt-save-button').click();
 
-    // 5. Go back to the chat
+    // 3. Go back to the chat
     await page.getByRole('button', { name: 'Chat' }).click();
     await page.waitForURL(`**/chat/${SESSION_WITH_PROMPT.session_id}`);
 
@@ -95,7 +93,7 @@ test.describe('System Prompt Interaction', () => {
       /You are a master chef/
     );
 
-    // 6. Intercept the next API call and regenerate
+    // 4. Intercept the next API call and regenerate
     let sentMessages: Message[] = [];
     await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
       const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
@@ -104,18 +102,18 @@ test.describe('System Prompt Interaction', () => {
       await route.fulfill({ status: 200, body: responseBody });
     });
 
-    // 7. Start waiting for the response BEFORE clicking the button
+    // 5. Start waiting for the response BEFORE clicking the button
     const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
     await page.locator('[data-testid="chat-message-2"] button:has-text("regenerate")').click();
     await responsePromise;
 
-    // 8. Assert that the messages sent to the API contained the UPDATED prompt
+    // 6. Assert that the messages sent to the API contained the UPDATED prompt
     expect(sentMessages.length).toBe(2); // Should be [system, user]
     const systemMessage = sentMessages.find((m) => m.role === 'system');
     expect(systemMessage).toBeDefined();
     expect(systemMessage.content).toBe('You are a world-renowned French chef.');
 
-    // 9. Assert the UI now shows the new response
+    // 7. Assert the UI now shows the new response
     await expect(
       page.locator('[data-testid="chat-message-2"] .chat-message-content')
     ).toHaveText(/Bonjour!/);

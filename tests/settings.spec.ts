@@ -6,9 +6,9 @@ const MOCK_PROMPTS: SystemPrompt[] = [
   { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
 ];
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ context, page }) => {
   // We need to mock APIs before any other action
-  await mockApis(page);
+  await mockApis(context);
   // Seed the OLD localStorage format to test the migration
   await page.addInitScript((prompts) => {
     const persistedState = {

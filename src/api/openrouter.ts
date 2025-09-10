@@ -77,6 +77,7 @@ const getOpenAIClient = (apiKey: string) => {
 // --- API Functions ---
 
 export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
+  console.debug('[API|listAvailableModels] Fetching from https://openrouter.ai/api/v1/models');
   // We are not using the OpenAI client here because this is an OpenRouter-specific endpoint.
   // The official OpenAI client does not have a `models.list()` equivalent that works for OpenRouter's model discovery.
   try {
@@ -90,7 +91,7 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     // Validate the structure of the full API response.
     const validation = apiModelsResponseSchema.safeParse(jsonResponse);
     if (!validation.success) {
-      console.error('[API] Zod validation failed for model list:', validation.error);
+      console.error('[API] Zod validation failed for model list:', validation.error.format());
       throw new Error('Received invalid data structure for model list.');
     }
 
@@ -103,8 +104,10 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     }));
 
   } catch (error) {
-    console.error('[API] listAvailableModels error:', error);
-    throw error; // Re-throw to be handled by the caller
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[API] listAvailableModels error: ${errorMessage}`);
+    // Re-throw a more specific error to be handled by the caller in the store.
+    throw new Error(`[API] listAvailableModels error: ${errorMessage}`);
   }
 }
 
@@ -122,7 +125,9 @@ export async function requestMessageContentStreamed(
       content: m.content,
     }));
 
-    console.log('[DEBUG] API request body:', JSON.stringify({ model, messages: openAiMessages.map(m => ({ role: m.role, content: m.content.slice(0, 100) + '...' })), stream: true }));
+    console.debug(
+      `[API] Requesting chat completion with model ${model} and ${String(openAiMessages.length)} messages.`
+    );
     const stream = await openai.chat.completions.create({
       model: model,
       messages: openAiMessages,
@@ -131,7 +136,8 @@ export async function requestMessageContentStreamed(
     
     return stream;
   } catch (error) {
-    console.error('[API] requestMessageContentStreamed error:', error);
-    throw error; // Re-throw to be handled by the caller
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[API] requestMessageContentStreamed error: ${errorMessage}`);
+    throw new Error(`[API] requestMessageContentStreamed error: ${errorMessage}`);
   }
 }

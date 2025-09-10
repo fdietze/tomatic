@@ -1,4 +1,4 @@
-import { test as base, expect, Page } from '@playwright/test';
+import { test as base, expect, BrowserContext } from '@playwright/test';
 import { Buffer } from 'buffer';
 
 const OPENROUTER_API_KEY = 'TEST_API_KEY';
@@ -73,9 +73,11 @@ export const MOCK_MODELS_RESPONSE = {
 
 
 // A function to set up common API mocks
-export async function mockApis(page: Page): Promise<void> {
+export async function mockApis(context: BrowserContext): Promise<void> {
+  console.debug('[TEST|mockApis] Setting up API mocks.');
   // Mock the /models endpoint
-  await page.route('https://openrouter.ai/api/v1/models', async (route) => {
+  await context.route('https://openrouter.ai/api/v1/models', async (route) => {
+    console.debug('[TEST|mockApis] Fulfilling request to /api/v1/models.');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -101,7 +103,7 @@ export const test = base.extend({
         version: 0,
       };
       window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
-      console.log('[TEST] Mock API key set in local storage.');
+      console.debug('[TEST] Mock API key set in local storage.');
     }, OPENROUTER_API_KEY);
 
     const consoleMessages: string[] = [];
@@ -109,8 +111,16 @@ export const test = base.extend({
       const msgType = msg.type().toUpperCase();
       const msgText = msg.text();
 
+      if (msgType === 'ERROR') {
+        // Fail the test if a console error occurs
+        throw new Error(`[BROWSER CONSOLE ERROR]: ${msgText}`);
+      }
+
       // Filter out noisy Vite HMR messages for cleaner test logs
-      if (msgText.startsWith('[vite]') || msgText.includes('Download the React DevTools for a better development experience')) {
+      if (
+        msgText.startsWith('[vite]') ||
+        msgText.includes('Download the React DevTools for a better development experience')
+      ) {
         return;
       }
       consoleMessages.push(`[BROWSER CONSOLE|${msgType}]: ${msgText}`);
@@ -119,9 +129,11 @@ export const test = base.extend({
     await use(page);
 
     if (testInfo.status !== testInfo.expectedStatus) {
-      console.log(`[TEST FAILED]: ${testInfo.title}`);
-      console.log('[BROWSER CONSOLE LOGS]:');
-      consoleMessages.forEach((msg) => { console.log(msg); });
+      console.debug(`[TEST FAILED]: ${testInfo.title}`);
+      console.debug('[BROWSER CONSOLE LOGS]:');
+      consoleMessages.forEach((msg) => {
+        console.debug(msg);
+      });
     }
   },
 });

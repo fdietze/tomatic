@@ -54,7 +54,7 @@ test.describe('Chat Session Navigation', () => {
     }, sessions);
 
     // Mock the models API to prevent network errors
-    await mockApis(page);
+    await mockApis(context);
 
     // Go to the newest session to start the test
     await page.goto('http://localhost:5173/chat/session-new');
