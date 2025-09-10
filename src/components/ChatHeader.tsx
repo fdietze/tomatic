@@ -41,11 +41,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         Next
       </button>
-      <SystemPromptBar
-        systemPrompts={systemPrompts}
-        selectedPromptName={selectedPromptName}
-        onSelectPrompt={setSelectedPromptName}
-      />
+      <div className="system-prompt-container">
+        <SystemPromptBar
+          systemPrompts={systemPrompts}
+          selectedPromptName={selectedPromptName}
+          onSelectPrompt={setSelectedPromptName}
+        />
+      </div>
       <button data-role="primary" data-size="compact" onClick={onNewChat}>
         New Chat
       </button>
