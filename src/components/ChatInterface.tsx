@@ -54,8 +54,6 @@ const ChatInterface: React.FC = () => {
         editAndResubmitMessage,
         cancelStream,
         fetchModelList, 
-        setSelectedPromptName,
-        systemPrompts,
     } = useAppStore();
 
     // Scroll to the bottom of the chat history when new messages are added.
@@ -82,18 +80,6 @@ const ChatInterface: React.FC = () => {
             void fetchModelList();
         }
     }, [apiKey, cachedModels.length, fetchModelList]);
-
-    // Effect to handle @mention system prompts in the input
-    useEffect(() => {
-        const match = input.match(/@(\w+)/);
-        if (match) {
-            const promptName = match[1];
-            const mentionedPrompt = systemPrompts.find(p => p.name === promptName);
-            if (mentionedPrompt) {
-                setSelectedPromptName(promptName);
-            }
-        }
-    }, [input, systemPrompts, setSelectedPromptName]);
 
     // Effect to handle the initial prompt from the URL
     useEffect(() => {
