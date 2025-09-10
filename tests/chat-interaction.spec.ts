@@ -246,16 +246,16 @@ test('can collapse and expand messages', async ({ page }) => {
   await expect(assistantMessage).toBeVisible();
 
   // Test collapsing and expanding the user message
-  await expect(userMessage.locator('.chat-message-content')).toBeVisible();
-  await userMessage.locator('button:has-text("▼")').click();
-  await expect(userMessage.locator('.chat-message-content')).not.toBeVisible();
-  await userMessage.locator('button:has-text("▶")').click();
-  await expect(userMessage.locator('.chat-message-content')).toBeVisible();
+  await expect(userMessage).not.toHaveClass(/collapsed/);
+  await userMessage.locator('button:has-text("[-]")').click();
+  await expect(userMessage).toHaveClass(/collapsed/);
+  await userMessage.locator('button:has-text("[+]")').click();
+  await expect(userMessage).not.toHaveClass(/collapsed/);
 
   // Test collapsing and expanding the assistant message
-  await expect(assistantMessage.locator('.chat-message-content')).toBeVisible();
-  await assistantMessage.locator('button:has-text("▼")').click();
-  await expect(assistantMessage.locator('.chat-message-content')).not.toBeVisible();
-  await assistantMessage.locator('button:has-text("▶")').click();
-  await expect(assistantMessage.locator('.chat-message-content')).toBeVisible();
+  await expect(assistantMessage).not.toHaveClass(/collapsed/);
+  await assistantMessage.locator('button:has-text("[-]")').click();
+  await expect(assistantMessage).toHaveClass(/collapsed/);
+  await assistantMessage.locator('button:has-text("[+]")').click();
+  await expect(assistantMessage).not.toHaveClass(/collapsed/);
 });

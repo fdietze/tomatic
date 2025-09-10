@@ -100,7 +100,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className="chat-message-role">{roleDisplay}</div>
           <button onClick={toggleCollapsed} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}>
-            {collapsed ? '▶' : '▼'}
+            {collapsed ? '[+]' : '[-]'}
           </button>
         </div>
         <div className="chat-message-buttons">
