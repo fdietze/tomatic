@@ -50,19 +50,6 @@
     --chat-width: 50rem;
 }
 
-#root {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-main {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
 body,
 html {
     width: 100%;
@@ -73,10 +60,47 @@ html {
 body {
     background-color: var(--base02);
     color: var(--base05);
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    margin: 0;
+    padding: 4px 4px 0 4px;
+    background-color: var(--base01);
+}
+
+header .tabs {
+    display: flex;
+}
+
+header .tabs button {
+    background-color: var(--base01);
+    /* color: var(--base04); */
+    border: none;
+    padding: 5px 10px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+}
+
+header .tabs button[data-active="true"] {
+    background-color: var(--base02);
+    color: var(--base05);
+}
+
+main {
+    flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
 }
+
+
 
 a {
     color: var(--base0D);
@@ -210,10 +234,6 @@ li {
     line-height: 1.5;
 }
 
-header {
-    margin: 0;
-    padding: 4px 0 0 12px;
-}
 
 .chat-interface {
     display: flex;
@@ -528,39 +548,20 @@ button.chat-controls-system-prompt {
     display: none;
 }
 
-header {
-  background-color: var(--base01);
-}
-
-header .tabs {
-    display: flex;
-}
-
-header .tabs button {
-    background-color: var(--base01);
-    /* color: var(--base04); */
-    border: none;
-    padding: 5px 10px;
-    border-radius: 6px 6px 0 0;
-    cursor: pointer;
-}
-
-header .tabs button[data-active="true"] {
-    background-color: var(--base02);
-    color: var(--base05);
-}
 
 .chat-header {
+    width: 100%;
+    margin: 4px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 4px;
+    padding-right: 4px;
     display: flex;
     justify-content: flex-start;
     gap: 4px;
-    margin: 4px;
     flex-wrap: nowrap;
     align-items: center;
-    width: 100%;
     max-width: var(--chat-width);
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .system-prompt-container {
