@@ -32,7 +32,9 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
           data-role="outline"
           className="chat-controls-system-prompt"
           data-selected={true}
-          onClick={() => handleSelectPrompt(selectedPrompt.name)}
+          onClick={() => {
+            handleSelectPrompt(selectedPrompt.name);
+          }}
         >
           {selectedPrompt.name}
         </button>
@@ -45,7 +47,9 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
             data-role="outline"
             className="chat-controls-system-prompt"
             data-selected={false}
-            onClick={() => handleSelectPrompt(prompt.name)}
+            onClick={() => {
+              handleSelectPrompt(prompt.name);
+            }}
           >
             {prompt.name}
           </button>
