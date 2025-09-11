@@ -19,3 +19,8 @@
 - if possible, push ifs out of functions up to the caller
 - after failed attempts, fetch docs from the internet or do a web search
 - do web searches for tricky error messages
+
+# Big tasks
+- bigger tasks always have specification gaps. note, which decisions you have taken to fill those gaps. be conservative and don't do anything the user didn't ask for.
+- for bigger tasks, break it down into smaller steps, that can be individually typechecked and tested, before moving on to the next step.
+- plans must contain those typechecking and testing steps.
