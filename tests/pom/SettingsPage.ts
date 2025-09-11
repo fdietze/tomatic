@@ -19,7 +19,7 @@ export class SettingsPage {
    * Navigates to the settings page.
    */
   async goto() {
-    await this.page.goto('http://localhost:5173/settings');
+     await this.page.goto('/settings');
   }
 
   /**

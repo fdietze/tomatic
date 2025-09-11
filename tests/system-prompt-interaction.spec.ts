@@ -42,7 +42,7 @@ test.describe('System Prompt Interaction', () => {
     // Seed the database with the chat session using the new helper.
     await seedChatSessions(context, [SESSION_WITH_PROMPT]);
 
-    await page.goto(`http://localhost:5173/chat/${SESSION_WITH_PROMPT.session_id}`);
+     await page.goto(`/chat/${SESSION_WITH_PROMPT.session_id}`);
   });
 
   test('uses the updated system prompt when regenerating a response', async ({ page }) => {

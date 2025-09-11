@@ -34,7 +34,7 @@ test.describe('Chat Session Navigation', () => {
     await mockApis(context);
 
     // Go to the newest session to start the test
-    await page.goto('http://localhost:5173/chat/session-new');
+     await page.goto('/chat/session-new');
   });
 
   test('navigates between sessions and disables buttons at boundaries', async ({ page }) => {

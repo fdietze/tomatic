@@ -132,7 +132,7 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
 
   // 2. Go to an arbitrary page that has the chat header, like an existing chat
   console.debug('[TEST] Navigating to settings page...');
-  await page.goto('http://localhost:5173/settings');
+   await page.goto('/settings');
   console.debug('[TEST] Navigation to settings page complete.');
 
   // This test has a unique navigation flow that can cause a race condition.
