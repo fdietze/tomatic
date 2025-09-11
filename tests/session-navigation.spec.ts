@@ -16,21 +16,18 @@ test.describe('Chat Session Navigation', () => {
         messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
         created_at_ms: 1000,
         updated_at_ms: 1000,
-        prompt_name: null,
       },
       {
         session_id: 'session-middle',
         messages: [{ id: 'msg2', role: 'user', content: 'Middle message' }],
         created_at_ms: 2000,
         updated_at_ms: 2000,
-        prompt_name: null,
       },
       {
         session_id: 'session-new',
         messages: [{ id: 'msg3', role: 'user', content: 'New message' }],
         created_at_ms: 3000,
         updated_at_ms: 3000,
-        prompt_name: null,
       },
     ];
 

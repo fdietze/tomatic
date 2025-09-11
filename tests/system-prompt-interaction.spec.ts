@@ -26,7 +26,6 @@ test.describe('System Prompt Interaction', () => {
       ],
       created_at_ms: 1000,
       updated_at_ms: 1000,
-      prompt_name: null,
     };
 
     // 2. Seed Data and Mock APIs
@@ -77,7 +76,7 @@ test.describe('System Prompt Interaction', () => {
     expect(sentMessages.length).toBe(2); // Should be [system, user]
     const systemMessage = sentMessages.find((m) => m.role === 'system');
     expect(systemMessage).toBeDefined();
-    expect(systemMessage.content).toBe('You are a world-renowned French chef.');
+    expect((systemMessage as Message).content).toBe('You are a world-renowned French chef.');
 
     // 10. Assert the UI now shows the new response
     await chatPage.expectMessage(2, 'assistant', /Bonjour!/);
