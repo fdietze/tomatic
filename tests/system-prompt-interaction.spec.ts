@@ -52,7 +52,7 @@ test.describe('System Prompt Interaction', () => {
     );
 
     // 2. Go to settings and edit the prompt
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByTestId('settings-button').click();
     await page.waitForURL('**/settings');
     const chefPrompt = page.getByTestId('system-prompt-item-Chef');
     await chefPrompt.getByTestId('system-prompt-edit-button').click();
@@ -62,7 +62,7 @@ test.describe('System Prompt Interaction', () => {
     await page.getByTestId('system-prompt-save-button').click();
 
     // 3. Go back to the chat
-    await page.getByRole('button', { name: 'Chat' }).click();
+    await page.getByTestId('chat-button').click();
     await page.waitForURL(`**/chat/${SESSION_WITH_PROMPT.session_id}`);
 
     // The display should still show the *old* prompt for historical accuracy
@@ -81,7 +81,7 @@ test.describe('System Prompt Interaction', () => {
 
     // 5. Start waiting for the response BEFORE clicking the button
     const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
-    await page.locator('[data-testid="chat-message-2"] button:has-text("regenerate")').click();
+    await page.locator('[data-testid="chat-message-2"]').getByTestId('regenerate-button').click();
     await responsePromise;
 
     // 6. Assert that the messages sent to the API contained the UPDATED prompt

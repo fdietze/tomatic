@@ -35,10 +35,10 @@ const Header: React.FC = () => {
   return (
     <header>
       <div className="tabs">
-        <button onClick={onChat} data-active={isChatActive}>
+        <button onClick={onChat} data-active={isChatActive} data-testid="chat-button">
           Chat
         </button>
-        <button onClick={onSettings} data-active={isSettingsActive}>
+        <button onClick={onSettings} data-active={isSettingsActive} data-testid="settings-button">
           Settings
         </button>
       </div>

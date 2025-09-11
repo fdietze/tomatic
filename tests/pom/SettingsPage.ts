@@ -10,7 +10,7 @@ export class SettingsPage {
   readonly newPromptButton: Locator;
 
   constructor(public readonly page: Page) {
-    this.newPromptButton = page.getByRole('button', { name: 'New' });
+    this.newPromptButton = page.getByTestId('new-system-prompt-button');
   }
 
   // --- Actions ---
@@ -114,6 +114,6 @@ export class SettingsPage {
    * @param message The exact error message text.
    */
   async expectErrorMessage(message: string) {
-    await expect(this.page.locator('.error-message')).toHaveText(message);
+    await expect(this.page.getByTestId('error-message')).toHaveText(message);
   }
 }

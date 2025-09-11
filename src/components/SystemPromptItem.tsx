@@ -89,7 +89,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             placeholder="name"
             data-testid="system-prompt-name-input"
           />
-          {nameError && <div className="error-message">{nameError}</div>}
+          {nameError && <div className="error-message" data-testid="error-message">{nameError}</div>}
           <textarea
             value={editingPrompt}
             onChange={(e) => { setEditingPrompt(e.target.value); }}

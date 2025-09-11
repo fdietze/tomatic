@@ -97,7 +97,7 @@ const SettingsPage: React.FC = () => {
       </div>
       <div className="settings-section">
         <div className="settings-label">system prompts</div>
-        <button
+        <button data-testid="new-system-prompt-button"
           data-role="primary"
           data-size="compact"
           onClick={handleNewPrompt}

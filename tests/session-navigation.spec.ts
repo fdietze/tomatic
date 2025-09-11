@@ -39,26 +39,26 @@ test.describe('Chat Session Navigation', () => {
 
   test('navigates between sessions and disables buttons at boundaries', async ({ page }) => {
     // 1. On the newest session
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
+    await expect(page.getByTestId('next-session-button')).toBeDisabled();
+    await expect(page.getByTestId('prev-session-button')).toBeEnabled();
     await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/New message/);
 
     // 2. Navigate to the middle session
-    await page.getByRole('button', { name: 'Prev' }).click();
+    await page.getByTestId('prev-session-button').click();
     await page.waitForURL('**/chat/session-middle');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
+    await expect(page.getByTestId('next-session-button')).toBeEnabled();
+    await expect(page.getByTestId('prev-session-button')).toBeEnabled();
     await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Middle message/);
 
     // 3. Navigate to the oldest session
-    await page.getByRole('button', { name: 'Prev' }).click();
+    await page.getByTestId('prev-session-button').click();
     await page.waitForURL('**/chat/session-old');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeDisabled();
+    await expect(page.getByTestId('next-session-button')).toBeEnabled();
+    await expect(page.getByTestId('prev-session-button')).toBeDisabled();
     await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Old message/);
 
     // 4. Navigate back to the middle session
-    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByTestId('next-session-button').click();
     await page.waitForURL('**/chat/session-middle');
     await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Middle message/);
   });

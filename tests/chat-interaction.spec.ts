@@ -141,7 +141,7 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
 
   // 3. Click the "New Chat" button to start a fresh session
   console.debug('[TEST] Clicking "New Chat" button...');
-  await page.getByRole('button', { name: 'Chat' }).click();
+  await page.getByTestId('chat-button').click();
   await page.waitForURL('**/chat/new');
   console.debug('[TEST] Navigation to new chat page complete.');
 
@@ -210,6 +210,6 @@ test('can edit a user message and discard changes', async ({ page }) => {
 
   // 3. Assertions
   await chatPage.expectMessage(0, 'user', /Initial message/);
-  await expect(chatPage.page.locator('[data-testid="chat-message-0"] textarea')).not.toBeVisible();
+  await expect(chatPage.page.locator('[data-testid="chat-message-0"] [data-testid="edit-textarea"]')).not.toBeVisible();
   await chatPage.expectMessage(1, 'assistant', /Initial response/);
 });

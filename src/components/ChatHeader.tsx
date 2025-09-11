@@ -30,10 +30,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <div className="chat-header">
-      <button data-size="compact" onClick={onPrev} disabled={!canGoPrev}>
+      <button data-size="compact" onClick={onPrev} disabled={!canGoPrev} data-testid="prev-session-button">
         Prev
       </button>
-      <button
+      <button data-testid="next-session-button"
         data-size="compact"
         onClick={onNext}
         disabled={!canGoNext}
@@ -48,7 +48,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onSelectPrompt={setSelectedPromptName}
         />
       </div>
-      <button data-role="primary" data-size="compact" onClick={onNewChat}>
+      <button data-role="primary" data-size="compact" onClick={onNewChat} data-testid="new-chat-button">
         New Chat
       </button>
     </div>

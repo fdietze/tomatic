@@ -42,7 +42,7 @@ export class ChatPage {
    */
   async regenerateMessage(messageIndex: number) {
     const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByRole('button', { name: 'regenerate' }).click();
+    await messageLocator.getByTestId('regenerate-button').click();
   }
 
 
@@ -53,9 +53,9 @@ export class ChatPage {
    */
   async editMessage(messageIndex: number, newContent: string) {
     const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByRole('button', { name: 'edit' }).click();
-    await messageLocator.locator('textarea').fill(newContent);
-    await messageLocator.getByRole('button', { name: 'Re-submit' }).click();
+    await messageLocator.getByTestId('edit-button').click();
+    await messageLocator.getByTestId('edit-textarea').fill(newContent);
+    await messageLocator.getByTestId('resubmit-button').click();
   }
 
   /**
@@ -64,8 +64,8 @@ export class ChatPage {
    */
   async cancelEdit(messageIndex: number) {
     const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByRole('button', { name: 'edit' }).click();
-    await messageLocator.getByRole('button', { name: 'Discard' }).click();
+    await messageLocator.getByTestId('edit-button').click();
+    await messageLocator.getByTestId('discard-edit-button').click();
   }
 
   // --- Assertions ---

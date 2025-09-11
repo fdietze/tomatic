@@ -8,7 +8,7 @@ export class ModelComboboxPage {
   readonly input: Locator;
 
   constructor(public readonly page: Page) {
-    this.input = page.locator('input[placeholder^="Select or type model ID"]');
+    this.input = page.getByTestId('model-combobox-input');
   }
 
   /**
@@ -17,7 +17,10 @@ export class ModelComboboxPage {
    */
   async selectModel(name: string) {
     await this.input.fill(name);
-    await this.page.locator('.combobox-item', { hasText: name }).click();
+    // The ID in the test is "mock-model/mock-model", but the name is "Mock Model".
+    // We need to find the item by its name, not its ID.
+    const modelId = this.page.locator(`[data-testid^="model-combobox-item-"]`, { hasText: name });
+    await modelId.click();
   }
 
   /**
