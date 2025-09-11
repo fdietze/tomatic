@@ -1,6 +1,7 @@
 import { type Page, type Locator, expect } from '@playwright/test';
 
 import { NavigationComponent } from './NavigationComponent';
+import { ModelComboboxPage } from './ModelComboboxPage';
 /**
  * Page Object Model for the Settings page.
  * This class encapsulates locators and actions for managing system prompts,
@@ -11,11 +12,13 @@ export class SettingsPage {
   readonly newPromptButton: Locator;
    readonly newSnippetButton: Locator;
   readonly navigation: NavigationComponent;
+  readonly modelCombobox: ModelComboboxPage;
 
   constructor(public readonly page: Page) {
     this.newPromptButton = page.getByTestId('new-system-prompt-button');
      this.newSnippetButton = page.getByTestId('new-snippet-button');
     this.navigation = new NavigationComponent(page);
+    this.modelCombobox = new ModelComboboxPage(page);
   }
 
   // --- Actions ---
@@ -111,19 +114,30 @@ export class SettingsPage {
     await editContainer.getByTestId('snippet-content-input').fill(content);
   }
 
+  async fillGeneratedSnippetForm(options: { name?: string; prompt?: string; modelName?: string; modelId?: string }) {
+    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
+    if (options.name) {
+      await editContainer.getByTestId('snippet-name-input').fill(options.name);
+    }
+    if (options.prompt) {
+      await editContainer.getByTestId('snippet-prompt-input').fill(options.prompt);
+    }
+    if (options.modelName && options.modelId) {
+      await this.modelCombobox.selectModel(options.modelName, options.modelId);
+    }
+  }
+
   async saveSnippet() {
     const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
     await editContainer.getByTestId('snippet-save-button').click();
   }
 
-  async createGeneratedSnippet(name: string, prompt: string, modelId: string) {
+  async createGeneratedSnippet(name: string, prompt: string, modelId: string, modelName?: string) {
     await this.newSnippetButton.click();
     const editContainer = this.page.getByTestId('snippet-item-edit-new');
     await editContainer.getByTestId('snippet-name-input').fill(name);
     await editContainer.getByText('Generated Snippet').click();
-    // Model selection needs its own POM/helper if it gets complex
-    await this.page.getByTestId('model-combobox-input').fill(modelId);
-    await this.page.locator(`[data-testid="model-combobox-item-${modelId}"]`).click();
+    await this.modelCombobox.selectModel(modelName ?? modelId, modelId);
     await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
     await editContainer.getByTestId('snippet-save-button').click();
   }
