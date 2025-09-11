@@ -1,5 +1,6 @@
 import { type Page, type Locator, expect } from '@playwright/test';
 
+import { NavigationComponent } from './NavigationComponent';
 /**
  * Page Object Model for the Settings page.
  * This class encapsulates locators and actions for managing system prompts,
@@ -8,9 +9,11 @@ import { type Page, type Locator, expect } from '@playwright/test';
 export class SettingsPage {
   // --- Locators ---
   readonly newPromptButton: Locator;
+  readonly navigation: NavigationComponent;
 
   constructor(public readonly page: Page) {
     this.newPromptButton = page.getByTestId('new-system-prompt-button');
+    this.navigation = new NavigationComponent(page);
   }
 
   // --- Actions ---

@@ -1,20 +1,13 @@
 import { test, expect, createStreamResponse, mockApis } from './fixtures';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
-import { NavigationComponent } from './pom/NavigationComponent';
 
 interface ChatRequestBody {
   model: string;
 }
 
-test.beforeEach(async ({ context }) => {
-  // Mock APIs before each test execution to ensure a clean slate
-  await mockApis(context);
-});
-
-test('sends a message and sees the response', async ({ page }) => {
-  const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+test('sends a message and sees the response', async ({ newChatPage, page }) => {
+  const chatPage: ChatPage = newChatPage;
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
@@ -41,9 +34,8 @@ test('sends a message and sees the response', async ({ page }) => {
   await chatPage.expectMessage(3, 'assistant', /Hello!/);
 });
 
-test('can select a model and get a model-specific response', async ({ page }) => {
-  const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+test('can select a model and get a model-specific response', async ({ newChatPage, page }) => {
+  const chatPage: ChatPage = newChatPage;
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const requestBody = (await route.request().postDataJSON()) as ChatRequestBody;
@@ -65,7 +57,7 @@ test('can select a model and get a model-specific response', async ({ page }) =>
   await chatPage.expectMessage(1, 'assistant', /Hello!/);
 
   // Select the mock model
-    await chatPage.modelCombobox.selectModel('Mock Model', 'mock-model/mock-model');
+  await chatPage.modelCombobox.selectModel('Mock Model', 'mock-model/mock-model');
   await chatPage.modelCombobox.expectInputValue('mock-model/mock-model');
 
   // Send a message with the new model
@@ -80,9 +72,8 @@ test('can select a model and get a model-specific response', async ({ page }) =>
   ).toHaveText('assistant (mock-model/mock-model)');
 });
 
-test('can regenerate an assistant response', async ({ page }) => {
-  const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+test('can regenerate an assistant response', async ({ newChatPage, page }) => {
+  const chatPage: ChatPage = newChatPage;
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
@@ -117,10 +108,14 @@ test('can regenerate an assistant response', async ({ page }) => {
   await chatPage.expectMessageCount(2);
 });
 
-test('shows system prompt immediately in a new chat', async ({ page }) => {
-  const navigation = new NavigationComponent(page);
+test('shows system prompt immediately in a new chat', async ({ page, context }) => {
+  const chatPage = new ChatPage(page);
 
-  // 1. Seed localStorage with a selected system prompt
+  // This test has a unique setup and cannot use the standard fixtures.
+  // 1. Mock APIs first
+  await mockApis(context);
+
+  // 2. Seed localStorage with a selected system prompt via an init script
   await page.addInitScript(() => {
     const persistedState = {
       state: {
@@ -128,35 +123,21 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
         apiKey: 'TEST_API_KEY',
         selectedPromptName: 'TestPrompt',
       },
-      version: 0, // Set to 0 to trigger migration
+      version: 0,
     };
     window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
   });
 
-  // 2. Go to an arbitrary page that has the chat header, like an existing chat
-  console.debug('[TEST] Navigating to settings page...');
-   await page.goto('/settings');
-  console.debug('[TEST] Navigation to settings page complete.');
-
-  // This test has a unique navigation flow that can cause a race condition.
-  // We re-apply the mock after the navigation to ensure it's ready.
-  // await mockApis(context); // This is no longer needed as it's done at the start.
-
-  // 3. Click the "New Chat" button to start a fresh session
-  console.debug('[TEST] Clicking "New Chat" button...');
-  await navigation.goToNewChat();
-  console.debug('[TEST] Navigation to new chat page complete.');
+  // 3. Go to an arbitrary page and then create a new chat to ensure the init script is applied.
+  await page.goto('/settings');
+  await chatPage.navigation.goToNewChat();
 
   // 4. Assert that the system message is immediately visible
-  await expect(page.locator('[data-testid="chat-message-0"][data-role="system"]')).toBeVisible();
-  await expect(
-    page.locator('[data-testid="chat-message-0"] .chat-message-content')
-  ).toHaveText(/You are a test bot/);
+  await chatPage.expectMessage(0, 'system', /You are a test bot/);
 });
 
-test('can edit a user message and resubmit', async ({ page }) => {
-  const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+test('can edit a user message and resubmit', async ({ newChatPage, page }) => {
+  const chatPage: ChatPage = newChatPage;
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
@@ -190,9 +171,8 @@ test('can edit a user message and resubmit', async ({ page }) => {
   await chatPage.expectMessageCount(2);
 });
 
-test('can edit a user message and discard changes', async ({ page }) => {
-  const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+test('can edit a user message and discard changes', async ({ newChatPage, page }) => {
+  const chatPage: ChatPage = newChatPage;
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {

@@ -1,8 +1,20 @@
 import { test as base, expect, BrowserContext } from '@playwright/test';
 import { Buffer } from 'buffer';
+import { SettingsPage } from './pom/SettingsPage';
+import type { SystemPrompt } from '../src/types/storage';
 
+import { ChatPage } from './pom/ChatPage';
 
 import type { ChatSession } from '@/types/chat';
+
+// We are extending the base test with custom fixtures.
+// https://playwright.dev/docs/test-fixtures
+type TestFixtures = {
+  chatPageWithHistory: ChatPage;
+  settingsPageWithPrompts: SettingsPage;
+  chatPageWithPrompt: ChatPage;
+  newChatPage: ChatPage;
+};
 
 // By convention, we extend the Window object with custom properties for test-specific flags.
 declare global {
@@ -98,7 +110,7 @@ export async function mockApis(context: BrowserContext): Promise<void> {
 
 
 // Extend basic test by providing a page fixture that logs all console messages.
-export const test = base.extend({
+export const test = base.extend<TestFixtures>({
   context: async ({ browser }, use) => {
     const context = await browser.newContext();
     await use(context);
@@ -145,6 +157,126 @@ export const test = base.extend({
         console.debug(msg);
       });
     }
+  },
+
+   chatPageWithHistory: async ({ context, page }, use) => {
+    // 1. Define Mock Data
+    const sessions: ChatSession[] = [
+      {
+        session_id: 'session-old',
+        messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
+        created_at_ms: 1000,
+        updated_at_ms: 1000,
+        prompt_name: null,
+      },
+      {
+        session_id: 'session-middle',
+        messages: [{ id: 'msg2', role: 'user', content: 'Middle message' }],
+        created_at_ms: 2000,
+        updated_at_ms: 2000,
+        prompt_name: null,
+      },
+      {
+        session_id: 'session-new',
+        messages: [{ id: 'msg3', role: 'user', content: 'New message' }],
+        created_at_ms: 3000,
+        updated_at_ms: 3000,
+        prompt_name: null,
+      },
+    ];
+
+    // 2. Seed Data and Mock APIs
+    await seedChatSessions(context, sessions);
+    await mockApis(context);
+
+    // 3. Navigate to the starting page
+    await page.goto('/chat/session-new');
+
+    // 4. Provide the POM to the test
+    const chatPage = new ChatPage(page);
+    await use(chatPage);
+   },
+
+   settingsPageWithPrompts: async ({ context, page }, use) => {
+    // 1. Define Mock Data
+    const MOCK_PROMPTS: SystemPrompt[] = [
+      { name: 'Chef', prompt: 'You are a master chef.' },
+      { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
+    ];
+
+    // 2. Seed Data (in old format) and Mock APIs
+    await mockApis(context);
+    await page.addInitScript((prompts) => {
+      const persistedState = {
+        state: {
+          systemPrompts: prompts, // Old format
+          apiKey: 'TEST_API_KEY',
+        },
+        version: 0, // Trigger migration
+      };
+      window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+    }, MOCK_PROMPTS);
+
+    // 3. Navigate to the starting page
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.goto();
+
+    // 4. Provide the POM to the test
+    await use(settingsPage);
+  },
+
+  chatPageWithPrompt: async ({ context, page }, use) => {
+    // 1. Define Mock Data
+    const MOCK_PROMPTS: SystemPrompt[] = [
+      { name: 'Chef', prompt: 'You are a master chef.' },
+      { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
+    ];
+    const SESSION_WITH_PROMPT: ChatSession = {
+      session_id: 'session-with-prompt',
+      messages: [
+        { id: 'msg1', role: 'system', content: 'You are a master chef.', prompt_name: 'Chef' },
+        { id: 'msg2', role: 'user', content: 'Hello chef' },
+        { id: 'msg3', role: 'assistant', content: 'Hello there!', model_name: 'openai/gpt-4o' },
+      ],
+      created_at_ms: 1000,
+      updated_at_ms: 1000,
+    };
+
+    // 2. Seed Data and Mock APIs
+    await mockApis(context);
+    await context.addInitScript((prompts) => {
+      if (window._localStorageSeeded) return;
+      const persistedState = {
+        state: {
+          systemPrompts: prompts,
+          apiKey: 'TEST_API_KEY',
+        },
+        version: 0,
+      };
+      window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+      window._localStorageSeeded = true;
+    }, MOCK_PROMPTS);
+
+    await seedChatSessions(context, [SESSION_WITH_PROMPT]);
+
+    // 3. Navigate to the starting page
+    await page.goto(`/chat/${SESSION_WITH_PROMPT.session_id}`);
+
+    // 4. Provide the POM to the test
+    const chatPage = new ChatPage(page);
+    await use(chatPage);
+  }, 
+
+  newChatPage: async ({ context, page }, use) => {
+    // 1. Mock APIs
+    await mockApis(context);
+
+    // 2. Navigate to the starting page
+    const chatPage = new ChatPage(page);
+    await chatPage.gotoNewChat();
+
+    // 3. Provide the POM to the test
+    await use(chatPage);
   },
 });
 
