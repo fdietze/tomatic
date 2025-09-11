@@ -1,13 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { Message } from '@/types/chat';
 import type { Snippet } from '@/types/storage';
 import { useAppStore } from '@/store/appStore';
 import { useShallow } from 'zustand/react/shallow';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
-import { requestMessageContentStreamed } from '@/api/openrouter';
-import { resolveSnippets } from '@/utils/snippetUtils';
 
 interface SnippetItemProps {
   snippet: Snippet;
@@ -28,12 +24,11 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-  const { cachedModels, modelName: defaultModelName, apiKey, allSnippets: allStoreSnippets } = useAppStore(
+  const { cachedModels, modelName: defaultModelName, generateSnippetContent } = useAppStore(
     useShallow((state) => ({
       cachedModels: state.cachedModels,
       modelName: state.modelName,
-      apiKey: state.apiKey,
-      allSnippets: state.snippets,
+      generateSnippetContent: state.generateSnippetContent,
     }))
   );
 
@@ -109,28 +104,18 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const generateContentAndSave = async (name: string) => {
-    if (!editingPrompt || !editingModel || !apiKey) {
-      setGenerationError('Prompt, model, and API key are required for generation.');
-      return;
-    }
     setIsGenerating(true);
     setGenerationError(null);
-    let newContent = '';
     try {
-      const resolvedPrompt = resolveSnippets(editingPrompt, allStoreSnippets);
-      const messages: Message[] = [{ id: uuidv4(), role: 'user', content: resolvedPrompt }];
-      const stream = await requestMessageContentStreamed(messages, editingModel, apiKey);
-      for await (const chunk of stream) {
-        newContent += chunk.choices[0]?.delta?.content || '';
-      }
-
-      onUpdate({
+      const snippetToGenerate: Snippet = {
         name,
-        content: newContent,
+        content: '', // This will be replaced by the generated content
         isGenerated: true,
         prompt: editingPrompt,
         model: editingModel,
-      });
+      };
+      const updatedSnippet = await generateSnippetContent(snippetToGenerate);
+      onUpdate(updatedSnippet);
       setIsEditing(false);
       setNameError(null);
     } catch (error) {
