@@ -588,7 +588,8 @@ button.chat-controls-system-prompt {
     scrollbar-width: none;  /* Firefox */
 }
 
-.system-prompt-list {
+.system-prompt-list,
+.snippet-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
