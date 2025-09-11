@@ -18,7 +18,7 @@ test('sends a message and sees the response', async ({ context, page }) => {
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
   });
   const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+  await chatPage.goto();
 
   const chatMocker = new ChatCompletionMocker(page);
   await chatMocker.setup();
@@ -66,7 +66,7 @@ test('can select a model and get a model-specific response', async ({ context, p
   const chatPage = new ChatPage(page);
   const chatMocker = new ChatCompletionMocker(page);
   await chatMocker.setup();
-  await chatPage.gotoNewChat();
+  await chatPage.goto();
 
   chatMocker.mock({
     request: {
@@ -116,7 +116,7 @@ test('can regenerate an assistant response', async ({ context, page }) => {
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
   });
   const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+  await chatPage.goto();
 
   const chatMocker = new ChatCompletionMocker(page);
   await chatMocker.setup();
@@ -191,7 +191,7 @@ test('can edit a user message and resubmit', async ({ context, page }) => {
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
   });
   const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+  await chatPage.goto();
 
   const chatMocker = new ChatCompletionMocker(page);
   await chatMocker.setup();
@@ -243,7 +243,7 @@ test('can edit a user message and discard changes', async ({ context, page }) =>
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
   });
   const chatPage = new ChatPage(page);
-  await chatPage.gotoNewChat();
+  await chatPage.goto();
   const chatMocker = new ChatCompletionMocker(page);
 
   await chatMocker.setup();
