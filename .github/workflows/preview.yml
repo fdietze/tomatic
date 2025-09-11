@@ -36,6 +36,12 @@ jobs:
       - name: Install Dependencies
         run: devbox run -- npm ci
 
+      - name: Typecheck
+        run: devbox run -- npm run typecheck
+
+      - name: Lint
+        run: devbox run -- npm run lint
+
       - name: Build
         run: devbox run -- npm run build
 
