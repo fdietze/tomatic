@@ -2,16 +2,19 @@
 import { test } from './fixtures';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
-import { createStreamResponse, expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from "./test-helpers";
+import {
+  ChatCompletionMocker,
+  createStreamResponse,
+  expect,
+  mockGlobalApis,
+  OPENROUTER_API_KEY,
+  seedLocalStorage,
+} from './test-helpers';
 
 
 test.beforeEach(async ({ context }) => {
   await mockGlobalApis(context);
 });
-interface ChatRequestBody {
-  model: string;
-}
-
 test('sends a message and sees the response', async ({ context, page }) => {
   await seedLocalStorage(context, {
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
@@ -19,13 +22,25 @@ test('sends a message and sees the response', async ({ context, page }) => {
   const chatPage = new ChatPage(page);
   await chatPage.gotoNewChat();
 
-  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
-    await route.fulfill({
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      status: 200,
-      body: responseBody,
-    });
+  const chatMocker = new ChatCompletionMocker(page);
+  await chatMocker.setup();
+  chatMocker.mock({
+    request: {
+      model: 'google/gemini-2.5-pro',
+      messages: [{ role: 'user', content: 'Hello' }],
+    },
+    response: { role: 'assistant', content: 'Hello!' },
+  });
+  chatMocker.mock({
+    request: {
+      model: 'google/gemini-2.5-pro',
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hello!' },
+        { role: 'user', content: 'Second message' },
+      ],
+    },
+    response: { role: 'assistant', content: 'Hello!' },
   });
 
   const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
@@ -49,20 +64,29 @@ test('can select a model and get a model-specific response', async ({ context, p
     'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
   });
   const chatPage = new ChatPage(page);
+  const chatMocker = new ChatCompletionMocker(page);
+  await chatMocker.setup();
   await chatPage.gotoNewChat();
 
-  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const requestBody = (await route.request().postDataJSON()) as ChatRequestBody;
-    const model = requestBody.model;
-
-    let responseBody: Buffer;
-    if (model === 'mock-model/mock-model') {
-      responseBody = createStreamResponse(model, 'Response from Mock Model');
-    } else {
-      responseBody = createStreamResponse('openai/gpt-4o', 'Hello!');
-    }
-    await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+  chatMocker.mock({
+    request: {
+      model: 'google/gemini-2.5-pro',
+      messages: [{ role: 'user', content: 'Hello' }],
+    },
+    response: { role: 'assistant', content: 'Hello!' },
   });
+  chatMocker.mock({
+    request: {
+      model: 'mock-model/mock-model',
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hello!' },
+        { role: 'user', content: 'Another message' },
+      ],
+    },
+    response: { role: 'assistant', content: 'Response from Mock Model' },
+  });
+
 
   // The first message will use the default model
   const responsePromise1 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
@@ -95,7 +119,7 @@ test('can regenerate an assistant response', async ({ context, page }) => {
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!', 'assistant');
     await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   });
 
@@ -111,7 +135,7 @@ test('can regenerate an assistant response', async ({ context, page }) => {
   // 2. Mock the next response to be different.
   await page.unroute('https://openrouter.ai/api/v1/chat/completions');
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'This is a regenerated response.');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'This is a regenerated response.', 'assistant');
     await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   });
 
@@ -158,7 +182,7 @@ test('can edit a user message and resubmit', async ({ context, page }) => {
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response', 'assistant');
     await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   });
   const responsePromise1 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
@@ -173,7 +197,7 @@ test('can edit a user message and resubmit', async ({ context, page }) => {
   // 2. Mock the next response for the edited message.
   await page.unroute('https://openrouter.ai/api/v1/chat/completions');
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Response to edited message.');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Response to edited message.', 'assistant');
     await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   });
 
@@ -197,7 +221,7 @@ test('can edit a user message and discard changes', async ({ context, page }) =>
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response');
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Initial response', 'assistant');
     await route.fulfill({ body: responseBody, status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   });
   const responsePromise1 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');

@@ -63,7 +63,7 @@ test.describe('System Prompt Interaction', () => {
     await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
       const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
       sentMessages = requestBody.messages;
-      const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Bonjour!');
+      const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Bonjour!', 'assistant');
       await route.fulfill({ status: 200, body: responseBody });
     });
 

@@ -95,9 +95,9 @@ export async function mockGlobalApis(context: BrowserContext): Promise<void> {
  * @param content The text content of the response.
  * @returns A Buffer object with the simulated stream data.
  */
-export function createStreamResponse(model: string, content: string): Buffer {
+export function createStreamResponse(model: string, content: string, role: 'assistant'): Buffer {
   const streamData = [
-    `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}`,
+    `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{"role":"${role}","content":""},"finish_reason":null}]}`,
     `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{"content":"${content}"},"finish_reason":null}]}`,
     `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
   ];
@@ -220,6 +220,89 @@ export async function seedIndexedDB(context: BrowserContext, data: { chat_sessio
 /**
  * Injects key-value pairs into localStorage.
  */
+
+
+import type { Page, Route } from '@playwright/test';
+
+// --- Chat Completion Mocking Utilities ---
+
+export interface ChatMessageMock {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatCompletionRequestMock {
+  model: string;
+  messages: ChatMessageMock[];
+}
+
+export interface ChatCompletionResponseMock {
+  role: 'assistant';
+  content: string;
+}
+
+export interface ChatCompletionMock {
+  request: ChatCompletionRequestMock;
+  response: ChatCompletionResponseMock;
+}
+
+/**
+ * A class to manage mocking chat completion API calls in Playwright tests.
+ * It allows defining specific request/response mocks for each test, ensuring
+ * that tests are self-contained and deterministic.
+ */
+export class ChatCompletionMocker {
+  private mocks: ChatCompletionMock[] = [];
+  private page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  async setup() {
+    await this.page.route('https://openrouter.ai/api/v1/chat/completions', this.handleRequest.bind(this));
+  }
+
+  /**
+   * Registers a new mock for a chat completion request.
+   * @param mock The mock definition, including the request to match and the response to serve.
+   */
+  mock(mock: ChatCompletionMock) {
+    this.mocks.push(mock);
+  }
+
+  private async handleRequest(route: Route) {
+    const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
+
+    const matchingMock = this.mocks.find((m) => {
+      const modelsMatch = m.request.model === requestBody.model;
+      // Deep comparison of message arrays
+      const messagesMatch = JSON.stringify(m.request.messages) === JSON.stringify(requestBody.messages);
+      return modelsMatch && messagesMatch;
+    });
+
+    if (matchingMock) {
+      const responseBody = createStreamResponse(
+        requestBody.model,
+        matchingMock.response.content,
+        matchingMock.response.role, 
+      );
+      await route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: responseBody,
+      });
+    } else {
+      // No match found, fail the test
+      const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions.\nNO MATCH FOUND FOR:\n${JSON.stringify(
+        requestBody,
+        null,
+        2,
+      )}\n\nDEFINED MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
+      throw new Error(errorMessage);
+    }
+  }
+}
 export async function seedLocalStorage(context: BrowserContext, data: Record<string, object>) {
   await context.addInitScript((data) => {
     for (const [key, value] of Object.entries(data)) {
