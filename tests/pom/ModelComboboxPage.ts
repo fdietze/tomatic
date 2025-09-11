@@ -13,14 +13,12 @@ export class ModelComboboxPage {
 
   /**
    * Selects a model from the model combobox.
-   * @param name The name of the model to select (e.g., 'Mock Model').
+   * @param name The name of the model to type into the input to filter the list.
+   * @param modelId The unique ID of the model to select, e.g. 'mock-model/mock-model'.
    */
-  async selectModel(name: string) {
+  async selectModel(name: string, modelId: string) {
     await this.input.fill(name);
-    // The ID in the test is "mock-model/mock-model", but the name is "Mock Model".
-    // We need to find the item by its name, not its ID.
-    const modelId = this.page.locator(`[data-testid^="model-combobox-item-"]`, { hasText: name });
-    await modelId.click();
+    await this.page.locator(`[data-testid="model-combobox-item-${modelId}"]`).click();
   }
 
   /**

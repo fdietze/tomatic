@@ -64,7 +64,7 @@ test('can select a model and get a model-specific response', async ({ page }) =>
   await chatPage.expectMessage(1, 'assistant', /Hello!/);
 
   // Select the mock model
-  await chatPage.modelCombobox.selectModel('Mock Model');
+    await chatPage.modelCombobox.selectModel('Mock Model', 'mock-model/mock-model');
   await chatPage.modelCombobox.expectInputValue('mock-model/mock-model');
 
   // Send a message with the new model
