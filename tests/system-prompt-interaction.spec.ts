@@ -1,17 +1,17 @@
 import { test } from './fixtures';
-import type { Message, ChatSession } from '@/types/chat';
+import type { ChatSession } from '@/types/chat';
 import type { SystemPrompt } from '../src/types/storage';
-import type { Buffer } from 'buffer';
+import { ChatCompletionMocker } from './test-helpers';
 import { ChatPage } from './pom/ChatPage';
 import { SettingsPage } from './pom/SettingsPage';
-import { createStreamResponse, expect, mockGlobalApis, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
+import { mockGlobalApis, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
 
 test.describe('System Prompt Interaction', () => {
 
   test.beforeEach(async ({ context }) => {
     await mockGlobalApis(context);
   });
-  test('uses the updated system prompt when regenerating a response', async ({ context, page }) => {
+   test('uses the updated system prompt when regenerating a response', async ({ context, page }) => {
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: 'Chef', prompt: 'You are a master chef.' },
@@ -31,11 +31,13 @@ test.describe('System Prompt Interaction', () => {
     // 2. Seed Data and Mock APIs
     await seedLocalStorage(context, {
       'tomatic-storage': {
-        state: { apiKey: OPENROUTER_API_KEY, systemPrompts: MOCK_PROMPTS },
+        state: { apiKey: OPENROUTER_API_KEY, systemPrompts: MOCK_PROMPTS, selectedModelId: 'google/gemini-2.5-pro' },
         version: 0,
       },
     });
     await seedIndexedDB(context, { chat_sessions: [SESSION_WITH_PROMPT] });
+    const chatMocker = new ChatCompletionMocker(page);
+    await chatMocker.setup();
 
     // 3. Navigate and create POMs
     await page.goto(`/chat/${SESSION_WITH_PROMPT.session_id}`);
@@ -58,13 +60,16 @@ test.describe('System Prompt Interaction', () => {
     // The display should still show the *old* prompt for historical accuracy
     await chatPage.expectMessage(0, 'system', /You are a master chef/);
 
-    // 7. Intercept the next API call and regenerate
-    let sentMessages: Message[] = [];
-    await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-      const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
-      sentMessages = requestBody.messages;
-      const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Bonjour!', 'assistant');
-      await route.fulfill({ status: 200, body: responseBody });
+    // 7. Mock the regeneration API call with the *new* system prompt
+    chatMocker.mock({
+      request: {
+         model: 'openai/gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a world-renowned French chef.' },
+          { role: 'user', content: 'Hello chef' },
+        ],
+      },
+      response: { role: 'assistant', content: 'Bonjour!' },
     });
 
     // 8. Start waiting for the response BEFORE clicking the button
@@ -72,13 +77,10 @@ test.describe('System Prompt Interaction', () => {
     await chatPage.regenerateMessage(2);
     await responsePromise;
 
-    // 9. Assert that the messages sent to the API contained the UPDATED prompt
-    expect(sentMessages.length).toBe(2); // Should be [system, user]
-    const systemMessage = sentMessages.find((m) => m.role === 'system');
-    expect(systemMessage).toBeDefined();
-    expect((systemMessage as Message).content).toBe('You are a world-renowned French chef.');
-
-    // 10. Assert the UI now shows the new response
+    // 9. Assert the UI now shows the new response
     await chatPage.expectMessage(2, 'assistant', /Bonjour!/);
+
+    // 10. Verify all mocks were consumed
+    chatMocker.verifyComplete();
   });
 });

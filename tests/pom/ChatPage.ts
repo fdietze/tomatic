@@ -65,11 +65,14 @@ export class ChatPage {
    * Clicks the edit button for a message, then clicks the discard button.
    * @param messageIndex The index of the message to begin editing.
    */
-  async cancelEdit(messageIndex: number) {
+   async cancelEdit(messageIndex: number, newContent?: string) {
     const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
     await messageLocator.getByTestId('edit-button').click();
+    if (newContent) {
+      await messageLocator.getByTestId('edit-textarea').fill(newContent);
+    }
     await messageLocator.getByTestId('discard-edit-button').click();
-  }
+   }
 
   // --- Assertions ---
 

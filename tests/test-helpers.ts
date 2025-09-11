@@ -271,21 +271,27 @@ export class ChatCompletionMocker {
     this.mocks.push(mock);
   }
 
-  private async handleRequest(route: Route) {
+   private async handleRequest(route: Route) {
     const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
+    const nextMock = this.mocks.shift();
 
-    const matchingMock = this.mocks.find((m) => {
-      const modelsMatch = m.request.model === requestBody.model;
-      // Deep comparison of message arrays
-      const messagesMatch = JSON.stringify(m.request.messages) === JSON.stringify(requestBody.messages);
-      return modelsMatch && messagesMatch;
-    });
+    if (!nextMock) {
+      const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions. No more mocks in the queue.\nRECEIVED:\n${JSON.stringify(
+        requestBody,
+        null,
+        2
+      )}`;
+      throw new Error(errorMessage);
+    }
 
-    if (matchingMock) {
+    const modelsMatch = nextMock.request.model === requestBody.model;
+    const messagesMatch = JSON.stringify(nextMock.request.messages) === JSON.stringify(requestBody.messages);
+
+    if (modelsMatch && messagesMatch) {
       const responseBody = createStreamResponse(
         requestBody.model,
-        matchingMock.response.content,
-        matchingMock.response.role, 
+        nextMock.response.content,
+        nextMock.response.role
       );
       await route.fulfill({
         status: 200,
@@ -293,15 +299,30 @@ export class ChatCompletionMocker {
         body: responseBody,
       });
     } else {
-      // No match found, fail the test
-      const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions.\nNO MATCH FOUND FOR:\n${JSON.stringify(
-        requestBody,
+      const errorMessage = `[ChatCompletionMocker] API call to /chat/completions did not match the expected request.\n\nEXPECTED:\n${JSON.stringify(
+        nextMock.request,
         null,
-        2,
-      )}\n\nDEFINED MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
+        2
+      )}\n\nRECEIVED:\n${JSON.stringify(requestBody, null, 2)}`;
+      // Put the mock back in the queue for better debugging
+      this.mocks.unshift(nextMock);
       throw new Error(errorMessage);
     }
-  }
+   }
+
+  /**
+   * Verifies that all registered mocks have been consumed by API calls.
+   * Throws an error if any mocks are left in the queue, indicating that
+   * the test made fewer API calls than expected.
+   */
+  verifyComplete() {
+    if (this.mocks.length > 0) {
+       const errorMessage = `[ChatCompletionMocker] Test completed, but ${String(
+        this.mocks.length
+       )} mock(s) were not consumed.\n\nUNCONSUMED MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
+      throw new Error(errorMessage);
+    }
+   }
 }
 export async function seedLocalStorage(context: BrowserContext, data: Record<string, object>) {
   await context.addInitScript((data) => {
