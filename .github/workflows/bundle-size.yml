@@ -15,12 +15,19 @@ jobs:
         with:
           enable-cache: 'true'
 
-      - name: Build
-        run: devbox run -- npm install && devbox run -- npm run build
+      - name: Cache node modules
+        uses: actions/cache@v4
+        id: npm-cache
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Compressed Size
         uses: preactjs/compressed-size-action@v2
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          build-script: 'build-dummy'
+          install-script: "devbox run -- npm ci"
+          build-script: "devbox run -- npm run build"
           pattern: "dist/**/*.{js,css,html,svg}"
