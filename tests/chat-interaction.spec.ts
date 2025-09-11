@@ -2,8 +2,12 @@
 import { test } from './fixtures';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
-import { createStreamResponse, expect, OPENROUTER_API_KEY, seedLocalStorage } from "./test-helpers";
+import { createStreamResponse, expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from "./test-helpers";
 
+
+test.beforeEach(async ({ context }) => {
+  await mockGlobalApis(context);
+});
 interface ChatRequestBody {
   model: string;
 }

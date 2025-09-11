@@ -1,15 +1,7 @@
 import { test as base } from '@playwright/test';
-import { mockGlobalApis } from './test-helpers';
 
 // Extend basic test by providing a page fixture that logs all console messages.
 export const test = base.extend({
-  context: async ({ browser }, use) => {
-    const context = await browser.newContext();
-    await mockGlobalApis(context);
-    await use(context);
-    await context.close();
-  },
-
   page: async ({ page }, use, testInfo) => {
     const consoleMessages: string[] = [];
     page.on('console', (msg) => {

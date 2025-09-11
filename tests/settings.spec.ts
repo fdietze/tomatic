@@ -1,12 +1,14 @@
 import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
 import type { SystemPrompt } from '../src/types/storage';
-import { expect, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
+import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
 
 test.describe('System Prompt CRUD', () => {
   let settingsPage: SettingsPage;
 
   test.beforeEach(async ({ context, page }) => {
+
+    await mockGlobalApis(context);
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: 'Chef', prompt: 'You are a master chef.' },

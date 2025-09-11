@@ -1,9 +1,13 @@
 import { test } from './fixtures';
 import { ChatPage } from './pom/ChatPage';
 import type { ChatSession } from '../src/types/chat';
-import { expect, seedIndexedDB, seedLocalStorage, OPENROUTER_API_KEY } from './test-helpers';
+import { expect, mockGlobalApis, seedIndexedDB, seedLocalStorage, OPENROUTER_API_KEY } from './test-helpers';
 
 test.describe('Chat Session Navigation', () => {
+
+  test.beforeEach(async ({ context }) => {
+    await mockGlobalApis(context);
+  });
   test('navigates between sessions and disables buttons at boundaries', async ({ context, page }) => {
     // 1. Define Mock Data
     const sessions: ChatSession[] = [

@@ -4,9 +4,13 @@ import type { SystemPrompt } from '../src/types/storage';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
 import { SettingsPage } from './pom/SettingsPage';
-import { createStreamResponse, expect, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
+import { createStreamResponse, expect, mockGlobalApis, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
 
 test.describe('System Prompt Interaction', () => {
+
+  test.beforeEach(async ({ context }) => {
+    await mockGlobalApis(context);
+  });
   test('uses the updated system prompt when regenerating a response', async ({ context, page }) => {
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
