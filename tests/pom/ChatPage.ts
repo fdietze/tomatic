@@ -13,14 +13,12 @@ export class ChatPage {
   readonly chatSubmitButton: Locator;
   readonly modelCombobox: ModelComboboxPage;
   readonly navigation: NavigationComponent;
-  readonly errorMessage: Locator;
 
   constructor(public readonly page: Page) {
     this.chatInput = page.getByTestId('chat-input');
     this.chatSubmitButton = page.getByTestId('chat-submit');
     this.modelCombobox = new ModelComboboxPage(page);
     this.navigation = new NavigationComponent(page);
-    this.errorMessage = page.locator('.chat-error');
   }
 
   // --- Actions ---
@@ -99,13 +97,5 @@ export class ChatPage {
    */
   async expectMessageCount(count: number) {
     await expect(this.page.locator('[data-testid^="chat-message-"]')).toHaveCount(count);
-  }
-
-  getChatMessage(index: number): Locator {
-    return this.page.locator(`[data-testid="chat-message-${String(index)}"]`);
-  }
-
-  getErrorMessage(): Locator {
-    return this.errorMessage;
   }
 }
