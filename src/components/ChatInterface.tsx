@@ -81,15 +81,6 @@ const ChatInterface: React.FC = () => {
         }
     }, [apiKey, cachedModels.length, fetchModelList]);
 
-    // Effect to handle the initial prompt from the URL
-    useEffect(() => {
-        const { initialChatPrompt, setInitialChatPrompt } = useAppStore.getState();
-        if (initialChatPrompt && messages.length === 0 && !isStreaming) {
-            void submitMessage({ promptOverride: initialChatPrompt, navigate });
-            setInitialChatPrompt(null); // Consume the prompt
-        }
-    }, [messages.length, isStreaming, submitMessage, navigate]);
-
     // Auto-focus the input on load
     useEffect(() => {
         inputRef.current?.focus();
