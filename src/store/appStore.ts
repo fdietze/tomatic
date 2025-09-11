@@ -11,10 +11,13 @@ import {
   saveSystemPrompt,
   loadAllSystemPrompts,
   deleteSystemPrompt as dbDeleteSystemPrompt,
+  saveSnippet,
+  loadAllSnippets,
+  deleteSnippet as dbDeleteSnippet,
 } from '@/services/persistence';
-import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
+import { listAvailableModels, requestMessageContentStreamed, requestMessageContent } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
-import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
+import type { DisplayModelInfo, SystemPrompt, Snippet } from '@/types/storage';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const STORAGE_KEY = 'tomatic-storage';
@@ -95,11 +98,36 @@ const getCurrentSystemPrompt = (prompts: SystemPrompt[], name: string | null): S
     return prompts.find(p => p.name === name) || null;
 };
 
+// --- Snippet Resolution Helper ---
+const resolveSnippets = (text: string, snippets: Snippet[]): string => {
+  const snippetMap = new Map(snippets.map((s) => [s.name, s.content]));
+  const regex = /@([a-zA-Z0-9_]+)/g;
+
+  const resolve = (currentText: string, visited: Set<string>): string => {
+    return currentText.replace(regex, (match, snippetName) => {
+      if (visited.has(snippetName)) {
+        throw new Error(`Snippet cycle detected: ${[...visited, snippetName].join(' -> ')}`);
+      }
+
+      if (snippetMap.has(snippetName)) {
+        const newVisited = new Set(visited);
+        newVisited.add(snippetName);
+        return resolve(snippetMap.get(snippetName)!, newVisited);
+      }
+
+      return match;
+    });
+  };
+
+  return resolve(text, new Set());
+};
+
 
 interface AppState {
   // --- Persisted State (in Local Storage) ---
   apiKey: string;
   systemPrompts: SystemPrompt[];
+  snippets: Snippet[];
   modelName: string;
   cachedModels: DisplayModelInfo[];
   input: string;
@@ -141,6 +169,11 @@ interface AppState {
   updateSystemPrompt: (oldName: string, prompt: SystemPrompt) => Promise<void>;
   deleteSystemPrompt: (name: string) => Promise<void>;
 
+  loadSnippets: () => Promise<void>;
+  addSnippet: (snippet: Snippet) => Promise<void>;
+  updateSnippet: (oldName: string, snippet: Snippet) => Promise<void>;
+  deleteSnippet: (name: string) => Promise<void>;
+
   fetchModelList: () => Promise<void>;
   
   // Core chat actions
@@ -162,6 +195,7 @@ export const useAppStore = create<AppState>()(
       // --- Persisted State ---
       apiKey: '',
       systemPrompts: [],
+      snippets: [],
       modelName: 'google/gemini-2.5-pro',
       cachedModels: [],
       input: '',
@@ -390,6 +424,49 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      loadSnippets: async () => {
+        try {
+          const snippets = await loadAllSnippets();
+          set({ snippets });
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to load snippets: ${error}`);
+        }
+      },
+
+      addSnippet: async (snippet) => {
+        try {
+          await saveSnippet(snippet);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to add snippet: ${error}`);
+        }
+      },
+
+      updateSnippet: async (oldName, snippet) => {
+        try {
+          if (oldName !== snippet.name) {
+            await dbDeleteSnippet(oldName);
+          }
+          await saveSnippet(snippet);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to update snippet: ${error}`);
+        }
+      },
+
+      deleteSnippet: async (name) => {
+        try {
+          await dbDeleteSnippet(name);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to delete snippet: ${error}`);
+        }
+      },
+
       fetchModelList: async () => {
         set({ modelsLoading: true, modelsError: null });
         console.debug('[STORE|fetchModelList] Fetching model list...');
@@ -405,11 +482,37 @@ export const useAppStore = create<AppState>()(
 
       // --- Core Chat Actions ---
       submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate }) => {
-        const { input, apiKey, modelName, systemPrompts, selectedPromptName } = get();
-        const content = promptOverride || input;
+        const { input, apiKey, modelName, systemPrompts, selectedPromptName, snippets } = get();
+        let content = promptOverride || input;
         if (!content || !apiKey) return;
 
-        console.debug(`[STORE|submitMessage] Start. Is regeneration: ${String(isRegeneration)}`);
+        const rawContent = content;
+        let hasSnippetError = false;
+
+        const regex = /@([a-zA-Z0-9_]+)/g;
+        const snippetNames = [...content.matchAll(regex)].map(m => m[1]);
+        if (snippetNames.length > 0) {
+          try {
+            const snippetMap = new Map(snippets.map((s) => [s.name, s.content]));
+            for (const name of snippetNames) {
+              if (!snippetMap.has(name)) {
+                throw new Error(`Snippet '@${name}' not found.`);
+              }
+            }
+            content = resolveSnippets(content, snippets);
+          } catch (e) {
+            const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            get().setError(error);
+            hasSnippetError = true;
+          }
+        }
+
+        if (hasSnippetError) return;
+
+        console.debug(`[STORE|submitMessage] Start. Is regeneration: ${String(isRegeneration)}. Raw content: "${rawContent}"`);
+        if (rawContent !== content) {
+          console.debug(`[STORE|submitMessage] Snippets resolved. Final content: "${content}"`);
+        }
 
         let sessionId = get().currentSessionId;
         const isNewSession = !sessionId;
@@ -433,7 +536,11 @@ export const useAppStore = create<AppState>()(
         }
         
         if (!isRegeneration) {
-            newMessages.push({ id: uuidv4(), role: 'user', content, prompt_name: null, model_name: null, cost: null });
+            const userMessage: Message = { id: uuidv4(), role: 'user', content, prompt_name: null, model_name: null, cost: null };
+            if (rawContent !== content) {
+              userMessage.raw_content = rawContent;
+            }
+            newMessages.push(userMessage);
         }
 
         if (newMessages.length > 0) {
@@ -544,29 +651,28 @@ export const useAppStore = create<AppState>()(
       regenerateMessage: async (index) => {
         console.debug(`[STORE|regenerateMessage] Called for index: ${String(index)}`);
         const { messages, systemPrompts } = get();
-        const messagesToRegenerate = [...messages.slice(0, index)]; // Create a mutable copy
+        const messagesToRegenerate = [...messages.slice(0, index)];
 
-        // Find the system message to check if its prompt needs updating
         const systemMessageIndex = messagesToRegenerate.findIndex(m => m.role === 'system');
         if (systemMessageIndex !== -1) {
           const systemMessage = messagesToRegenerate[systemMessageIndex];
           const latestPrompt = systemPrompts.find(p => p.name === systemMessage.prompt_name);
 
-          // If the prompt still exists and its content has changed, update the message
           if (latestPrompt && latestPrompt.prompt !== systemMessage.content) {
             console.debug(`[STORE|regenerateMessage] Found updated prompt "${latestPrompt.name}". Updating content for regeneration.`);
             messagesToRegenerate[systemMessageIndex] = { ...systemMessage, content: latestPrompt.prompt };
           }
         }
         
-        const lastUserMessage = [...messagesToRegenerate].reverse().find((m) => m.role === 'user');
+        const lastUserMessage = [...messages.slice(0, index)].reverse().find((m) => m.role === 'user');
         
         if (lastUserMessage) {
-            // Since this is an internal call, we don't need to navigate.
+            const contentToResubmit = lastUserMessage.raw_content || lastUserMessage.content;
+            console.debug(`[STORE|regenerateMessage] Resubmitting with content: "${contentToResubmit}"`);
             await get().submitMessage({ 
-              promptOverride: lastUserMessage.content, 
+              promptOverride: contentToResubmit,
               isRegeneration: true, 
-              messagesToRegenerate 
+              messagesToRegenerate,
             });
         }
       },
@@ -587,9 +693,9 @@ export const useAppStore = create<AppState>()(
 
       init: () => {
         console.debug('[STORE|init] Starting application initialization.');
-        Promise.all([get().loadSystemPrompts(), get().fetchModelList()])
+        Promise.all([get().loadSystemPrompts(), get().loadSnippets(), get().fetchModelList()])
           .then(() => {
-            console.debug('[STORE|init] System prompts and model list loaded successfully.');
+            console.debug('[STORE|init] System prompts, snippets, and model list loaded successfully.');
             set({ isInitializing: false });
           })
           .catch((error: unknown) => {
