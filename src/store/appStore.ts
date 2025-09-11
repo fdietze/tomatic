@@ -11,10 +11,13 @@ import {
   saveSystemPrompt,
   loadAllSystemPrompts,
   deleteSystemPrompt as dbDeleteSystemPrompt,
+  saveSnippet,
+  loadAllSnippets,
+  deleteSnippet as dbDeleteSnippet,
 } from '@/services/persistence';
 import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
-import type { DisplayModelInfo, SystemPrompt } from '@/types/storage';
+import type { DisplayModelInfo, Snippet, SystemPrompt } from '@/types/storage';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 const STORAGE_KEY = 'tomatic-storage';
@@ -95,11 +98,46 @@ const getCurrentSystemPrompt = (prompts: SystemPrompt[], name: string | null): S
     return prompts.find(p => p.name === name) || null;
 };
 
+/**
+ * Resolves snippets in a given text, handling recursion and cycle detection.
+ * @param text The text to resolve snippets in.
+ * @param allSnippets A list of all available snippets.
+ * @param visited A set to track visited snippets for cycle detection.
+ * @returns The text with all snippets resolved.
+ * @throws An error if a snippet is not found or a cycle is detected.
+ */
+function resolveSnippets(
+  text: string,
+  allSnippets: Snippet[],
+  visited: Set<string> = new Set()
+): string {
+  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
+
+  return text.replace(snippetRegex, (_match: string, snippetName: string) => {
+    if (visited.has(snippetName)) {
+      throw new Error(`Snippet cycle detected: @${snippetName} is referenced within its own expansion.`);
+    }
+
+    const snippet = allSnippets.find((s) => s.name === snippetName);
+    if (!snippet) {
+      throw new Error(`Snippet '@${snippetName}' not found.`);
+    }
+
+    // Add the current snippet to the visited set for this resolution path
+    const newVisited = new Set(visited);
+    newVisited.add(snippetName);
+
+    // Recursively resolve snippets in the content of the found snippet
+    return resolveSnippets(snippet.content, allSnippets, newVisited);
+  });
+}
+
 
 interface AppState {
   // --- Persisted State (in Local Storage) ---
   apiKey: string;
   systemPrompts: SystemPrompt[];
+  snippets: Snippet[];
   modelName: string;
   cachedModels: DisplayModelInfo[];
   input: string;
@@ -140,6 +178,10 @@ interface AppState {
   addSystemPrompt: (prompt: SystemPrompt) => Promise<void>;
   updateSystemPrompt: (oldName: string, prompt: SystemPrompt) => Promise<void>;
   deleteSystemPrompt: (name: string) => Promise<void>;
+  loadSnippets: () => Promise<void>;
+  addSnippet: (snippet: Snippet) => Promise<void>;
+  updateSnippet: (oldName: string, snippet: Snippet) => Promise<void>;
+  deleteSnippet: (name: string) => Promise<void>;
 
   fetchModelList: () => Promise<void>;
   
@@ -162,6 +204,7 @@ export const useAppStore = create<AppState>()(
       // --- Persisted State ---
       apiKey: '',
       systemPrompts: [],
+      snippets: [],
       modelName: 'google/gemini-2.5-pro',
       cachedModels: [],
       input: '',
@@ -390,6 +433,49 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      loadSnippets: async () => {
+        try {
+          const snippets = await loadAllSnippets();
+          set({ snippets });
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to load snippets: ${error}`);
+        }
+      },
+
+      addSnippet: async (snippet) => {
+        try {
+          await saveSnippet(snippet);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to add snippet: ${error}`);
+        }
+      },
+
+      updateSnippet: async (oldName, snippet) => {
+        try {
+          if (oldName !== snippet.name) {
+            await dbDeleteSnippet(oldName);
+          }
+          await saveSnippet(snippet);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to update snippet: ${error}`);
+        }
+      },
+
+      deleteSnippet: async (name) => {
+        try {
+          await dbDeleteSnippet(name);
+          await get().loadSnippets();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to delete snippet: ${error}`);
+        }
+      },
+
       fetchModelList: async () => {
         set({ modelsLoading: true, modelsError: null });
         console.debug('[STORE|fetchModelList] Fetching model list...');
@@ -405,9 +491,19 @@ export const useAppStore = create<AppState>()(
 
       // --- Core Chat Actions ---
       submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate }) => {
-        const { input, apiKey, modelName, systemPrompts, selectedPromptName } = get();
-        const content = promptOverride || input;
-        if (!content || !apiKey) return;
+        const { input, apiKey, modelName, systemPrompts, selectedPromptName, snippets } = get();
+        const rawContent = promptOverride || input;
+        if (!rawContent || !apiKey) return;
+
+        let processedContent: string;
+        try {
+          processedContent = resolveSnippets(rawContent, snippets);
+          console.debug(`[STORE|submitMessage] Snippet resolution complete. Original: "${rawContent}", Processed: "${processedContent}"`);
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(error);
+          return;
+        }
 
         console.debug(`[STORE|submitMessage] Start. Is regeneration: ${String(isRegeneration)}`);
 
@@ -433,7 +529,18 @@ export const useAppStore = create<AppState>()(
         }
         
         if (!isRegeneration) {
-            newMessages.push({ id: uuidv4(), role: 'user', content, prompt_name: null, model_name: null, cost: null });
+            const userMessage: Message = {
+              id: uuidv4(),
+              role: 'user',
+              content: processedContent,
+              prompt_name: null,
+              model_name: null,
+              cost: null,
+            };
+            if (rawContent !== processedContent) {
+              userMessage.raw_content = rawContent;
+            }
+            newMessages.push(userMessage);
         }
 
         if (newMessages.length > 0) {
@@ -562,9 +669,11 @@ export const useAppStore = create<AppState>()(
         const lastUserMessage = [...messagesToRegenerate].reverse().find((m) => m.role === 'user');
         
         if (lastUserMessage) {
+            const contentForRegeneration = lastUserMessage.raw_content || lastUserMessage.content;
+            console.debug(`[STORE|regenerateMessage] Regenerating with content: "${contentForRegeneration}"`);
             // Since this is an internal call, we don't need to navigate.
             await get().submitMessage({ 
-              promptOverride: lastUserMessage.content, 
+              promptOverride: contentForRegeneration,
               isRegeneration: true, 
               messagesToRegenerate 
             });
@@ -587,9 +696,9 @@ export const useAppStore = create<AppState>()(
 
       init: () => {
         console.debug('[STORE|init] Starting application initialization.');
-        Promise.all([get().loadSystemPrompts(), get().fetchModelList()])
+        Promise.all([get().loadSystemPrompts(), get().loadSnippets(), get().fetchModelList()])
           .then(() => {
-            console.debug('[STORE|init] System prompts and model list loaded successfully.');
+            console.debug('[STORE|init] System prompts, snippets, and model list loaded successfully.');
             set({ isInitializing: false });
           })
           .catch((error: unknown) => {

@@ -9,3 +9,11 @@ export interface DisplayModelInfo {
   prompt_cost_usd_pm: number | null;
   completion_cost_usd_pm: number | null;
 }
+
+export interface Snippet {
+  name: string;
+  content: string;
+  isGenerated: boolean; // Must be a required boolean
+  prompt?: string;
+  model?: string;
+}

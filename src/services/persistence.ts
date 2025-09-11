@@ -2,7 +2,7 @@ import { openDB, DBSchema } from 'idb';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatSession, Message } from '@/types/chat';
-import type { SystemPrompt } from '@/types/storage';
+import type { Snippet, SystemPrompt } from '@/types/storage';
 
 // For DB version < 2
 type V1Message = Omit<Message, 'id' | 'prompt_name'> & { id?: string, prompt_name?: string | null };
@@ -36,14 +36,23 @@ const systemPromptSchema = z.object({
   prompt: z.string(),
 });
 
+const snippetSchema = z.object({
+  name: z.string(),
+  content: z.string(),
+  isGenerated: z.boolean(),
+  prompt: z.string().optional(),
+  model: z.string().optional(),
+});
+
 
 // --- IndexedDB Constants ---
 const DB_NAME = 'tomatic_chat_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SESSIONS_STORE_NAME = 'chat_sessions';
 const SYSTEM_PROMPTS_STORE_NAME = 'system_prompts';
+const SNIPPETS_STORE_NAME = 'snippets';
 const SESSION_ID_KEY_PATH = 'session_id';
-const PROMPT_NAME_KEY_PATH = 'name';
+const NAME_KEY_PATH = 'name';
 const UPDATED_AT_INDEX = 'updated_at_ms';
 
 // --- IDB Schema Definition ---
@@ -58,6 +67,10 @@ interface TomaticDB extends DBSchema {
   [SYSTEM_PROMPTS_STORE_NAME]: {
     key: string;
     value: SystemPrompt;
+  };
+  [SNIPPETS_STORE_NAME]: {
+    key: string;
+    value: Snippet;
   };
 }
 
@@ -75,7 +88,7 @@ const dbPromise = openDB<TomaticDB>(DB_NAME, DB_VERSION, {
 
       // Create system prompts store
       if (!db.objectStoreNames.contains(SYSTEM_PROMPTS_STORE_NAME)) {
-        db.createObjectStore(SYSTEM_PROMPTS_STORE_NAME, { keyPath: PROMPT_NAME_KEY_PATH });
+        db.createObjectStore(SYSTEM_PROMPTS_STORE_NAME, { keyPath: NAME_KEY_PATH });
       }
       
       // Migrate data
@@ -105,6 +118,12 @@ const dbPromise = openDB<TomaticDB>(DB_NAME, DB_VERSION, {
         void cursor.update(newSession);
         void cursor.continue().then(migrate);
       });
+    }
+    if (oldVersion < 3) {
+      console.log('[DB] Upgrading database from version 2 to 3...');
+      if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
+        db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
+      }
     }
   },
 });
@@ -240,5 +259,46 @@ export async function deleteSystemPrompt(promptName: string): Promise<void> {
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete system prompt '${promptName}':`, error);
     throw new Error('Failed to delete system prompt.');
+  }
+}
+
+
+// --- Snippet CRUD ---
+
+export async function saveSnippet(snippet: Snippet): Promise<void> {
+  const db = await dbPromise;
+  try {
+    await db.put(SNIPPETS_STORE_NAME, snippet);
+  } catch (error) {
+    console.error('[DB] Save: Failed to save snippet:', error);
+    throw new Error('Failed to save snippet.');
+  }
+}
+
+export async function loadAllSnippets(): Promise<Snippet[]> {
+  const db = await dbPromise;
+  try {
+    const snippets = await db.getAll(SNIPPETS_STORE_NAME);
+    // Validate each snippet
+    const validation = z.array(snippetSchema).safeParse(snippets);
+    if (validation.success) {
+      return validation.data;
+    } else {
+      console.error('[DB] Load: Zod validation failed for snippets:', validation.error);
+      return [];
+    }
+  } catch (error) {
+    console.error('[DB] Load: Failed to load snippets:', error);
+    throw new Error('Failed to load snippets.');
+  }
+}
+
+export async function deleteSnippet(name: string): Promise<void> {
+  const db = await dbPromise;
+  try {
+    await db.delete(SNIPPETS_STORE_NAME, name);
+  } catch (error) {
+    console.error(`[DB] Delete: Failed to delete snippet '${name}':`, error);
+    throw new Error('Failed to delete snippet.');
   }
 }
