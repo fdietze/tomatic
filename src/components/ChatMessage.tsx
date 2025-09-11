@@ -42,8 +42,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onEditAndResubmit,
   isMobile,
 }) => {
+  const contentToDisplay = message.role === 'user' && message.raw_content ? message.raw_content : message.content;
   const [isEditing, setIsEditing] = useState(false);
-  const [editInput, setEditInput] = useState(message.content);
+  const [editInput, setEditInput] = useState(contentToDisplay);
 
   const isSystemMessage = message.role === 'system';
   const [collapsed, setCollapsed] = useState(isSystemMessage);
@@ -55,7 +56,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const handleKeyDown = useTextAreaEnterHandler(isMobile, handleResubmit);
 
-  const textForCopyButton = isEditing ? editInput : message.content;
+  const textForCopyButton = isEditing ? editInput : contentToDisplay;
 
   const roleDisplay = useMemo(() => {
     let displayString: string = message.role;
@@ -126,7 +127,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 style={{ marginLeft: 'auto' }}
                 data-testid="discard-edit-button"
                 onClick={() => {
-                  setEditInput(message.content);
+                  setEditInput(contentToDisplay);
                   setIsEditing(false);
                 }}
               >
@@ -136,7 +137,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             </div>
           </>
         ) : (
-          <Markdown markdownText={message.content} />
+          <Markdown markdownText={contentToDisplay} />
         )}
       </div>
       {message.cost && (
