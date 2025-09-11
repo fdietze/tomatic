@@ -115,6 +115,18 @@ export class SettingsPage {
     const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
     await editContainer.getByTestId('snippet-save-button').click();
   }
+
+  async createGeneratedSnippet(name: string, prompt: string, modelId: string) {
+    await this.newSnippetButton.click();
+    const editContainer = this.page.getByTestId('snippet-item-edit-new');
+    await editContainer.getByTestId('snippet-name-input').fill(name);
+    await editContainer.getByText('Generated Snippet').click();
+    // Model selection needs its own POM/helper if it gets complex
+    await this.page.getByTestId('model-combobox-input').fill(modelId);
+    await this.page.locator(`[data-testid="model-combobox-item-${modelId}"]`).click();
+    await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
+    await editContainer.getByTestId('snippet-save-button').click();
+  }
   // --- Helpers ---
 
   /**
@@ -153,6 +165,16 @@ export class SettingsPage {
 
   async expectSnippetToNotExist(name: string) {
     await expect(this.getSnippetItem(name)).not.toBeVisible();
+  }
+
+  async expectGeneratedSnippetContent(name: string, expectedContent: string | RegExp) {
+    // In view mode, the content is in a different element
+    const contentLocator = this.getSnippetItem(name).locator('.system-prompt-text');
+    await expect(contentLocator).toHaveText(expectedContent);
+  }
+
+  async expectGenerationErrorMessage(message: string | RegExp) {
+    await expect(this.page.getByTestId('generation-error-message')).toHaveText(message);
   }
   /**
    * Asserts that a specific error message is visible.
