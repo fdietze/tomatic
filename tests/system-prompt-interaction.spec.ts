@@ -1,4 +1,4 @@
-import { test, expect, createStreamResponse, mockApis } from './fixtures';
+import { test, expect, createStreamResponse, mockApis, seedChatSessions } from './fixtures';
 import type { ChatSession, Message } from '@/types/chat';
 import type { SystemPrompt } from '@/types/storage';
 import type { Buffer } from 'buffer';
@@ -23,48 +23,25 @@ test.describe('System Prompt Interaction', () => {
   test.beforeEach(async ({ context, page }) => {
     // Mock APIs, seed the database, and navigate to the starting page
     await mockApis(context);
-    await context.addInitScript(
-      ({ session, prompts }) => {
-        // This script runs on every navigation. We only want to seed data once.
-        if ((window as { hasBeenSeeded?: boolean }).hasBeenSeeded) return;
-        (window as { hasBeenSeeded?: boolean }).hasBeenSeeded = true;
 
-        // Seed localStorage with OLD format for migration testing
-        const persistedState = {
-          state: { 
-            systemPrompts: prompts, 
-            apiKey: 'TEST_API_KEY' 
-          },
-          version: 0, // Trigger migration
-        };
-        window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+    // Seed localStorage with the OLD format for system prompts to test the migration.
+    await context.addInitScript((prompts) => {
+      // This guard prevents a test from re-seeding if it navigates to a new page.
+      if (window._localStorageSeeded) return;
+      const persistedState = {
+        state: {
+          systemPrompts: prompts,
+          apiKey: 'TEST_API_KEY',
+        },
+        version: 0, // Set to 0 to trigger migration
+      };
+      window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+      window._localStorageSeeded = true;
+    }, MOCK_PROMPTS);
 
-        // Seed IndexedDB
-        return new Promise((resolve) => {
-          const request = indexedDB.open('tomatic_chat_db', 2);
-          request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains('chat_sessions')) {
-              const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
-              store.createIndex('updated_at_ms', 'updated_at_ms');
-            }
-            if (!db.objectStoreNames.contains('system_prompts')) {
-              db.createObjectStore('system_prompts', { keyPath: 'name' });
-            }
-          };
-          request.onsuccess = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            const tx = db.transaction('chat_sessions', 'readwrite');
-            tx.objectStore('chat_sessions').put(session);
-            tx.oncomplete = () => {
-              db.close();
-              resolve(undefined);
-            };
-          };
-        });
-      },
-      { session: SESSION_WITH_PROMPT, prompts: MOCK_PROMPTS }
-    );
+    // Seed the database with the chat session using the new helper.
+    await seedChatSessions(context, [SESSION_WITH_PROMPT]);
+
     await page.goto(`http://localhost:5173/chat/${SESSION_WITH_PROMPT.session_id}`);
   });
 

@@ -1,6 +1,16 @@
 import { test as base, expect, BrowserContext } from '@playwright/test';
 import { Buffer } from 'buffer';
 
+
+import type { ChatSession } from '@/types/chat';
+
+// By convention, we extend the Window object with custom properties for test-specific flags.
+declare global {
+  interface Window {
+    _chatSessionsSeeded?: boolean;
+    _localStorageSeeded?: boolean;
+  }
+}
 const OPENROUTER_API_KEY = 'TEST_API_KEY';
 
 // A mock response for the /models endpoint
@@ -148,4 +158,60 @@ export function createStreamResponse(model: string, content: string): Buffer {
   return Buffer.from(responseString);
 }
 
+
+/**
+ * Seeds the IndexedDB `chat_sessions` object store with mock data.
+ * This runs in a browser context via `addInitScript`.
+ *
+ * @param context The Playwright browser context.
+ * @param sessions An array of chat sessions to seed.
+ */
+export async function seedChatSessions(context: BrowserContext, sessions: ChatSession[]) {
+  await context.addInitScript((mockSessions) => {
+    // This guard prevents a test from re-seeding if it navigates to a new page.
+    if (window._chatSessionsSeeded) return;
+
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('tomatic_chat_db', 2);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('chat_sessions')) {
+          const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
+          store.createIndex('updated_at_ms', 'updated_at_ms');
+        }
+        if (!db.objectStoreNames.contains('system_prompts')) {
+          db.createObjectStore('system_prompts', { keyPath: 'name' });
+        }
+      };
+
+      request.onerror = () => {
+        reject(new Error(`IndexedDB error: ${request.error?.message ?? 'Unknown'}`));
+      };
+
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (mockSessions.length === 0) {
+          db.close();
+          resolve();
+          return;
+        }
+
+        const tx = db.transaction('chat_sessions', 'readwrite');
+        const store = tx.objectStore('chat_sessions');
+        mockSessions.forEach((session) => store.put(session));
+
+        tx.oncomplete = () => {
+          db.close();
+          window._chatSessionsSeeded = true;
+          resolve();
+        };
+
+        tx.onerror = () => {
+          reject(new Error(`Transaction error: ${tx.error?.message ?? 'Unknown'}`));
+        };
+      };
+    });
+  }, sessions);
+}
 export { expect };

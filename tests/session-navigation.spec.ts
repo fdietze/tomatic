@@ -1,7 +1,8 @@
-import { test, expect, mockApis } from './fixtures';
+import { test, expect, mockApis, seedChatSessions } from './fixtures';
+import type { ChatSession } from '@/types/chat';
 
 test.describe('Chat Session Navigation', () => {
-  const sessions = [
+  const sessions: ChatSession[] = [
     {
       session_id: 'session-old',
       messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
@@ -27,31 +28,7 @@ test.describe('Chat Session Navigation', () => {
 
   test.beforeEach(async ({ context, page }) => {
     // Seed the IndexedDB with mock session data
-    await context.addInitScript((mockSessions) => {
-      return new Promise((resolve) => {
-        const request = indexedDB.open('tomatic_chat_db', 2);
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains('chat_sessions')) {
-            const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
-            store.createIndex('updated_at_ms', 'updated_at_ms');
-          }
-          if (!db.objectStoreNames.contains('system_prompts')) {
-            db.createObjectStore('system_prompts', { keyPath: 'name' });
-          }
-        };
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          const tx = db.transaction('chat_sessions', 'readwrite');
-          const store = tx.objectStore('chat_sessions');
-          mockSessions.forEach((session) => store.put(session));
-          tx.oncomplete = () => {
-            db.close();
-            resolve(undefined);
-          };
-        };
-      });
-    }, sessions);
+    await seedChatSessions(context, sessions);
 
     // Mock the models API to prevent network errors
     await mockApis(context);
