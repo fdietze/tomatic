@@ -120,7 +120,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       setNameError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-      console.error('Snippet generation failed:', message);
+       console.debug('Snippet generation failed:', message);
       setGenerationError(`Generation failed: ${message}`);
     } finally {
       setIsGenerating(false);

@@ -1,16 +1,33 @@
 import { test as base } from '@playwright/test';
 
+interface TestOptions {
+  expectedConsoleErrors: (string | RegExp)[];
+}
+
 // Extend basic test by providing a page fixture that logs all console messages.
-export const test = base.extend({
-  page: async ({ page }, use, testInfo) => {
+export const test = base.extend<TestOptions>({
+  // Set a default value for the option
+  expectedConsoleErrors: [[], { option: true }],
+
+  page: async ({ page, expectedConsoleErrors }, use, testInfo) => {
     const consoleMessages: string[] = [];
+    const unhandledErrors: string[] = [];
+
     page.on('console', (msg) => {
       const msgType = msg.type().toUpperCase();
       const msgText = msg.text();
 
       if (msgType === 'ERROR') {
-        // Fail the test if a console error occurs
-        throw new Error(`[BROWSER CONSOLE ERROR]: ${msgText}`);
+        const isExpected = expectedConsoleErrors.some((pattern) => {
+          if (typeof pattern === 'string') {
+            return msgText.includes(pattern);
+          }
+          return pattern.test(msgText);
+        });
+
+        if (!isExpected) {
+          unhandledErrors.push(msgText);
+        }
       }
 
       // Filter out noisy Vite HMR messages for cleaner test logs
@@ -25,6 +42,10 @@ export const test = base.extend({
 
     await use(page);
 
+    if (unhandledErrors.length > 0) {
+        throw new Error(`[UNHANDLED BROWSER CONSOLE ERRORS]:\n - ${unhandledErrors.join('\n - ')}`);
+    }
+
     if (testInfo.status !== testInfo.expectedStatus) {
       console.debug(`[TEST FAILED]: ${testInfo.title}`);
       console.debug('[BROWSER CONSOLE LOGS]:');
@@ -34,7 +55,6 @@ export const test = base.extend({
     }
   },
 });
-
 // We are extending the base test with custom fixtures.
 // https://playwright.dev/docs/test-fixtures
 
