@@ -43,7 +43,7 @@ const runLocalStorageMigration = () => {
     return;
   }
 
-  console.log('[Migration] Migrating old localStorage data to new format...');
+  console.debug('[Migration] Migrating old localStorage data to new format...');
 
   try {
     const oldState: OldState = {
@@ -70,7 +70,7 @@ const runLocalStorageMigration = () => {
     localStorage.removeItem('input');
     localStorage.removeItem('selected_prompt_name');
     
-    console.log('[Migration] Migration successful.');
+    console.debug('[Migration] Migration successful.');
 
   } catch (error) {
     console.error('[Migration] Failed to migrate localStorage:', error);
@@ -118,7 +118,7 @@ interface AppState {
   modelsError: string | null;
   isStreaming: boolean;
   streamController: AbortController | null;
-  initialChatPrompt: string | null;
+  isInitializing: boolean;
 
   // --- Actions ---
   setApiKey: (key: string) => void;
@@ -129,10 +129,9 @@ interface AppState {
   toggleAutoScroll: () => void;
 
   setError: (error: string | null) => void;
-  setInitialChatPrompt: (prompt: string | null) => void;
   
-  loadSession: (sessionId: string) => Promise<void>;
-  startNewSession: () => Promise<void>;
+  loadSession: (sessionId: string, initialPrompt?: string, navigate?: NavigateFunction) => Promise<void>;
+  startNewSession: (initialPrompt?: string, navigate?: NavigateFunction) => Promise<void>;
   saveCurrentSession: () => Promise<void>;
   deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
   loadSystemPrompts: () => Promise<void>;
@@ -152,6 +151,7 @@ interface AppState {
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
   cancelStream: () => void;
+  init: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -178,7 +178,7 @@ export const useAppStore = create<AppState>()(
       modelsError: null,
       isStreaming: false,
       streamController: null,
-      initialChatPrompt: null,
+      isInitializing: true,
 
       // --- Actions ---
       setApiKey: (apiKey) => set({ apiKey }),
@@ -218,31 +218,36 @@ export const useAppStore = create<AppState>()(
 
       setError: (error) => {
         if (error) {
-          console.error(`[App Error] ${error}`);
+          console.error(`[STORE|setError] ${error}`);
         }
         set({ error });
       },
-
-      setInitialChatPrompt: (prompt) => set({ initialChatPrompt: prompt }),
       
-      loadSession: async (sessionId) => {
-        // This check MUST come first to prevent wiping state during navigation race conditions.
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
+      loadSession: async (sessionId, initialPrompt, navigate) => {
+        const { currentSessionId, messages } = get();
+
+        // If we are asked to load the same session, do nothing.
+        if (currentSessionId === sessionId && sessionId !== 'new') {
           return;
         }
 
-        if (get().isStreaming) {
-          get().cancelStream();
+        // If we are asked to load 'new' but we already have a session ID and some messages,
+        // it means we are in the middle of a new session creation from a prompt.
+        // The re-render from clearing search params is causing this. We should ignore it.
+        if (sessionId === 'new' && !initialPrompt && currentSessionId && messages.length > 0) {
+          console.debug('[STORE|loadSession] Ignoring redundant "new" session load.');
+          return;
         }
 
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
-          return; // Session is already in memory, no need to load.
+        console.debug(`[STORE|loadSession] Loading session: ${sessionId}`);
+        if (get().isStreaming) {
+          get().cancelStream();
         }
 
         set({ error: null, messages: [], currentSessionId: sessionId });
 
         if (sessionId === 'new') {
-          await get().startNewSession();
+          await get().startNewSession(initialPrompt, navigate);
           return;
         }
 
@@ -276,13 +281,15 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      startNewSession: async () => {
+      startNewSession: async (initialPrompt, navigate) => {
         const mostRecentId = await getMostRecentSessionId();
-        const { systemPrompts, selectedPromptName } = get();
+        const { systemPrompts, selectedPromptName, setSelectedPromptName } = get();
         const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
+        console.debug(`[STORE|startNewSession] Starting new session. Most recent was: ${String(mostRecentId)}`);
         
         const initialMessages: Message[] = [];
-        if (systemPrompt) {
+        // If there's an initial prompt, we don't want to use the stored system prompt
+        if (systemPrompt && !initialPrompt) {
           initialMessages.push({
             id: uuidv4(),
             role: 'system',
@@ -299,6 +306,12 @@ export const useAppStore = create<AppState>()(
           prevSessionId: mostRecentId, // The "previous" session from "new" is the most recent one
           nextSessionId: null,
         });
+
+        // If there's an initial prompt, deselect the system prompt and submit the message
+        if (initialPrompt) {
+          setSelectedPromptName(null);
+          await get().submitMessage({ promptOverride: initialPrompt, navigate });
+        }
       },
       
       saveCurrentSession: async () => {
@@ -387,16 +400,15 @@ export const useAppStore = create<AppState>()(
       },
 
       fetchModelList: async () => {
-        if (get().apiKey) {
-            set({ modelsLoading: true, modelsError: null });
-            try {
-              const models = await listAvailableModels();
-              set({ cachedModels: models, modelsLoading: false });
-            } catch (e) {
-              const error = e instanceof Error ? e.message : 'An unknown error occurred.';
-              console.error(`[Model Fetch Error] ${error}`);
-              set({ modelsError: error, modelsLoading: false });
-            }
+        set({ modelsLoading: true, modelsError: null });
+        console.debug('[STORE|fetchModelList] Fetching model list...');
+        try {
+          const models = await listAvailableModels();
+          set({ cachedModels: models, modelsLoading: false });
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          console.error(`[STORE|fetchModelList] Failed to fetch models: ${error}`);
+          set({ modelsError: error, modelsLoading: false });
         }
       },
 
@@ -406,7 +418,7 @@ export const useAppStore = create<AppState>()(
         const content = promptOverride || input;
         if (!content || !apiKey) return;
 
-        console.log('[DEBUG] submitMessage START. Content:', content);
+        console.debug(`[STORE|submitMessage] Start. Is regeneration: ${String(isRegeneration)}`);
 
         let sessionId = get().currentSessionId;
         const isNewSession = !sessionId;
@@ -434,19 +446,12 @@ export const useAppStore = create<AppState>()(
         }
 
         if (newMessages.length > 0) {
-          console.log('[DEBUG] submitMessage (existing session): adding user message. Current message count:', get().messages.length);
+          console.debug(`[STORE|submitMessage] Adding ${String(newMessages.length)} new message(s) to state.`);
           set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
-          console.log('[DEBUG] submitMessage (existing session): after adding user message. New message count:', get().messages.length);
         }
         
-        // Navigate after the first message if it's a new session
-        if (isNewSession && navigate && sessionId) {
-            console.log(`[DEBUG] submitMessage (new session): Navigating to /chat/${sessionId}`);
-            void navigate(`/chat/${sessionId}`, { replace: true });
-        }
-
         const messagesToSubmit = messagesToRegenerate || get().messages;
-        console.log('[DEBUG] submitMessage: messagesToSubmit count:', messagesToSubmit.length, 'Content:', JSON.stringify(messagesToSubmit.map(m => m.content)));
+        console.debug(`[STORE|submitMessage] Submitting ${String(messagesToSubmit.length)} messages to API.`);
         set({ isStreaming: true, error: null });
 
         const controller = new AbortController();
@@ -468,13 +473,10 @@ export const useAppStore = create<AppState>()(
                   messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
               }));
             }
-            console.log('[DEBUG] submitMessage: Assistant placeholder added. Total messages:', get().messages.length);
-
-            console.log('[DEBUG] submitMessage: Entering stream processing loop...');
+            console.debug('[STORE|submitMessage] Entering stream processing loop...');
             let finalChunk: ChatCompletionChunk | undefined;
             for await (const chunk of stream) {
                 finalChunk = chunk;
-                console.log('[DEBUG] submitMessage: Received stream chunk.');
                 if (controller.signal.aborted) {
                   stream.controller.abort();
                   break;
@@ -482,7 +484,7 @@ export const useAppStore = create<AppState>()(
                 const contentChunk = chunk.choices[0]?.delta?.content || '';
                  set((state) => {
                     if (state.messages.length === 0 || state.messages[state.messages.length - 1].role !== 'assistant') {
-                        console.log('[DEBUG] submitMessage stream: bailing out, no assistant message found at the end.');
+                        console.warn('[STORE|submitMessage] Stream update skipped: no assistant message found at the end of the message array.');
                         return state;
                     }
                     const lastMessage = state.messages[state.messages.length - 1];
@@ -492,8 +494,7 @@ export const useAppStore = create<AppState>()(
             }
             
             if (finalChunk?.usage) {
-              console.log('[DEBUG] submitMessage: Final stream chunk:', finalChunk);
-              console.log('[DEBUG] submitMessage: Usage data:', finalChunk.usage);
+              console.debug('[STORE|submitMessage] Usage data received:', finalChunk.usage);
               const { prompt_tokens, completion_tokens } = finalChunk.usage;
               const { cachedModels, modelName } = get();
               const modelInfo = cachedModels.find(m => m.id === modelName);
@@ -522,12 +523,19 @@ export const useAppStore = create<AppState>()(
             }
 
             // --- Finalization logic moved from finally block ---
-            console.log('[DEBUG] submitMessage stream finished. isStreaming:', get().isStreaming);
+            console.debug('[STORE|submitMessage] Stream finished.');
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
-            const sessionId = get().currentSessionId;
-            if (sessionId) {
-                const currentSession = await loadSession(sessionId);
+
+            // Navigate after saving if it was a new session
+            if (isNewSession && navigate && sessionId) {
+              console.debug(`[STORE|submitMessage] New session, navigating to /chat/${sessionId}`);
+              void navigate(`/chat/${sessionId}`, { replace: true });
+            }
+
+            const currentId = get().currentSessionId;
+            if (currentId) {
+                const currentSession = await loadSession(currentId);
                 if (currentSession) {
                     const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
                     set({ prevSessionId: prevId, nextSessionId: nextId });
@@ -536,7 +544,6 @@ export const useAppStore = create<AppState>()(
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(error);
-            console.log(`[DEBUG] submitMessage error: ${error}`);
             // Remove the placeholder assistant message on error
             set(state => ({ messages: state.messages.filter(m => m.role !== 'assistant' || m.content !== '') }));
              // Also need to reset streaming state on error
@@ -545,7 +552,7 @@ export const useAppStore = create<AppState>()(
       },
 
       regenerateMessage: async (index) => {
-        console.log(`[DEBUG] regenerateMessage called for index: ${String(index)}`);
+        console.debug(`[STORE|regenerateMessage] Called for index: ${String(index)}`);
         const { messages, systemPrompts } = get();
         const messagesToRegenerate = [...messages.slice(0, index)]; // Create a mutable copy
 
@@ -557,12 +564,10 @@ export const useAppStore = create<AppState>()(
 
           // If the prompt still exists and its content has changed, update the message
           if (latestPrompt && latestPrompt.prompt !== systemMessage.content) {
-            console.log(`[DEBUG] Found updated prompt "${latestPrompt.name}". Updating content for regeneration.`);
+            console.debug(`[STORE|regenerateMessage] Found updated prompt "${latestPrompt.name}". Updating content for regeneration.`);
             messagesToRegenerate[systemMessageIndex] = { ...systemMessage, content: latestPrompt.prompt };
           }
         }
-
-        console.log('[DEBUG] regenerateMessage: messagesToRegenerate (after update)', JSON.stringify(messagesToRegenerate.map(m => m.content)));
         
         const lastUserMessage = [...messagesToRegenerate].reverse().find((m) => m.role === 'user');
         
@@ -590,6 +595,21 @@ export const useAppStore = create<AppState>()(
 
       toggleAutoScroll: () => set((state) => ({ autoScrollEnabled: !state.autoScrollEnabled })),
 
+      init: () => {
+        console.debug('[STORE|init] Starting application initialization.');
+        Promise.all([get().loadSystemPrompts(), get().fetchModelList()])
+          .then(() => {
+            console.debug('[STORE|init] System prompts and model list loaded successfully.');
+            set({ isInitializing: false });
+          })
+          .catch((error: unknown) => {
+            console.error('[STORE|init] Initialization failed:', error);
+            // We can still finish initializing, but show an error.
+            get().setError('Initialization failed. Some features may not be available.');
+            set({ isInitializing: false });
+          });
+      },
+
     }),
     {
       name: STORAGE_KEY,
@@ -599,17 +619,16 @@ export const useAppStore = create<AppState>()(
         if (version === 0) {
           // In this specific case, the migration from v0 to v1 requires no changes,
           // as the initial migration script already shapes the data correctly for v1.
-          // This block is here to establish the pattern for future migrations.
           const oldState = persistedState as Partial<AppState>;
           if (oldState.systemPrompts && Array.isArray(oldState.systemPrompts)) {
-            console.log('[Migration] Migrating system prompts from localStorage to IndexedDB...');
+            console.debug('[Migration] Migrating system prompts from localStorage to IndexedDB...');
             try {
               const promptsToMigrate = oldState.systemPrompts;
               for (const prompt of promptsToMigrate) {
                 // This will overwrite existing prompts with the same name if any.
                 await saveSystemPrompt(prompt);
               }
-              console.log(`[Migration] Successfully migrated ${String(promptsToMigrate.length)} prompts.`);
+              console.debug(`[Migration] Successfully migrated ${String(promptsToMigrate.length)} prompts.`);
               // We don't need to remove systemPrompts from oldState because
               // the `partialize` function below will prevent it from being
               // re-persisted into localStorage on the next save.

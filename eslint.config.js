@@ -3,12 +3,12 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
-import { globalIgnores } from 'eslint/config'
 
 export default tseslint.config(
-  globalIgnores(['dist']),
   {
-    ignores: ['eslint.config.js'],
+    // By default, ESLint ignored `node_modules` and files/folders starting with a dot.
+    // We add `dist` to that list.
+    ignores: ['dist', 'eslint.config.js'],
   },
   {
     // Source files (React/Browser environment)

@@ -1,105 +1,64 @@
-import { test, expect, MOCK_MODELS_RESPONSE } from './fixtures';
+import { test } from './fixtures';
+import { ChatPage } from './pom/ChatPage';
+import type { ChatSession } from '../src/types/chat';
+import { expect, mockGlobalApis, seedIndexedDB, seedLocalStorage, OPENROUTER_API_KEY } from './test-helpers';
 
 test.describe('Chat Session Navigation', () => {
-  const sessions = [
-    {
-      session_id: 'session-old',
-      messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
-      created_at_ms: 1000,
-      updated_at_ms: 1000,
-      prompt_name: null,
-    },
-    {
-      session_id: 'session-middle',
-      messages: [{ id: 'msg2', role: 'user', content: 'Middle message' }],
-      created_at_ms: 2000,
-      updated_at_ms: 2000,
-      prompt_name: null,
-    },
-    {
-      session_id: 'session-new',
-      messages: [{ id: 'msg3', role: 'user', content: 'New message' }],
-      created_at_ms: 3000,
-      updated_at_ms: 3000,
-      prompt_name: null,
-    },
-  ];
 
-  test.beforeEach(async ({ context, page }) => {
-    // Seed the IndexedDB with mock session data
-    await context.addInitScript((mockSessions) => {
-      return new Promise((resolve) => {
-        const request = indexedDB.open('tomatic_chat_db', 2);
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains('chat_sessions')) {
-            const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
-            store.createIndex('updated_at_ms', 'updated_at_ms');
-          }
-          if (!db.objectStoreNames.contains('system_prompts')) {
-            db.createObjectStore('system_prompts', { keyPath: 'name' });
-          }
-        };
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          const tx = db.transaction('chat_sessions', 'readwrite');
-          const store = tx.objectStore('chat_sessions');
-          mockSessions.forEach((session) => store.put(session));
-          tx.oncomplete = () => {
-            db.close();
-            resolve(undefined);
-          };
-        };
-      });
-    }, sessions);
-
-    // Mock the models API to prevent network errors
-    await page.route('https://openrouter.ai/api/v1/models', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_MODELS_RESPONSE),
-      });
-    });
-
-    // Go to the newest session to start the test
-    await page.goto('http://localhost:5173/chat/session-new');
+  test.beforeEach(async ({ context }) => {
+    await mockGlobalApis(context);
   });
+  test('navigates between sessions and disables buttons at boundaries', async ({ context, page }) => {
+    // 1. Define Mock Data
+    const sessions: ChatSession[] = [
+      {
+        session_id: 'session-old',
+        messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
+        created_at_ms: 1000,
+        updated_at_ms: 1000,
+      },
+      {
+        session_id: 'session-middle',
+        messages: [{ id: 'msg2', role: 'user', content: 'Middle message' }],
+        created_at_ms: 2000,
+        updated_at_ms: 2000,
+      },
+      {
+        session_id: 'session-new',
+        messages: [{ id: 'msg3', role: 'user', content: 'New message' }],
+        created_at_ms: 3000,
+        updated_at_ms: 3000,
+      },
+    ];
 
-  test('navigates between sessions and disables buttons at boundaries', async ({ page }) => {
-    // 1. On the newest session
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/New message/);
+    // 2. Setup Test State
+    await seedLocalStorage(context, { 'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 } });
+    await seedIndexedDB(context, { chat_sessions: sessions });
 
-    // 2. Navigate to the middle session
-    await page.getByRole('button', { name: 'Prev' }).click();
-    await page.waitForURL('**/chat/session-middle');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Middle message/);
+    // 3. Navigate to the newest session
+    await page.goto('/chat/session-new');
+    const chatPage = new ChatPage(page);
+    await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
+    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+    await chatPage.expectMessage(0, 'user', /New message/);
 
-    // 3. Navigate to the oldest session
-    await page.getByRole('button', { name: 'Prev' }).click();
-    await page.waitForURL('**/chat/session-old');
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeDisabled();
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Old message/);
+    // 4. Navigate to the middle session
+    await chatPage.navigation.goToPrevSession();
+    await chatPage.page.waitForURL('**/chat/session-middle');
+    await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
+    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+    await chatPage.expectMessage(0, 'user', /Middle message/);
 
-    // 4. Navigate back to the middle session
-    await page.getByRole('button', { name: 'Next' }).click();
-    await page.waitForURL('**/chat/session-middle');
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/Middle message/);
-  });
+    // 5. Navigate to the oldest session
+    await chatPage.navigation.goToPrevSession();
+    await chatPage.page.waitForURL('**/chat/session-old');
+    await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
+    await expect(chatPage.navigation.prevSessionButton).toBeDisabled();
+    await chatPage.expectMessage(0, 'user', /Old message/);
 
-  test('navigates from the "new" page to the most recent session', async ({ page }) => {
-    await page.goto('http://localhost:5173/chat/new');
-
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Prev' })).toBeEnabled();
-
-    await page.getByRole('button', { name: 'Prev' }).click();
-    await page.waitForURL('**/chat/session-new');
-    await expect(page.locator('[data-testid="chat-message-0"][data-role="user"]')).toHaveText(/New message/);
+    // 6. Navigate back to the middle session
+    await chatPage.navigation.goToNextSession();
+    await chatPage.page.waitForURL('**/chat/session-middle');
+    await chatPage.expectMessage(0, 'user', /Middle message/);
   });
 });

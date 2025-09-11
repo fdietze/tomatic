@@ -10,6 +10,7 @@ import {
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
 import { useAppStore } from './store/appStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -34,10 +35,10 @@ const Header: React.FC = () => {
   return (
     <header>
       <div className="tabs">
-        <button onClick={onChat} data-active={isChatActive}>
+        <button onClick={onChat} data-active={isChatActive} data-testid="chat-button">
           Chat
         </button>
-        <button onClick={onSettings} data-active={isSettingsActive}>
+        <button onClick={onSettings} data-active={isSettingsActive} data-testid="settings-button">
           Settings
         </button>
       </div>
@@ -47,22 +48,24 @@ const Header: React.FC = () => {
 
 
 const App: React.FC = () => {
-  const loadSystemPrompts = useAppStore((state) => state.loadSystemPrompts);
+  const { isInitializing, init } = useAppStore(
+    useShallow((state) => ({
+      isInitializing: state.isInitializing,
+      init: state.init,
+    }))
+  );
 
-  // Fetch initial data on app load
   useEffect(() => {
-    // Check for stale selected prompt on startup
-    const { systemPrompts, selectedPromptName, setSelectedPromptName } = useAppStore.getState();
-    if (selectedPromptName) {
-      const isStale = !systemPrompts.some(p => p.name === selectedPromptName);
-      if (isStale) {
-        setSelectedPromptName(null);
-      }
-    }
+    console.debug('[App|useEffect] Initialization effect is running.');
+    init();
+  }, [init]);
 
-    void loadSystemPrompts();
-  }, [loadSystemPrompts]);
+  if (isInitializing) {
+    console.debug('[App|render] Rendering loading spinner.');
+    return <div className="loading-spinner">Loading...</div>;
+  }
 
+  console.debug('[App|render] Rendering main application.');
   return (
     <Router>
       <Header />

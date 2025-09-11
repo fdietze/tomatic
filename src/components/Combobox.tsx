@@ -146,6 +146,7 @@ const Combobox: React.FC<ComboboxProps> = ({
       {label && <label className="combobox-label">{label}</label>}
       <div className="combobox-input-wrapper">
         <input
+          data-testid="model-combobox-input"
           ref={inputRef}
           type="text"
           value={searchQuery}
@@ -171,6 +172,7 @@ const Combobox: React.FC<ComboboxProps> = ({
               {filteredItems.map((item, index) => (
                 <li
                   key={item.id}
+                  data-testid={`model-combobox-item-${item.id}`}
                   className={`combobox-item ${index === highlightedIndex ? 'combobox-item-highlighted' : ''}`}
                   onClick={() => { handleSelectItem(item); }}
                   onMouseEnter={() => { setHighlightedIndex(index); }}

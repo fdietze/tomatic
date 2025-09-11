@@ -1,121 +1,86 @@
-import { test, expect, createStreamResponse } from './fixtures';
-import type { ChatSession, Message } from '@/types/chat';
-import type { SystemPrompt } from '@/types/storage';
-import type { Buffer } from 'buffer';
-
-const MOCK_PROMPTS: SystemPrompt[] = [
-  { name: 'Chef', prompt: 'You are a master chef.' },
-  { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
-];
-
-const SESSION_WITH_PROMPT: ChatSession = {
-  session_id: 'session-with-prompt',
-  messages: [
-    { id: 'msg1', role: 'system', content: 'You are a master chef.', prompt_name: 'Chef' },
-    { id: 'msg2', role: 'user', content: 'Hello chef' },
-    { id: 'msg3', role: 'assistant', content: 'Hello there!', model_name: 'openai/gpt-4o' },
-  ],
-  created_at_ms: 1000,
-  updated_at_ms: 1000,
-};
+import { test } from './fixtures';
+import type { ChatSession } from '@/types/chat';
+import type { SystemPrompt } from '../src/types/storage';
+import { ChatCompletionMocker } from './test-helpers';
+import { ChatPage } from './pom/ChatPage';
+import { SettingsPage } from './pom/SettingsPage';
+import { mockGlobalApis, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
 
 test.describe('System Prompt Interaction', () => {
-  test('uses the updated system prompt when regenerating a response', async ({
-    page,
-    context,
-  }) => {
-    // 1. Seed the database and local storage
-    await context.addInitScript(
-      ({ session, prompts }) => {
-        // This script runs on every navigation. We only want to seed data once.
-        if ((window as { hasBeenSeeded?: boolean }).hasBeenSeeded) return;
-        (window as { hasBeenSeeded?: boolean }).hasBeenSeeded = true;
 
-        // Seed localStorage with OLD format for migration testing
-        const persistedState = {
-          state: { 
-            systemPrompts: prompts, 
-            apiKey: 'TEST_API_KEY' 
-          },
-          version: 0, // Trigger migration
-        };
-        window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+  test.beforeEach(async ({ context }) => {
+    await mockGlobalApis(context);
+  });
+   test('uses the updated system prompt when regenerating a response', async ({ context, page }) => {
+    // 1. Define Mock Data
+    const MOCK_PROMPTS: SystemPrompt[] = [
+      { name: 'Chef', prompt: 'You are a master chef.' },
+      { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
+    ];
+    const SESSION_WITH_PROMPT: ChatSession = {
+      session_id: 'session-with-prompt',
+      messages: [
+        { id: 'msg1', role: 'system', content: 'You are a master chef.', prompt_name: 'Chef' },
+        { id: 'msg2', role: 'user', content: 'Hello chef' },
+        { id: 'msg3', role: 'assistant', content: 'Hello there!', model_name: 'openai/gpt-4o' },
+      ],
+      created_at_ms: 1000,
+      updated_at_ms: 1000,
+    };
 
-        // Seed IndexedDB
-        return new Promise((resolve) => {
-          const request = indexedDB.open('tomatic_chat_db', 2);
-          request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains('chat_sessions')) {
-              const store = db.createObjectStore('chat_sessions', { keyPath: 'session_id' });
-              store.createIndex('updated_at_ms', 'updated_at_ms');
-            }
-            if (!db.objectStoreNames.contains('system_prompts')) {
-              db.createObjectStore('system_prompts', { keyPath: 'name' });
-            }
-          };
-          request.onsuccess = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            const tx = db.transaction('chat_sessions', 'readwrite');
-            tx.objectStore('chat_sessions').put(session);
-            tx.oncomplete = () => {
-              db.close();
-              resolve(undefined);
-            };
-          };
-        });
+    // 2. Seed Data and Mock APIs
+    await seedLocalStorage(context, {
+      'tomatic-storage': {
+        state: { apiKey: OPENROUTER_API_KEY, systemPrompts: MOCK_PROMPTS, selectedModelId: 'google/gemini-2.5-pro' },
+        version: 0,
       },
-      { session: SESSION_WITH_PROMPT, prompts: MOCK_PROMPTS }
-    );
+    });
+    await seedIndexedDB(context, { chat_sessions: [SESSION_WITH_PROMPT] });
+    const chatMocker = new ChatCompletionMocker(page);
+    await chatMocker.setup();
 
-    // 2. Navigate to the chat page
-    await page.goto(`http://localhost:5173/chat/${SESSION_WITH_PROMPT.session_id}`);
-    await expect(page.locator('[data-role="system"] .chat-message-content')).toHaveText(
-      /You are a master chef/
-    );
+    // 3. Navigate and create POMs
+    await page.goto(`/chat/${SESSION_WITH_PROMPT.session_id}`);
+    const chatPage = new ChatPage(page);
+    const settingsPage = new SettingsPage(page);
 
-    // 3. Go to settings and edit the prompt
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await page.waitForURL('**/settings');
-    const chefPrompt = page.getByTestId('system-prompt-item-Chef');
-    await chefPrompt.getByTestId('system-prompt-edit-button').click();
-    await page
-      .getByTestId('system-prompt-prompt-input')
-      .fill('You are a world-renowned French chef.');
-    await page.getByTestId('system-prompt-save-button').click();
+    // 4. Verify initial state
+    await chatPage.expectMessage(0, 'system', /You are a master chef/);
 
-    // 4. Go back to the chat
-    await page.getByRole('button', { name: 'Chat' }).click();
-    await page.waitForURL(`**/chat/${SESSION_WITH_PROMPT.session_id}`);
+    // 5. Go to settings and edit the prompt
+    await chatPage.navigation.goToSettings();
+    await settingsPage.startEditing('Chef');
+    await settingsPage.fillPromptForm('Chef', 'You are a world-renowned French chef.');
+    await settingsPage.savePrompt();
+
+    // 6. Go back to the chat
+    await settingsPage.navigation.goBackToChat();
+    await page.waitForURL(`**/chat/session-with-prompt`);
 
     // The display should still show the *old* prompt for historical accuracy
-    await expect(page.locator('[data-role="system"] .chat-message-content')).toHaveText(
-      /You are a master chef/
-    );
+    await chatPage.expectMessage(0, 'system', /You are a master chef/);
 
-    // 5. Intercept the next API call and regenerate
-    let sentMessages: Message[] = [];
-    await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-      const requestBody = (await route.request().postDataJSON()) as { messages: Message[] };
-      sentMessages = requestBody.messages;
-      const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Bonjour!');
-      await route.fulfill({ status: 200, body: responseBody });
+    // 7. Mock the regeneration API call with the *new* system prompt
+    chatMocker.mock({
+      request: {
+         model: 'openai/gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a world-renowned French chef.' },
+          { role: 'user', content: 'Hello chef' },
+        ],
+      },
+      response: { role: 'assistant', content: 'Bonjour!' },
     });
 
-    // Start waiting for the response BEFORE clicking the button
+    // 8. Start waiting for the response BEFORE clicking the button
     const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
-    await page.locator('[data-testid="chat-message-2"] button:has-text("regenerate")').click();
+    await chatPage.regenerateMessage(2);
     await responsePromise;
 
-    // 6. Assert that the messages sent to the API contained the UPDATED prompt
-    expect(sentMessages.length).toBe(2); // Should be [system, user]
-    const systemMessage = sentMessages.find((m) => m.role === 'system');
-    expect(systemMessage).toBeDefined();
-    expect(systemMessage.content).toBe('You are a world-renowned French chef.');
+    // 9. Assert the UI now shows the new response
+    await chatPage.expectMessage(2, 'assistant', /Bonjour!/);
 
-    // 7. Assert the UI now shows the new response
-    await expect(
-      page.locator('[data-testid="chat-message-2"] .chat-message-content')
-    ).toHaveText(/Bonjour!/);
+    // 10. Verify all mocks were consumed
+    chatMocker.verifyComplete();
   });
 });

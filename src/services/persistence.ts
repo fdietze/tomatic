@@ -63,68 +63,64 @@ interface TomaticDB extends DBSchema {
 
 // --- Database Interaction Functions ---
 
-async function getDb() {
-  return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion, _newVersion, tx) {
-      if (oldVersion < 2) {
-        console.log('[DB] Upgrading database from version 1 to 2...');
-        // Create sessions store
-        if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
-          const store = db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
-          store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
-        }
+const dbPromise = openDB<TomaticDB>(DB_NAME, DB_VERSION, {
+  upgrade(db, oldVersion, _newVersion, tx) {
+    if (oldVersion < 2) {
+      console.log('[DB] Upgrading database from version 1 to 2...');
+      // Create sessions store
+      if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
+        const store = db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
+        store.createIndex(UPDATED_AT_INDEX, 'updated_at_ms');
+      }
 
-        // Create system prompts store
-        if (!db.objectStoreNames.contains(SYSTEM_PROMPTS_STORE_NAME)) {
-          db.createObjectStore(SYSTEM_PROMPTS_STORE_NAME, { keyPath: PROMPT_NAME_KEY_PATH });
+      // Create system prompts store
+      if (!db.objectStoreNames.contains(SYSTEM_PROMPTS_STORE_NAME)) {
+        db.createObjectStore(SYSTEM_PROMPTS_STORE_NAME, { keyPath: PROMPT_NAME_KEY_PATH });
+      }
+      
+      // Migrate data
+      void (tx.objectStore(SESSIONS_STORE_NAME).openCursor()).then(function migrate(cursor) {
+        if (!cursor) {
+          console.log('[DB] Migration complete.');
+          return;
         }
         
-        // Migrate data
-        void (tx.objectStore(SESSIONS_STORE_NAME).openCursor()).then(function migrate(cursor) {
-          if (!cursor) {
-            console.log('[DB] Migration complete.');
-            return;
-          }
-          
-          const oldSession = cursor.value;
+        const oldSession = cursor.value;
 
-          // V2 introduces optional `name` on sessions and required `id` and optional `prompt_name` on messages
-          const newSession: ChatSession = {
-            ...oldSession,
-            name: oldSession.name || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            messages: (oldSession.messages as any[]).map((m: V1Message) => {
-              const newMessage: Message = {
-                ...m,
-                id: m.id || uuidv4(),
-                prompt_name: m.prompt_name || null,
-              };
-              return newMessage;
-            }),
-          };
-          
-          void cursor.update(newSession);
-          void cursor.continue().then(migrate);
-        });
-      }
-    },
-  });
-}
+        // V2 introduces optional `name` on sessions and required `id` and optional `prompt_name` on messages
+        const newSession: ChatSession = {
+          ...oldSession,
+          name: oldSession.name || null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          messages: (oldSession.messages as any[]).map((m: V1Message) => {
+            const newMessage: Message = {
+              ...m,
+              id: m.id || uuidv4(),
+              prompt_name: m.prompt_name || null,
+            };
+            return newMessage;
+          }),
+        };
+        
+        void cursor.update(newSession);
+        void cursor.continue().then(migrate);
+      });
+    }
+  },
+});
 
 export async function saveSession(session: ChatSession): Promise<void> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     await db.put(SESSIONS_STORE_NAME, session);
   } catch (error) {
     console.error('[DB] Save: Failed to save session:', error);
     throw new Error('Failed to save session.');
-  } finally {
-    db.close();
   }
 }
 
 export async function loadSession(sessionId: string): Promise<ChatSession | null> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     const result = await db.get(SESSIONS_STORE_NAME, sessionId);
     if (!result) {
@@ -143,15 +139,13 @@ export async function loadSession(sessionId: string): Promise<ChatSession | null
   } catch (error) {
     console.error(`[DB] Load: Failed to load session '${sessionId}':`, error);
     throw new Error('Failed to load session.');
-  } finally {
-    db.close();
   }
 }
 
 export async function findNeighbourSessionIds(
   currentSession: ChatSession,
 ): Promise<{ prevId: string | null; nextId: string | null }> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     const tx = db.transaction(SESSIONS_STORE_NAME, 'readonly');
     const store = tx.store;
@@ -180,13 +174,11 @@ export async function findNeighbourSessionIds(
       error,
     );
     return { prevId: null, nextId: null };
-  } finally {
-    db.close();
   }
 }
 
 export async function getMostRecentSessionId(): Promise<string | null> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     const cursor = await db
       .transaction(SESSIONS_STORE_NAME, 'readonly')
@@ -197,20 +189,16 @@ export async function getMostRecentSessionId(): Promise<string | null> {
   } catch (error) {
     console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
     return null;
-  } finally {
-    db.close();
   }
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     await db.delete(SESSIONS_STORE_NAME, sessionId);
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete session '${sessionId}':`, error);
     throw new Error('Failed to delete session.');
-  } finally {
-    db.close();
   }
 }
 
@@ -218,19 +206,17 @@ export async function deleteSession(sessionId: string): Promise<void> {
 // --- System Prompt CRUD ---
 
 export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     await db.put(SYSTEM_PROMPTS_STORE_NAME, prompt);
   } catch (error) {
     console.error('[DB] Save: Failed to save system prompt:', error);
     throw new Error('Failed to save system prompt.');
-  } finally {
-    db.close();
   }
 }
 
 export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
     // Validate each prompt
@@ -244,19 +230,15 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
   } catch (error) {
     console.error('[DB] Load: Failed to load system prompts:', error);
     throw new Error('Failed to load system prompts.');
-  } finally {
-    db.close();
   }
 }
 
 export async function deleteSystemPrompt(promptName: string): Promise<void> {
-  const db = await getDb();
+  const db = await dbPromise;
   try {
     await db.delete(SYSTEM_PROMPTS_STORE_NAME, promptName);
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete system prompt '${promptName}':`, error);
     throw new Error('Failed to delete system prompt.');
-  } finally {
-    db.close();
   }
 }

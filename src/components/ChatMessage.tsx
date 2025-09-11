@@ -81,14 +81,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const renderButtons = () => {
     if (message.role === 'assistant') {
       return (
-        <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }}>
+        <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }} data-testid="regenerate-button">
           regenerate
         </button>
       );
     }
     if (message.role === 'user') {
       return (
-        <button data-size="compact" onClick={() => { setIsEditing(!isEditing); }}>
+        <button data-size="compact" onClick={() => { setIsEditing(!isEditing); }} data-testid="edit-button">
           edit
         </button>
       );
@@ -114,6 +114,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {isEditing ? (
           <>
             <textarea
+              data-testid="edit-textarea"
               style={{ width: '100%' }}
               value={editInput}
               onInput={(e) => { setEditInput(e.currentTarget.value); }}
@@ -123,6 +124,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               <button
                 data-role="secondary"
                 style={{ marginLeft: 'auto' }}
+                data-testid="discard-edit-button"
                 onClick={() => {
                   setEditInput(message.content);
                   setIsEditing(false);
@@ -130,7 +132,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               >
                 Discard
               </button>
-              <button onClick={handleResubmit}>Re-submit</button>
+              <button onClick={handleResubmit} data-testid="resubmit-button">Re-submit</button>
             </div>
           </>
         ) : (
