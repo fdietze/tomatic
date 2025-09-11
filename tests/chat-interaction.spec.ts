@@ -1,13 +1,19 @@
-import { test, expect, createStreamResponse, mockApis } from './fixtures';
+
+import { test } from './fixtures';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
+import { createStreamResponse, expect, OPENROUTER_API_KEY, seedLocalStorage } from "./test-helpers";
 
 interface ChatRequestBody {
   model: string;
 }
 
-test('sends a message and sees the response', async ({ newChatPage, page }) => {
-  const chatPage: ChatPage = newChatPage;
+test('sends a message and sees the response', async ({ context, page }) => {
+  await seedLocalStorage(context, {
+    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+  });
+  const chatPage = new ChatPage(page);
+  await chatPage.gotoNewChat();
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Hello!');
@@ -34,8 +40,12 @@ test('sends a message and sees the response', async ({ newChatPage, page }) => {
   await chatPage.expectMessage(3, 'assistant', /Hello!/);
 });
 
-test('can select a model and get a model-specific response', async ({ newChatPage, page }) => {
-  const chatPage: ChatPage = newChatPage;
+test('can select a model and get a model-specific response', async ({ context, page }) => {
+  await seedLocalStorage(context, {
+    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+  });
+  const chatPage = new ChatPage(page);
+  await chatPage.gotoNewChat();
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const requestBody = (await route.request().postDataJSON()) as ChatRequestBody;
@@ -72,8 +82,12 @@ test('can select a model and get a model-specific response', async ({ newChatPag
   ).toHaveText('assistant (mock-model/mock-model)');
 });
 
-test('can regenerate an assistant response', async ({ newChatPage, page }) => {
-  const chatPage: ChatPage = newChatPage;
+test('can regenerate an assistant response', async ({ context, page }) => {
+  await seedLocalStorage(context, {
+    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+  });
+  const chatPage = new ChatPage(page);
+  await chatPage.gotoNewChat();
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
@@ -111,33 +125,32 @@ test('can regenerate an assistant response', async ({ newChatPage, page }) => {
 test('shows system prompt immediately in a new chat', async ({ page, context }) => {
   const chatPage = new ChatPage(page);
 
-  // This test has a unique setup and cannot use the standard fixtures.
-  // 1. Mock APIs first
-  await mockApis(context);
-
-  // 2. Seed localStorage with a selected system prompt via an init script
-  await page.addInitScript(() => {
-    const persistedState = {
+  // 1. Setup State and Mock APIs
+  await seedLocalStorage(context, {
+    'tomatic-storage': {
       state: {
+        apiKey: OPENROUTER_API_KEY,
         systemPrompts: [{ name: 'TestPrompt', prompt: 'You are a test bot.' }],
-        apiKey: 'TEST_API_KEY',
         selectedPromptName: 'TestPrompt',
       },
       version: 0,
-    };
-    window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
+    },
   });
 
-  // 3. Go to an arbitrary page and then create a new chat to ensure the init script is applied.
+  // 2. Navigate
   await page.goto('/settings');
   await chatPage.navigation.goToNewChat();
 
-  // 4. Assert that the system message is immediately visible
+  // 3. Assert
   await chatPage.expectMessage(0, 'system', /You are a test bot/);
 });
 
-test('can edit a user message and resubmit', async ({ newChatPage, page }) => {
-  const chatPage: ChatPage = newChatPage;
+test('can edit a user message and resubmit', async ({ context, page }) => {
+  await seedLocalStorage(context, {
+    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+  });
+  const chatPage = new ChatPage(page);
+  await chatPage.gotoNewChat();
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
@@ -171,8 +184,12 @@ test('can edit a user message and resubmit', async ({ newChatPage, page }) => {
   await chatPage.expectMessageCount(2);
 });
 
-test('can edit a user message and discard changes', async ({ newChatPage, page }) => {
-  const chatPage: ChatPage = newChatPage;
+test('can edit a user message and discard changes', async ({ context, page }) => {
+  await seedLocalStorage(context, {
+    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+  });
+  const chatPage = new ChatPage(page);
+  await chatPage.gotoNewChat();
 
   // 1. Send an initial message and get a response
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
