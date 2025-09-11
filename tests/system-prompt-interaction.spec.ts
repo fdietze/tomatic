@@ -2,6 +2,7 @@ import { test, expect, createStreamResponse, mockApis, seedChatSessions } from '
 import type { ChatSession, Message } from '@/types/chat';
 import type { SystemPrompt } from '@/types/storage';
 import type { Buffer } from 'buffer';
+import { NavigationComponent } from './pom/NavigationComponent';
 
 const MOCK_PROMPTS: SystemPrompt[] = [
   { name: 'Chef', prompt: 'You are a master chef.' },
@@ -46,14 +47,15 @@ test.describe('System Prompt Interaction', () => {
   });
 
   test('uses the updated system prompt when regenerating a response', async ({ page }) => {
+    const navigation = new NavigationComponent(page);
+
     // 1. Verify initial state
     await expect(page.locator('[data-role="system"] .chat-message-content')).toHaveText(
       /You are a master chef/
     );
 
     // 2. Go to settings and edit the prompt
-    await page.getByTestId('settings-button').click();
-    await page.waitForURL('**/settings');
+    await navigation.goToSettings();
     const chefPrompt = page.getByTestId('system-prompt-item-Chef');
     await chefPrompt.getByTestId('system-prompt-edit-button').click();
     await page
@@ -62,7 +64,7 @@ test.describe('System Prompt Interaction', () => {
     await page.getByTestId('system-prompt-save-button').click();
 
     // 3. Go back to the chat
-    await page.getByTestId('chat-button').click();
+    await navigation.goBackToChat();
     await page.waitForURL(`**/chat/${SESSION_WITH_PROMPT.session_id}`);
 
     // The display should still show the *old* prompt for historical accuracy

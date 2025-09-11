@@ -1,5 +1,6 @@
 import { type Page, type Locator, expect } from '@playwright/test';
 import { ModelComboboxPage } from './ModelComboboxPage';
+import { NavigationComponent } from './NavigationComponent';
 
 /**
  * Page Object Model for the main chat interface.
@@ -11,11 +12,13 @@ export class ChatPage {
   readonly chatInput: Locator;
   readonly chatSubmitButton: Locator;
   readonly modelCombobox: ModelComboboxPage;
+  readonly navigation: NavigationComponent;
 
   constructor(public readonly page: Page) {
     this.chatInput = page.getByTestId('chat-input');
     this.chatSubmitButton = page.getByTestId('chat-submit');
     this.modelCombobox = new ModelComboboxPage(page);
+    this.navigation = new NavigationComponent(page);
   }
 
   // --- Actions ---

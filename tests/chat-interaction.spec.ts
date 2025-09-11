@@ -1,6 +1,7 @@
 import { test, expect, createStreamResponse, mockApis } from './fixtures';
 import type { Buffer } from 'buffer';
 import { ChatPage } from './pom/ChatPage';
+import { NavigationComponent } from './pom/NavigationComponent';
 
 interface ChatRequestBody {
   model: string;
@@ -117,6 +118,8 @@ test('can regenerate an assistant response', async ({ page }) => {
 });
 
 test('shows system prompt immediately in a new chat', async ({ page }) => {
+  const navigation = new NavigationComponent(page);
+
   // 1. Seed localStorage with a selected system prompt
   await page.addInitScript(() => {
     const persistedState = {
@@ -141,8 +144,7 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
 
   // 3. Click the "New Chat" button to start a fresh session
   console.debug('[TEST] Clicking "New Chat" button...');
-  await page.getByTestId('chat-button').click();
-  await page.waitForURL('**/chat/new');
+  await navigation.goToNewChat();
   console.debug('[TEST] Navigation to new chat page complete.');
 
   // 4. Assert that the system message is immediately visible
