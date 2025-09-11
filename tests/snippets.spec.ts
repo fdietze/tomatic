@@ -102,11 +102,47 @@ test.describe('Generated Snippets', () => {
       response: { role: 'assistant', content: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
     });
 
-    await settingsPage.createGeneratedSnippet('joke', 'Tell me a joke', 'mock-model/mock-model');
+    await settingsPage.createGeneratedSnippet('joke', 'Tell me a joke', 'mock-model/mock-model', 'Mock Model');
 
     await settingsPage.expectSnippetToBeVisible('joke');
     await settingsPage.expectGeneratedSnippetContent('joke', /outstanding in his field/);
 
+    chatMocker.verifyComplete();
+  });
+
+  test('updates a generated snippet', async () => {
+    // 1. Mock initial creation
+    chatMocker.mock({
+      request: {
+        model: 'mock-model/mock-model',
+        messages: [{ role: 'user', content: 'Tell me a joke' }],
+      },
+      response: { role: 'assistant', content: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
+    });
+    await settingsPage.createGeneratedSnippet('joke', 'Tell me a joke', 'mock-model/mock-model', 'Mock Model');
+    await settingsPage.expectSnippetToBeVisible('joke');
+    await settingsPage.expectGeneratedSnippetContent('joke', /outstanding in his field/);
+
+    // 2. Mock the update/regeneration
+    chatMocker.mock({
+      request: {
+        model: 'mock-model/mock-model',
+        messages: [{ role: 'user', content: 'Tell me a short story' }],
+      },
+      response: { role: 'assistant', content: 'Once upon a time...' },
+    });
+
+    // 3. Perform the update
+    await settingsPage.startEditingSnippet('joke');
+    await settingsPage.fillGeneratedSnippetForm({ name: 'joke_story', prompt: 'Tell me a short story' });
+    await settingsPage.saveSnippet();
+
+    // 4. Verify the update
+    await settingsPage.expectSnippetToNotExist('joke');
+    await settingsPage.expectSnippetToBeVisible('joke_story');
+    await settingsPage.expectGeneratedSnippetContent('joke_story', /Once upon a time/);
+
+    // 5. Verify mocks
     chatMocker.verifyComplete();
   });
 });
@@ -139,7 +175,7 @@ test.describe('Generated Snippets (Error Handling)', () => {
       });
     });
 
-    await settingsPage.createGeneratedSnippet('bad_joke', 'This will fail', 'mock-model/mock-model');
+    await settingsPage.createGeneratedSnippet('bad_joke', 'This will fail', 'mock-model/mock-model', 'Mock Model');
 
     // The edit form should remain open and show an error
     await expect(settingsPage.page.getByTestId('snippet-item-edit-new')).toBeVisible();
