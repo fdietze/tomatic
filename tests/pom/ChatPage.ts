@@ -26,7 +26,7 @@ export class ChatPage {
   /**
    * Navigates to a new chat page.
    */
-  async goto() {
+  async gotoNewChat() {
      await this.page.goto('/chat/new');
   }
 
