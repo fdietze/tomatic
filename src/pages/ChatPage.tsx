@@ -17,6 +17,8 @@ const ChatPage: React.FC = () => {
     setSelectedPromptName,
     prevSessionId,
     nextSessionId,
+    error,
+    setError,
   } = useAppStore(
     useShallow((state) => ({
       loadSession: state.loadSession,
@@ -25,6 +27,8 @@ const ChatPage: React.FC = () => {
       setSelectedPromptName: state.setSelectedPromptName,
       prevSessionId: state.prevSessionId,
       nextSessionId: state.nextSessionId,
+      error: state.error,
+      setError: state.setError,
     }))
   );
 
@@ -69,6 +73,14 @@ const ChatPage: React.FC = () => {
         onPrev={onPrev}
         onNext={onNext}
       />
+      {error && (
+        <div className="error-display" data-testid="error-message">
+          <p>{error}</p>
+          <button onClick={() => { setError(null); }} className="close-button">
+            &times;
+          </button>
+        </div>
+      )}
       <ChatInterface />
     </>
   );

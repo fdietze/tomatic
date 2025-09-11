@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Snippet } from '@/types/storage';
 import { useAppStore } from '@/store/appStore';
 import { useShallow } from 'zustand/react/shallow';
+import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
 
@@ -41,6 +42,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const [nameError, setNameError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const modelItems = useMemo((): ComboboxItem[] => {
@@ -56,6 +58,38 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       nameInputRef.current?.focus();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    const errors: string[] = [];
+    const textToScan = editingIsGenerated ? editingPrompt : editingContent;
+
+    // We need a complete and up-to-date list of snippets for validation.
+    const snippetsForValidation = allSnippets.filter(s => s.name !== snippet.name);
+    snippetsForValidation.push({
+      ...snippet,
+      name: editingName.trim() || snippet.name,
+      prompt: editingPrompt,
+      isGenerated: editingIsGenerated,
+      model: editingModel,
+      content: editingContent,
+    });
+
+    // 1. Check for cyclical dependencies (hard error).
+    try {
+      validateSnippetDependencies(textToScan, snippetsForValidation);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'An unknown cycle was detected.');
+    }
+    
+    // 2. Check for non-existent snippets (warning).
+    const missingSnippets = findNonExistentSnippets(textToScan, snippetsForValidation);
+    for (const missing of missingSnippets) {
+      errors.push(`Warning: Snippet '@${missing}' not found.`);
+    }
+
+    setPromptErrors(errors);
+
+  }, [editingIsGenerated, editingPrompt, editingName, allSnippets, snippet, editingModel, editingContent]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
@@ -83,44 +117,50 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     }
   };
 
-  const validateAndSaveChanges = () => {
+  const handleSave = () => {
     const trimmedName = editingName.trim();
     if (nameError || trimmedName === '') {
         if (trimmedName === '') setNameError('Name cannot be empty.');
         return;
     }
 
-    if (editingIsGenerated) {
-      void generateContentAndSave(trimmedName);
-    } else {
-      onUpdate({
-        name: trimmedName,
-        content: editingContent,
-        isGenerated: false,
-      });
-      setIsEditing(false);
-      setNameError(null);
-    }
+    onUpdate({
+      name: trimmedName,
+      content: editingContent,
+      isGenerated: editingIsGenerated,
+      prompt: editingPrompt,
+      model: editingModel,
+    });
+    setIsEditing(false);
+    setNameError(null);
   };
 
-  const generateContentAndSave = async (name: string) => {
+  const generateAndSetContent = async () => {
     setIsGenerating(true);
     setGenerationError(null);
+
+    const snippetToGenerate: Snippet = {
+      name: editingName.trim(),
+      content: '', // This will be replaced by the generated content
+      isGenerated: true,
+      prompt: editingPrompt,
+      model: editingModel,
+    };
+
     try {
-      const snippetToGenerate: Snippet = {
-        name,
-        content: '', // This will be replaced by the generated content
-        isGenerated: true,
-        prompt: editingPrompt,
-        model: editingModel,
-      };
+      const snippetsForValidation = allSnippets.filter(s => s.name !== snippet.name);
+      snippetsForValidation.push(snippetToGenerate);
+      
+      validateSnippetDependencies(editingPrompt, snippetsForValidation);
+      const missingSnippets = findNonExistentSnippets(editingPrompt, snippetsForValidation);
+      if (missingSnippets.length > 0) {
+        throw new Error(`Snippet '@${missingSnippets[0]}' not found.`);
+      }
+      
       const updatedSnippet = await generateSnippetContent(snippetToGenerate);
-      onUpdate(updatedSnippet);
-      setIsEditing(false);
-      setNameError(null);
+      setEditingContent(updatedSnippet.content);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-       console.debug('Snippet generation failed:', message);
       setGenerationError(`Generation failed: ${message}`);
     } finally {
       setIsGenerating(false);
@@ -190,28 +230,51 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           {editingIsGenerated ? (
             <div className="generated-content-readonly" data-testid="snippet-content-display">
                 <div className="settings-label" style={{fontSize: 'var(--font-size-small)', marginTop: '10px'}}>Content (read-only)</div>
-                <Markdown markdownText={editingContent} />
+                {promptErrors.length > 0 ? (
+                  <div className="error-message" data-testid="prompt-error-message">
+                    {promptErrors.map((error, i) => <div key={i}>{error}</div>)}
+                  </div>
+                ) : (
+                  <Markdown markdownText={editingContent} />
+                )}
             </div>
           ) : (
-            <textarea
-              value={editingContent}
-              onChange={(e) => { setEditingContent(e.target.value); }}
-              placeholder="content"
-              data-testid="snippet-content-input"
-              rows={5}
-            />
+            <>
+              <textarea
+                value={editingContent}
+                onChange={(e) => { setEditingContent(e.target.value); }}
+                placeholder="content"
+                data-testid="snippet-content-input"
+                rows={5}
+              />
+              {promptErrors.length > 0 && (
+                <div className="error-message" data-testid="prompt-error-message">
+                  {promptErrors.map((error, i) => <div key={i}>{error}</div>)}
+                </div>
+              )}
+            </>
           )}
 
         </div>
         <div className="system-prompt-edit-buttons">
+          {editingIsGenerated && (
+            <button
+              onClick={() => { void generateAndSetContent(); }}
+              data-size="compact"
+              disabled={isGenerating || promptErrors.length > 0}
+              data-testid="snippet-regenerate-button"
+            >
+              {isGenerating ? 'Generating...' : 'Regenerate'}
+            </button>
+          )}
           <button
-            onClick={validateAndSaveChanges}
+            onClick={handleSave}
             data-size="compact"
             data-role="primary"
             disabled={isGenerating || (!!nameError && editingName.trim() !== '')}
             data-testid="snippet-save-button"
           >
-            {isGenerating ? 'Generating...' : 'Save'}
+            Save
           </button>
           <button
             onClick={handleCancelEditing}

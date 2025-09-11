@@ -108,7 +108,7 @@ export function createStreamResponse(model: string, content: string, role: 'assi
 
 export { expect };
 import type { ChatSession } from '../src/types/chat';
-import type { SystemPrompt } from '../src/types/storage';
+import type { Snippet, SystemPrompt } from '../src/types/storage';
 
 interface InjectedState {
   localStorage: Record<string, string>;
@@ -119,7 +119,7 @@ interface InjectedState {
       storeName: string;
       keyPath: string;
       indexes?: { name: string; keyPath: string; options?: IDBIndexParameters }[];
-      data: (ChatSession | SystemPrompt)[];
+      data: (ChatSession | SystemPrompt | Snippet)[];
     }[];
   };
 }
@@ -127,13 +127,13 @@ interface InjectedState {
 /**
  * Injects data into IndexedDB.
  */
-export async function seedIndexedDB(context: BrowserContext, data: { chat_sessions?: ChatSession[], system_prompts?: SystemPrompt[] }) {
+export async function seedIndexedDB(context: BrowserContext, data: { chat_sessions?: ChatSession[], system_prompts?: SystemPrompt[], snippets?: Snippet[] }) {
 
   const injectedState: InjectedState = {
     localStorage: {},
     indexedDB: {
       dbName: 'tomatic_chat_db',
-      version: 2,
+      version: 3,
       stores: [
         {
           storeName: 'chat_sessions',
@@ -147,6 +147,11 @@ export async function seedIndexedDB(context: BrowserContext, data: { chat_sessio
           // Data is empty here because the new implementation uses localStorage for prompts
           // and the DB store is created via migration, which we are simulating.
           data: data.system_prompts || [],
+        },
+        {
+          storeName: 'snippets',
+          keyPath: 'name',
+          data: data.snippets || [],
         },
       ],
     },

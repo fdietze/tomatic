@@ -139,6 +139,8 @@ export class SettingsPage {
     await editContainer.getByText('Generated Snippet').click();
     await this.modelCombobox.selectModel(modelName ?? modelId, modelId);
     await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
+    // With the new flow, we must regenerate then save.
+    await editContainer.getByTestId('snippet-regenerate-button').click();
     await editContainer.getByTestId('snippet-save-button').click();
   }
   // --- Helpers ---
