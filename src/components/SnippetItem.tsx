@@ -60,26 +60,37 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     }
   }, [isEditing]);
 
-  const validateAndSaveChanges = () => {
-    const trimmedName = editingName.trim();
-    if (trimmedName === '') {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setEditingName(newName);
+
+    if (newName.trim() === '') {
       setNameError('Name cannot be empty.');
       return;
     }
 
-    if (!NAME_REGEX.test(trimmedName)) {
+    if (!NAME_REGEX.test(newName)) {
       setNameError('Name can only contain alphanumeric characters and underscores.');
       return;
     }
 
     const originalName = snippet.name;
     const isDuplicate = allSnippets.some(
-      (s) => s.name.trim().toLowerCase() === trimmedName.toLowerCase() && s.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
+      (s) => s.name.trim().toLowerCase() === newName.trim().toLowerCase() && s.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
     );
 
     if (isDuplicate) {
       setNameError('A snippet with this name already exists.');
-      return;
+    } else {
+      setNameError(null);
+    }
+  };
+
+  const validateAndSaveChanges = () => {
+    const trimmedName = editingName.trim();
+    if (nameError || trimmedName === '') {
+        if (trimmedName === '') setNameError('Name cannot be empty.');
+        return;
     }
 
     if (editingIsGenerated) {
@@ -142,16 +153,9 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     }
   };
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingName(e.target.value);
-    if (nameError) {
-      setNameError(null);
-    }
-  };
-
   if (isEditing) {
     return (
-      <div className="system-prompt-item-edit"> {/* Re-using style for now */}
+      <div className="system-prompt-item-edit" data-testid={`snippet-item-edit-${snippet.name || 'new'}`}> {/* Re-using style for now */}
         <div className="system-prompt-inputs">
           <input
             ref={nameInputRef}
