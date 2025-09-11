@@ -9,7 +9,16 @@ test.describe('New Chat via Query Parameter', () => {
   }) => {
     // 1. Setup mocks and initial state
     await mockGlobalApis(context);
-    await seedLocalStorage(context, { 'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 } });
+    // Seed a selected system prompt to ensure it gets ignored by the query chat flow.
+    await seedLocalStorage(context, {
+      'tomatic-storage': {
+        state: {
+          apiKey: OPENROUTER_API_KEY,
+          selectedPromptName: 'test-prompt',
+        },
+        version: 0
+      }
+    });
 
     // Mock the chat stream response
     await context.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
@@ -29,7 +38,8 @@ test.describe('New Chat via Query Parameter', () => {
     // 3. Wait for navigation to the new session URL
     await page.waitForURL(/\/chat\/[a-f0-9-]+/);
 
-    // 4. Verify the initial user message is displayed
+    // 4. Verify that only the user and assistant messages are present (no system prompt)
+    await chatPage.expectMessageCount(2);
     await chatPage.expectMessage(0, 'user', /Hello from the test/);
 
     // 5. Verify the mocked assistant response is displayed

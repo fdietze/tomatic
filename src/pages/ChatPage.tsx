@@ -33,8 +33,9 @@ const ChatPage: React.FC = () => {
     const idToLoad = sessionIdFromUrl || 'new';
 
     const handleLoadAndSubmit = async () => {
-      // First, ensure the session is loaded or a new one is started.
-      await loadSession(idToLoad);
+      const initialPrompt = searchParams.get('q');
+      // Pass a flag to loadSession so it knows not to add a system prompt.
+      await loadSession(idToLoad, { isQueryInit: !!initialPrompt });
 
       // Only proceed if we are on a "new" session page.
       if (idToLoad === 'new') {

@@ -132,8 +132,8 @@ interface AppState {
   setError: (error: string | null) => void;
   setInitialChatPrompt: (prompt: string | null) => void;
   
-  loadSession: (sessionId: string) => Promise<void>;
-  startNewSession: () => Promise<void>;
+  loadSession: (sessionId: string, options?: { isQueryInit?: boolean }) => Promise<void>;
+  startNewSession: (options?: { isQueryInit?: boolean }) => Promise<void>;
   saveCurrentSession: () => Promise<void>;
   deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
   loadSystemPrompts: () => Promise<void>;
@@ -228,7 +228,7 @@ export const useAppStore = create<AppState>()(
 
       setInitialChatPrompt: (prompt) => set({ initialChatPrompt: prompt }),
       
-      loadSession: async (sessionId) => {
+      loadSession: async (sessionId, options) => {
         // This check MUST come first to prevent wiping state during navigation race conditions.
         if (get().currentSessionId === sessionId) {
           console.debug(`[STORE|loadSession] Session ${sessionId} is already loaded. Skipping.`);
@@ -242,7 +242,7 @@ export const useAppStore = create<AppState>()(
         set({ error: null, messages: [], currentSessionId: sessionId });
 
         if (sessionId === 'new') {
-          await get().startNewSession();
+          await get().startNewSession(options);
           return;
         }
 
@@ -276,14 +276,15 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      startNewSession: async () => {
+      startNewSession: async (options) => {
         const mostRecentId = await getMostRecentSessionId();
         const { systemPrompts, selectedPromptName } = get();
         const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
         console.debug(`[STORE|startNewSession] Starting new session. Most recent was: ${String(mostRecentId)}`);
         
         const initialMessages: Message[] = [];
-        if (systemPrompt) {
+        // Only add a system prompt if one is selected AND this is not a new chat from a query param.
+        if (systemPrompt && !options?.isQueryInit) {
           initialMessages.push({
             id: uuidv4(),
             role: 'system',

@@ -3,11 +3,11 @@
 - Where appropriate, add a new e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test.
 - automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps.
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
+- trust the type checker.
 
 # General
-- trust the type checker.
 - with every step, consider different options and their tradeoffs
-- all plans must contain those typechecking and testing steps.
+- if a variable or field name contains a quantity with a unit, like seconds, meters, etc. include that as a suffix in the name.
 - When encountering a runtime error or failed test, immediately pause before attempting a fix and formulate several specific hypotheses about the root cause. Strategically add logging to gather evidence that will either confirm or reject each hypothesis. Execute the test and analyze the log output. You must repeat this cycle—refining your hypotheses, adjusting logging, and re-running the test after each execution—until one hypothesis is conclusively proven. Only after a hypothesis is confirmed should you design and implement a robust fix. If your fix fails, treat it as a new problem: revert the change, form new hypotheses for the new failure, and restart the logging and iteration process. Once the issue is resolved, leave any lightweight and informative debug logs in the codebase, disabled by default if necessary, to expedite future debugging.
 - prefer pure functions
 - design functions and datastructures that do one thing well. Follow SRP.
@@ -21,7 +21,6 @@
 - if possible, push ifs out of functions up to the caller
 - after failed attempts, fetch docs from the internet or do a web search
 - do web searches for tricky error messages
-- if a variable or field name contains a quantity with a unit, like seconds, meters, etc. include that as a suffix in the name.
 
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 
@@ -32,3 +31,4 @@
 # Big tasks
 - bigger tasks always have specification gaps. note, which decisions you have taken to fill those gaps. be conservative and don't do anything the user didn't ask for.
 - for bigger tasks, break it down into smaller steps, that can be individually typechecked and tested, before moving on to the next step.
+- plans must contain those typechecking and testing steps.
