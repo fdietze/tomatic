@@ -9,10 +9,12 @@ import { NavigationComponent } from './NavigationComponent';
 export class SettingsPage {
   // --- Locators ---
   readonly newPromptButton: Locator;
+   readonly newSnippetButton: Locator;
   readonly navigation: NavigationComponent;
 
   constructor(public readonly page: Page) {
     this.newPromptButton = page.getByTestId('new-system-prompt-button');
+     this.newSnippetButton = page.getByTestId('new-snippet-button');
     this.navigation = new NavigationComponent(page);
   }
 
@@ -84,6 +86,35 @@ export class SettingsPage {
     await this.getPromptItem(name).getByTestId('system-prompt-edit-button').click();
   }
 
+
+  // --- Snippet Actions ---
+
+  async createNewSnippet(name: string, content: string) {
+    await this.newSnippetButton.click();
+    const editContainer = this.page.getByTestId('snippet-item-edit-new');
+    await editContainer.getByTestId('snippet-name-input').fill(name);
+    await editContainer.getByTestId('snippet-content-input').fill(content);
+    await editContainer.getByTestId('snippet-save-button').click();
+  }
+
+  async deleteSnippet(name: string) {
+    await this.getSnippetItem(name).getByTestId('snippet-delete-button').click();
+  }
+
+  async startEditingSnippet(name: string) {
+    await this.getSnippetItem(name).getByTestId('snippet-edit-button').click();
+  }
+
+  async fillSnippetForm(name: string, content: string) {
+    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
+    await editContainer.getByTestId('snippet-name-input').fill(name);
+    await editContainer.getByTestId('snippet-content-input').fill(content);
+  }
+
+  async saveSnippet() {
+    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
+    await editContainer.getByTestId('snippet-save-button').click();
+  }
   // --- Helpers ---
 
   /**
@@ -94,6 +125,10 @@ export class SettingsPage {
     return this.page.getByTestId(`system-prompt-item-${name}`);
   }
 
+
+  getSnippetItem(name: string): Locator {
+    return this.page.getByTestId(`snippet-item-${name}`);
+  }
   // --- Assertions ---
 
   /**
@@ -104,6 +139,10 @@ export class SettingsPage {
     await expect(this.getPromptItem(name)).toBeVisible();
   }
 
+  async expectSnippetToBeVisible(name: string) {
+    await expect(this.getSnippetItem(name)).toBeVisible();
+  }
+
   /**
    * Asserts that a prompt with the given name does not exist.
    * @param name The name of the prompt.
@@ -112,6 +151,9 @@ export class SettingsPage {
     await expect(this.getPromptItem(name)).not.toBeVisible();
   }
 
+  async expectSnippetToNotExist(name: string) {
+    await expect(this.getSnippetItem(name)).not.toBeVisible();
+  }
   /**
    * Asserts that a specific error message is visible.
    * @param message The exact error message text.
