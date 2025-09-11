@@ -19,7 +19,7 @@ jobs:
         run: devbox run -- npm install && devbox run -- npm run build
 
       - name: Compressed Size
-        uses: preactjs/compressed-size-action@v3
+        uses: preactjs/compressed-size-action@v2
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           build-script: 'build-dummy'
