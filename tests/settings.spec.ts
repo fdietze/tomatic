@@ -1,14 +1,18 @@
 import { test, expect, mockApis } from './fixtures';
 import type { SystemPrompt } from '../src/types/storage';
 
+import { SettingsPage } from './pom/SettingsPage';
 const MOCK_PROMPTS: SystemPrompt[] = [
   { name: 'Chef', prompt: 'You are a master chef.' },
   { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
 ];
 
 test.beforeEach(async ({ context, page }) => {
+  const settingsPage = new SettingsPage(page);
+
   // We need to mock APIs before any other action
   await mockApis(context);
+
   // Seed the OLD localStorage format to test the migration
   await page.addInitScript((prompts) => {
     const persistedState = {
@@ -20,101 +24,89 @@ test.beforeEach(async ({ context, page }) => {
     };
     window.localStorage.setItem('tomatic-storage', JSON.stringify(persistedState));
   }, MOCK_PROMPTS);
-  await page.goto('http://localhost:5173/settings');
+
+  await settingsPage.goto();
 });
 
 test.describe('System Prompt CRUD', () => {
   test('displays existing system prompts', async ({ page }) => {
-    await expect(page.getByTestId('system-prompt-item-Chef')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Chef')).toHaveText(/Chef/);
-    await expect(page.getByTestId('system-prompt-item-Pirate')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Pirate')).toHaveText(/Pirate/);
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.expectPromptToBeVisible('Chef');
+    await expect(settingsPage.getPromptItem('Chef')).toHaveText(/Chef/);
+    await settingsPage.expectPromptToBeVisible('Pirate');
+    await expect(settingsPage.getPromptItem('Pirate')).toHaveText(/Pirate/);
   });
 
   test('creates a new system prompt', async ({ page }) => {
-    await page.getByRole('button', { name: 'New' }).click();
-
-    // The new prompt item should be in edit mode
-    await expect(page.getByTestId('system-prompt-name-input')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-name-input')).toBeFocused();
-
-    // Fill and save
-    await page.getByTestId('system-prompt-name-input').fill('Wizard');
-    await page.getByTestId('system-prompt-prompt-input').fill('You are a wise wizard.');
-    await page.getByTestId('system-prompt-save-button').click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.createNewPrompt('Wizard', 'You are a wise wizard.');
 
     // Verify the new prompt is displayed
-    await expect(page.getByTestId('system-prompt-item-Wizard')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Wizard')).toHaveText(/wise wizard/);
+    await settingsPage.expectPromptToBeVisible('Wizard');
+    await expect(settingsPage.getPromptItem('Wizard')).toHaveText(/wise wizard/);
   });
 
   test('updates an existing system prompt', async ({ page }) => {
-    const promptItem = page.getByTestId('system-prompt-item-Chef');
-    await promptItem.getByTestId('system-prompt-edit-button').click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.startEditing('Chef');
 
-    // Edit the fields
-    await page.getByTestId('system-prompt-name-input').fill('Master Chef');
-    await page
-      .getByTestId('system-prompt-prompt-input')
-      .fill('You are the greatest chef in the world.');
-    await page.getByTestId('system-prompt-save-button').click();
+    // Edit the fields and save
+    await settingsPage.fillPromptForm('Master Chef', 'You are the greatest chef in the world.');
+    await settingsPage.savePrompt();
 
     // Verify the update
-    await expect(page.getByTestId('system-prompt-item-Chef')).not.toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Master Chef')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Master Chef')).toHaveText(
-      /greatest chef/
-    );
+    await settingsPage.expectPromptToNotExist('Chef');
+    await settingsPage.expectPromptToBeVisible('Master Chef');
+    await expect(settingsPage.getPromptItem('Master Chef')).toHaveText(/greatest chef/);
   });
 
   test('deletes a system prompt', async ({ page }) => {
-    await expect(page.getByTestId('system-prompt-item-Pirate')).toBeVisible();
-    const promptItem = page.getByTestId('system-prompt-item-Pirate');
-    await promptItem.getByTestId('system-prompt-delete-button').click();
-
-    await expect(page.getByTestId('system-prompt-item-Pirate')).not.toBeVisible();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.expectPromptToBeVisible('Pirate');
+    await settingsPage.deletePrompt('Pirate');
+    await settingsPage.expectPromptToNotExist('Pirate');
   });
 
   test('cancels creating a new prompt', async ({ page }) => {
-    await page.getByRole('button', { name: 'New' }).click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.startCreating();
     await expect(page.getByTestId('system-prompt-name-input')).toBeVisible();
-    await page.getByTestId('system-prompt-cancel-button').click();
+    await settingsPage.cancelEditing();
     await expect(page.getByTestId('system-prompt-name-input')).not.toBeVisible();
   });
 
   test('cancels editing a prompt', async ({ page }) => {
-    const promptItem = page.getByTestId('system-prompt-item-Chef');
-    await promptItem.getByTestId('system-prompt-edit-button').click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.startEditing('Chef');
 
-    await page.getByTestId('system-prompt-name-input').fill('Baker');
-    await page.getByTestId('system-prompt-cancel-button').click();
+    await settingsPage.fillPromptForm('Baker', 'ignored');
+    await settingsPage.cancelEditing();
 
     // The original prompt should still be there, unchanged
-    await expect(page.getByTestId('system-prompt-item-Baker')).not.toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Chef')).toBeVisible();
-    await expect(page.getByTestId('system-prompt-item-Chef')).toHaveText(/master chef/);
+    await settingsPage.expectPromptToNotExist('Baker');
+    await settingsPage.expectPromptToBeVisible('Chef');
+    await expect(settingsPage.getPromptItem('Chef')).toHaveText(/master chef/);
   });
 
   test('prevents saving a prompt with an empty name', async ({ page }) => {
-    await page.getByRole('button', { name: 'New' }).click();
-    await page.getByTestId('system-prompt-prompt-input').fill('Some prompt text.');
-    await page.getByTestId('system-prompt-save-button').click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.startCreating();
+    await settingsPage.fillPromptForm('', 'Some prompt text.');
+    await settingsPage.savePrompt();
 
     // Should show an error and remain in edit mode
-    await expect(page.locator('.error-message')).toHaveText('Name cannot be empty.');
+    await settingsPage.expectErrorMessage('Name cannot be empty.');
     await expect(page.getByTestId('system-prompt-name-input')).toBeVisible();
   });
 
   test('prevents saving a prompt with a duplicate name', async ({ page }) => {
-    await page.getByRole('button', { name: 'New' }).click();
-    await page.getByTestId('system-prompt-name-input').fill('Chef'); // Duplicate name
-    await page.getByTestId('system-prompt-prompt-input').fill('Another chef prompt.');
-    await page.getByTestId('system-prompt-save-button').click();
+    const settingsPage = new SettingsPage(page);
+    await settingsPage.startCreating();
+    await settingsPage.fillPromptForm('Chef', 'Another chef prompt.'); // Duplicate name
+    await settingsPage.savePrompt();
 
     // Should show an error and remain in edit mode
-    await expect(page.locator('.error-message')).toHaveText(
-      'A prompt with this name already exists.'
-    );
+    await settingsPage.expectErrorMessage('A prompt with this name already exists.');
     await expect(page.getByTestId('system-prompt-name-input')).toBeVisible();
   });
 });
