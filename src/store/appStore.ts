@@ -231,9 +231,6 @@ export const useAppStore = create<AppState>()(
       },
 
       setError: (error) => {
-        if (error) {
-          console.error(`[STORE|setError] ${error}`);
-        }
         set({ error });
       },
 
@@ -454,6 +451,10 @@ export const useAppStore = create<AppState>()(
         }
 
         const resolvedPrompt = resolveSnippets(snippet.prompt, snippets);
+        if (resolvedPrompt.trim() === '') {
+          return { ...snippet, content: '' }; // Skip generation, return empty content
+        }
+
         const messages: Message[] = [{ id: uuidv4(), role: 'user', content: resolvedPrompt }];
         const stream = await requestMessageContentStreamed(messages, snippet.model, apiKey);
 
