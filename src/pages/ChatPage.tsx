@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/store/appStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,6 +9,7 @@ const ChatPage: React.FC = () => {
   const { id: sessionIdFromUrl } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const initialPromptHandled = useRef(false);
 
   const {
     loadSession,
@@ -31,16 +32,19 @@ const ChatPage: React.FC = () => {
   // Effect to load session when URL parameter changes
   useEffect(() => {
     const idToLoad = sessionIdFromUrl || 'new';
-    void loadSession(idToLoad);
+    const initialPrompt = searchParams.get('q');
 
-    if (idToLoad === 'new') {
-        const initialPrompt = searchParams.get('q');
-        if (initialPrompt) {
-            useAppStore.getState().setInitialChatPrompt(initialPrompt);
-            setSearchParams({}); // Clear the query param after consuming it
-        }
+    if (idToLoad === 'new' && initialPrompt) {
+      if (initialPromptHandled.current) {
+        return;
+      }
+      initialPromptHandled.current = true;
+      void loadSession('new', initialPrompt, navigate);
+      setSearchParams({}, { replace: true });
+    } else {
+      void loadSession(idToLoad, undefined, navigate);
     }
-  }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams]);
+  }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams, navigate]);
 
   const canGoPrev = !!prevSessionId; // "Prev" button goes to older sessions
   const canGoNext = !!nextSessionId; // "Next" button goes to newer sessions
