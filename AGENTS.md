@@ -3,6 +3,7 @@
 - Where appropriate, add a new e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test.
 - automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps.
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
+- before commiting, opening a PR or considering a task as done, just check must have run successfully
 
 # General
 - trust the type checker.
