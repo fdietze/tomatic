@@ -31,16 +31,27 @@ const ChatPage: React.FC = () => {
   // Effect to load session when URL parameter changes
   useEffect(() => {
     const idToLoad = sessionIdFromUrl || 'new';
-    void loadSession(idToLoad);
 
-    if (idToLoad === 'new') {
+    const handleLoadAndSubmit = async () => {
+      // First, ensure the session is loaded or a new one is started.
+      await loadSession(idToLoad);
+
+      // Only proceed if we are on a "new" session page.
+      if (idToLoad === 'new') {
         const initialPrompt = searchParams.get('q');
         if (initialPrompt) {
-            useAppStore.getState().setInitialChatPrompt(initialPrompt);
-            setSearchParams({}); // Clear the query param after consuming it
+          // Now that the session is ready, submit the message.
+          // The navigate function is passed to handle the URL change.
+          void useAppStore.getState().submitMessage({ promptOverride: initialPrompt, navigate });
+          // Clear the query param from the URL.
+          setSearchParams({}, { replace: true });
         }
-    }
-  }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams]);
+      }
+    };
+
+    handleLoadAndSubmit().catch(console.error);
+
+  }, [sessionIdFromUrl, loadSession, navigate, searchParams, setSearchParams]);
 
   const canGoPrev = !!prevSessionId; // "Prev" button goes to older sessions
   const canGoNext = !!nextSessionId; // "Next" button goes to newer sessions

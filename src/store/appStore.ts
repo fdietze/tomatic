@@ -230,16 +230,13 @@ export const useAppStore = create<AppState>()(
       
       loadSession: async (sessionId) => {
         // This check MUST come first to prevent wiping state during navigation race conditions.
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
+        if (get().currentSessionId === sessionId) {
+          console.debug(`[STORE|loadSession] Session ${sessionId} is already loaded. Skipping.`);
           return;
         }
         console.debug(`[STORE|loadSession] Loading session: ${sessionId}`);
         if (get().isStreaming) {
           get().cancelStream();
-        }
-
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
-          return; // Session is already in memory, no need to load.
         }
 
         set({ error: null, messages: [], currentSessionId: sessionId });
