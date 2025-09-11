@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
 import { requestMessageContentStreamed } from '@/api/openrouter';
+import { resolveSnippets } from '@/utils/snippetUtils';
 
 interface SnippetItemProps {
   snippet: Snippet;
@@ -27,11 +28,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-  const { cachedModels, modelName: defaultModelName, apiKey } = useAppStore(
+  const { cachedModels, modelName: defaultModelName, apiKey, allSnippets: allStoreSnippets } = useAppStore(
     useShallow((state) => ({
       cachedModels: state.cachedModels,
       modelName: state.modelName,
       apiKey: state.apiKey,
+      allSnippets: state.snippets,
     }))
   );
 
@@ -115,7 +117,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     setGenerationError(null);
     let newContent = '';
     try {
-      const messages: Message[] = [{ id: uuidv4(), role: 'user', content: editingPrompt }];
+      const resolvedPrompt = resolveSnippets(editingPrompt, allStoreSnippets);
+      const messages: Message[] = [{ id: uuidv4(), role: 'user', content: resolvedPrompt }];
       const stream = await requestMessageContentStreamed(messages, editingModel, apiKey);
       for await (const chunk of stream) {
         newContent += chunk.choices[0]?.delta?.content || '';
@@ -241,10 +244,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
   return (
     <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
-      <div style={{ flex: 1 }}>
-        <span className="system-prompt-name">{snippet.name}</span>
-        <span className="system-prompt-text">{snippet.content}</span>
-      </div>
+      <span className="system-prompt-name">{snippet.name}</span>
+      <span className="system-prompt-text">{snippet.content}</span>
       <div className="system-prompt-buttons">
         <button
           onClick={() => { setIsEditing(true); }}
