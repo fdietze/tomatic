@@ -118,7 +118,6 @@ interface AppState {
   modelsError: string | null;
   isStreaming: boolean;
   streamController: AbortController | null;
-  initialChatPrompt: string | null;
   isInitializing: boolean;
 
   // --- Actions ---
@@ -130,10 +129,9 @@ interface AppState {
   toggleAutoScroll: () => void;
 
   setError: (error: string | null) => void;
-  setInitialChatPrompt: (prompt: string | null) => void;
   
-  loadSession: (sessionId: string) => Promise<void>;
-  startNewSession: () => Promise<void>;
+  loadSession: (sessionId: string, initialPrompt?: string, navigate?: NavigateFunction) => Promise<void>;
+  startNewSession: (initialPrompt?: string, navigate?: NavigateFunction) => Promise<void>;
   saveCurrentSession: () => Promise<void>;
   deleteSession: (sessionId: string, navigate: NavigateFunction) => Promise<void>;
   loadSystemPrompts: () => Promise<void>;
@@ -180,7 +178,6 @@ export const useAppStore = create<AppState>()(
       modelsError: null,
       isStreaming: false,
       streamController: null,
-      initialChatPrompt: null,
       isInitializing: true,
 
       // --- Actions ---
@@ -225,27 +222,32 @@ export const useAppStore = create<AppState>()(
         }
         set({ error });
       },
-
-      setInitialChatPrompt: (prompt) => set({ initialChatPrompt: prompt }),
       
-      loadSession: async (sessionId) => {
-        // This check MUST come first to prevent wiping state during navigation race conditions.
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
+      loadSession: async (sessionId, initialPrompt, navigate) => {
+        const { currentSessionId, messages } = get();
+
+        // If we are asked to load the same session, do nothing.
+        if (currentSessionId === sessionId && sessionId !== 'new') {
           return;
         }
+
+        // If we are asked to load 'new' but we already have a session ID and some messages,
+        // it means we are in the middle of a new session creation from a prompt.
+        // The re-render from clearing search params is causing this. We should ignore it.
+        if (sessionId === 'new' && !initialPrompt && currentSessionId && messages.length > 0) {
+          console.debug('[STORE|loadSession] Ignoring redundant "new" session load.');
+          return;
+        }
+
         console.debug(`[STORE|loadSession] Loading session: ${sessionId}`);
         if (get().isStreaming) {
           get().cancelStream();
         }
 
-        if (get().currentSessionId === sessionId && sessionId !== 'new') {
-          return; // Session is already in memory, no need to load.
-        }
-
         set({ error: null, messages: [], currentSessionId: sessionId });
 
         if (sessionId === 'new') {
-          await get().startNewSession();
+          await get().startNewSession(initialPrompt, navigate);
           return;
         }
 
@@ -279,14 +281,15 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      startNewSession: async () => {
+      startNewSession: async (initialPrompt, navigate) => {
         const mostRecentId = await getMostRecentSessionId();
-        const { systemPrompts, selectedPromptName } = get();
+        const { systemPrompts, selectedPromptName, setSelectedPromptName } = get();
         const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
         console.debug(`[STORE|startNewSession] Starting new session. Most recent was: ${String(mostRecentId)}`);
         
         const initialMessages: Message[] = [];
-        if (systemPrompt) {
+        // If there's an initial prompt, we don't want to use the stored system prompt
+        if (systemPrompt && !initialPrompt) {
           initialMessages.push({
             id: uuidv4(),
             role: 'system',
@@ -303,6 +306,12 @@ export const useAppStore = create<AppState>()(
           prevSessionId: mostRecentId, // The "previous" session from "new" is the most recent one
           nextSessionId: null,
         });
+
+        // If there's an initial prompt, deselect the system prompt and submit the message
+        if (initialPrompt) {
+          setSelectedPromptName(null);
+          await get().submitMessage({ promptOverride: initialPrompt, navigate });
+        }
       },
       
       saveCurrentSession: async () => {
@@ -441,12 +450,6 @@ export const useAppStore = create<AppState>()(
           set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
         }
         
-        // Navigate after the first message if it's a new session
-        if (isNewSession && navigate && sessionId) {
-            console.debug(`[STORE|submitMessage] New session, navigating to /chat/${sessionId}`);
-            void navigate(`/chat/${sessionId}`, { replace: true });
-        }
-
         const messagesToSubmit = messagesToRegenerate || get().messages;
         console.debug(`[STORE|submitMessage] Submitting ${String(messagesToSubmit.length)} messages to API.`);
         set({ isStreaming: true, error: null });
@@ -523,9 +526,16 @@ export const useAppStore = create<AppState>()(
             console.debug('[STORE|submitMessage] Stream finished.');
             set({ isStreaming: false, streamController: null });
             await get().saveCurrentSession();
-            const sessionId = get().currentSessionId;
-            if (sessionId) {
-                const currentSession = await loadSession(sessionId);
+
+            // Navigate after saving if it was a new session
+            if (isNewSession && navigate && sessionId) {
+              console.debug(`[STORE|submitMessage] New session, navigating to /chat/${sessionId}`);
+              void navigate(`/chat/${sessionId}`, { replace: true });
+            }
+
+            const currentId = get().currentSessionId;
+            if (currentId) {
+                const currentSession = await loadSession(currentId);
                 if (currentSession) {
                     const { prevId, nextId } = await findNeighbourSessionIds(currentSession);
                     set({ prevSessionId: prevId, nextSessionId: nextId });
