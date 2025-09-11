@@ -1,4 +1,5 @@
 import { type Page, type Locator, expect } from '@playwright/test';
+import { ModelComboboxPage } from './ModelComboboxPage';
 
 /**
  * Page Object Model for the main chat interface.
@@ -9,10 +10,12 @@ export class ChatPage {
   // --- Locators ---
   readonly chatInput: Locator;
   readonly chatSubmitButton: Locator;
+  readonly modelCombobox: ModelComboboxPage;
 
   constructor(public readonly page: Page) {
     this.chatInput = page.getByTestId('chat-input');
     this.chatSubmitButton = page.getByTestId('chat-submit');
+    this.modelCombobox = new ModelComboboxPage(page);
   }
 
   // --- Actions ---
@@ -42,14 +45,6 @@ export class ChatPage {
     await messageLocator.getByRole('button', { name: 'regenerate' }).click();
   }
 
-  /**
-   * Selects a model from the model combobox.
-   * @param name The name of the model to select (e.g., 'Mock Model').
-   */
-  async selectModel(name: string) {
-    await this.page.locator('input[placeholder^="Select or type model ID"]').fill(name);
-    await this.page.locator('.combobox-item', { hasText: name }).click();
-  }
 
   /**
    * Clicks the edit button for a message, fills the input, and re-submits.
