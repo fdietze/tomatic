@@ -75,8 +75,13 @@ test.describe('Database Migrations', () => {
         const dbName = 'tomatic_chat_db';
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = window.indexedDB.open(dbName); // open with no version to get latest
-          request.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
-          request.onerror = (e) => reject((e.target as IDBOpenDBRequest).error);
+          request.onsuccess = (e) => {
+            resolve((e.target as IDBOpenDBRequest).result);
+          };
+          request.onerror = (e) => {
+            const err = (e.target as IDBOpenDBRequest).error;
+            reject(new Error(err?.message ?? 'Unknown IndexedDB open error'));
+          };
         });
 
         const dbVersion = db.version;
@@ -86,8 +91,12 @@ test.describe('Database Migrations', () => {
         const store = tx.objectStore('chat_sessions');
         const session = await new Promise<ChatSession>((resolve, reject) => {
           const req = store.get(sessionId);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
+          req.onsuccess = () => {
+            resolve(req.result as ChatSession);
+          };
+          req.onerror = () => {
+            reject(new Error(req.error?.message ?? 'Unknown get error'));
+          };
         });
         db.close();
         return { session, hasPromptsStore, dbVersion };
