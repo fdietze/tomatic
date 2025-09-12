@@ -5,7 +5,7 @@ import { Message } from '@/types/chat';
 import { requestMessageContentStreamed } from '@/api/openrouter';
 import { resolveSnippets } from '@/utils/snippetUtils';
 import { ChatCompletionChunk } from 'openai/resources/chat';
-import {findNeighbourSessionIds, loadSession} from "@/services/persistence";
+import {findNeighbourSessionIds, loadSession} from "@/services/db";
 
 import { SystemPrompt } from '@/types/storage';
 

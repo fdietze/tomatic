@@ -4,7 +4,7 @@ import {
     deleteSystemPrompt as dbDeleteSystemPrompt,
     loadAllSystemPrompts,
     saveSystemPrompt,
-} from '@/services/persistence';
+} from '@/services/db';
 
 export const createSystemPromptsSlice: StateCreator<
     AppState,

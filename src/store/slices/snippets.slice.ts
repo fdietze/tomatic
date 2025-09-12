@@ -6,7 +6,7 @@ import {
     loadAllSnippets,
     saveSnippet,
     saveSnippets,
-} from '@/services/persistence';
+} from '@/services/db';
 import { Message } from '@/types/chat';
 import { requestMessageContentStreamed } from '@/api/openrouter';
 import {

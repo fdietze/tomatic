@@ -8,7 +8,7 @@ import {
     getMostRecentSessionId,
     loadSession,
     saveSession,
-} from '@/services/persistence';
+} from '@/services/db';
 
 import { SystemPrompt } from '@/types/storage';
 
