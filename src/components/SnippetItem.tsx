@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Snippet } from '@/types/storage';
-import { useAppStore } from '@/store/appStore';
+import { useAppStore } from '@/store';
+import { AppState } from '@/store/types';
+import { DisplayModelInfo } from '@/types/storage';
 import { useShallow } from 'zustand/react/shallow';
 import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
 import Combobox, { type ComboboxItem } from './Combobox';
@@ -26,7 +28,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onCancel,
 }) => {
   const { cachedModels, modelName: defaultModelName, generateSnippetContent } = useAppStore(
-    useShallow((state) => ({
+useShallow((state: AppState) => ({
       cachedModels: state.cachedModels,
       modelName: state.modelName,
       generateSnippetContent: state.generateSnippetContent,
@@ -46,7 +48,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const modelItems = useMemo((): ComboboxItem[] => {
-    return cachedModels.map((model) => ({
+return cachedModels.map((model: DisplayModelInfo) => ({
       id: model.id,
       display_text: model.name,
       model_info: model,

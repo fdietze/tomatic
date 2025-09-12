@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useAppStore } from '@/store/appStore';
+import { useAppStore } from '@/store';
+import { AppState } from '@/store/types';
 import { useShallow } from 'zustand/react/shallow';
 import ChatHeader from '@/components/ChatHeader';
 import ChatInterface from '@/components/ChatInterface';
@@ -20,7 +21,7 @@ const ChatPage: React.FC = () => {
     error,
     setError,
   } = useAppStore(
-    useShallow((state) => ({
+useShallow((state: AppState) => ({
       loadSession: state.loadSession,
       systemPrompts: state.systemPrompts,
       selectedPromptName: state.selectedPromptName,

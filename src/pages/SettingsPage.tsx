@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '@/store/appStore';
+import { useAppStore } from '@/store';
+import { AppState } from '@/store/types';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import SnippetItem from '@/components/SnippetItem';
 import type { Snippet, SystemPrompt } from '@/types/storage';
@@ -20,7 +21,7 @@ const SettingsPage: React.FC = () => {
     updateSnippet,
     deleteSnippet,
   } = useAppStore(
-    useShallow((state) => ({
+useShallow((state: AppState) => ({
       apiKey: state.apiKey,
       setApiKey: state.setApiKey,
       systemPrompts: state.systemPrompts,
@@ -135,7 +136,7 @@ const SettingsPage: React.FC = () => {
               onCancel={handleCancelNewPrompt}
             />
           )}
-          {systemPrompts.map((prompt) => (
+{systemPrompts.map((prompt: SystemPrompt) => (
             <SystemPromptItem
               key={prompt.name}
               prompt={prompt}
@@ -170,7 +171,7 @@ const SettingsPage: React.FC = () => {
               onCancel={handleCancelNewSnippet}
             />
           )}
-          {snippets.map((snippet) => (
+{snippets.map((snippet: Snippet) => (
             <SnippetItem
               key={snippet.name}
               snippet={snippet}
