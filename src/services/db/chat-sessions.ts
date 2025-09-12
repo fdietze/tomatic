@@ -14,12 +14,11 @@ export async function saveSession(session: ChatSession): Promise<void> {
 export async function loadSession(sessionId: string): Promise<ChatSession | null> {
   const db = await dbPromise;
   try {
-    const result = await db.get(SESSIONS_STORE_NAME, sessionId);
-    if (!result) {
-      return null;
-    }
+    const session = await db.get(SESSIONS_STORE_NAME, sessionId);
+    if (!session) return null;
+
     // Validate data from DB against our schema at runtime
-    const validation = chatSessionSchema.safeParse(result);
+    const validation = chatSessionSchema.safeParse(session);
     if (validation.success) {
       return validation.data;
     } else {
@@ -77,7 +76,7 @@ export async function getMostRecentSessionId(): Promise<string | null> {
       .store.index(UPDATED_AT_INDEX)
       .openKeyCursor(null, 'prev'); // 'prev' direction gets the newest item first
 
-    return cursor ? cursor.primaryKey : null;
+    return cursor ? cursor.primaryKey as string : null;
   } catch (error) {
     console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
     return null;

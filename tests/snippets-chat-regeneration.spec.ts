@@ -1,7 +1,7 @@
 import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
 import { ChatPage } from './pom/ChatPage';
-import { OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
+import { OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB, expect } from './test-helpers';
 
 test.describe('Chat Regeneration with Snippets', () => {
 let settingsPage: SettingsPage;
@@ -72,6 +72,9 @@ await chatPage.navigation.goToSettings();
 await settingsPage.startEditingSnippet('greet');
 await settingsPage.fillSnippetForm('greet', 'Bonjour');
 await settingsPage.saveSnippet();
+// Wait for the UI to confirm the save is complete to avoid a race condition
+await expect(settingsPage.getSnippetEditContainer('greet')).not.toBeVisible();
+await expect(settingsPage.getSnippetItem('greet')).toBeVisible();
 
 // 6. Go back to the chat
 await settingsPage.navigation.goBackToChat();
