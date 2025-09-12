@@ -141,6 +141,10 @@ export class SettingsPage {
     await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
     // With the new flow, we must regenerate then save.
     await editContainer.getByTestId('snippet-regenerate-button').click();
+
+    // Wait for the regeneration to complete before trying to save.
+    await expect(editContainer.getByTestId('snippet-regenerate-button')).toHaveText('Regenerate');
+
     await editContainer.getByTestId('snippet-save-button').click();
   }
 
