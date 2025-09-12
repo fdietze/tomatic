@@ -224,7 +224,6 @@ test.describe('Automatic Regeneration', () => {
 				messages: [{ role: 'user', content: 'Hello Universe' }],
 			},
 			response: { role: 'assistant', content: 'Updated content for B' },
-			delay_ms: 100, // Add a small delay to ensure the spinner is visible
 		});
 
 		// 4. Update snippet A
@@ -232,17 +231,54 @@ test.describe('Automatic Regeneration', () => {
 		await settingsPage.fillSnippetForm('A', 'Universe');
 		await settingsPage.saveSnippet();
 
-		// 5. Wait for the regeneration to start and finish
-		const snippetBItem = settingsPage.getSnippetItem('B');
-		const spinner = snippetBItem.locator('.spinner');
-
-		await expect(spinner).toBeVisible({ timeout: 10000 });
-		await expect(spinner).not.toBeVisible({ timeout: 10000 });
-
-		// 6. Assert that snippet B's content has been updated
+		// 5. Assert that snippet B's content has been updated.
+		// Playwright's expect has a built-in timeout, so it will wait for the regeneration to complete.
 		await settingsPage.expectGeneratedSnippetContent('B', /Updated content for B/);
 
-		// 7. Verify all mocks were consumed
+		// 6. Verify all mocks were consumed
+		chatMocker.verifyComplete();
+	});
+
+	test('transitively regenerates snippets in the correct order', async () => {
+		// 1. Set up mocks for the initial creation of B and C
+		chatMocker.mock({ // Initial generation of B
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v1' }] },
+			response: { role: 'assistant', content: 'Content of B from v1' },
+		});
+		chatMocker.mock({ // Initial generation of C
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v1' }] },
+			response: { role: 'assistant', content: 'Content of C from B_v1' },
+		});
+
+		// 2. Create the snippet chain: C -> B -> A
+		await settingsPage.createNewSnippet('A', 'v1');
+		await settingsPage.createGeneratedSnippet('B', 'Prompt for B using @A', 'mock-model/mock-model', 'Mock Model');
+		await settingsPage.createGeneratedSnippet('C', 'Prompt for C using @B', 'mock-model/mock-model', 'Mock Model');
+		
+		// 3. Verify initial state
+		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
+		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);
+
+		// 4. Set up mocks for the transitive regeneration
+		chatMocker.mock({ // Regeneration of B after A is updated
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }] },
+			response: { role: 'assistant', content: 'Content of B from v2' },
+		});
+		chatMocker.mock({ // Regeneration of C after B is updated
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v2' }] },
+			response: { role: 'assistant', content: 'Content of C from B_v2' },
+		});
+
+		// 5. Update the base snippet 'A', which should trigger the chain reaction
+		await settingsPage.startEditingSnippet('A');
+		await settingsPage.fillSnippetForm('A', 'v2');
+		await settingsPage.saveSnippet();
+
+		// 6. Assert that both B and C have been regenerated with the new content
+		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v2/);
+		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v2/);
+
+		// 7. Verify all mocks were consumed in the correct order
 		chatMocker.verifyComplete();
 	});
 });
