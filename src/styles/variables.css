@@ -1,0 +1,51 @@
+:root {
+    /* based on */
+    /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/catppuccin-latte.yaml*/
+    /*name: "Catppuccin Latte"*/
+    /*author: "https://github.com/catppuccin/catppuccin"*/
+    --base00: #eff1f5; /* (Background): Main background color of your UI or application. */
+    --base01: #e1e5ef; /* (Cursor): Cursor or other highlight elements. */
+    --base02: #ccd0da; /* (Selection Background): Background for selected elements, such as text or active list items. */
+    --base03: #bcc0cc; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+    --base04: #acb0be; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
+    --base05: #4c4f69; /* (Default Foreground): Main text color for readability. */
+    --base06: #dc8a78; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
+    --base07: #7287fd; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
+    --base08: #d20f39; /* (Red): Error states, warnings, or destructive actions. */
+    --base09: #fe640b; /* (Orange): Warnings, cautions, or less critical alerts. */
+    --base0A: #df8e1d; /* (Yellow): Alerts and new notifications. */
+    --base0B: #40a02b; /* (Green): Success messages, validations, or active states. */
+    --base0C: #179299; /* (Cyan): Information and neutral notifications. */
+    --base0D: #1e66f5; /* (Blue): Action prompts like buttons or links. */
+    --base0E: #8839ef; /* (Magenta): Call to action elements or highlighting interactive components. */
+    --base0F: #dd7878; /* (Brown): Rarely used, can act as a complementary or accent color. */
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* based on */
+        /*https://github.com/tinted-theming/schemes/blob/spec-0.11/base16/material-palenight.yaml*/
+        /*name: "Material Palenight"*/
+        /*author: "Nate Peterson"*/
+        --base00: #292d3e; /* (Background): Main background color of your UI or application. */
+        --base01: #414866; /* (Cursor): Cursor or other highlight elements. */
+        --base02: #32374d; /* (Selection Background): Background for selected elements, such as text or active list items. */
+        --base03: #676e95; /* (Comment): Less intense than the main text, often used for non-intrusive elements such as disabled items or secondary text. */
+        --base04: #8796b0; /* (Dark Foreground): Used for secondary or tertiary information to provide contrast. */
+        --base05: #959dcb; /* (Default Foreground): Main text color for readability. */
+        --base06: #959dcb; /* (Light Background): Alternatives to Base00, like headers or section backgrounds. */
+        --base07: #ffffff; /* (Lightest): Highlights or emphasis elements like borders or active tabs. */
+        --base08: #f07178; /* (Red): Error states, warnings, or destructive actions. */
+        --base09: #f78c6c; /* (Orange): Warnings, cautions, or less critical alerts. */
+        --base0A: #ffcb6b; /* (Yellow): Alerts and new notifications. */
+        --base0B: #c3e88d; /* (Green): Success messages, validations, or active states. */
+        --base0C: #89ddff; /* (Cyan): Information and neutral notifications. */
+        --base0D: #82aaff; /* (Blue): Action prompts like buttons or links. */
+        --base0E: #c792ea; /* (Magenta): Call to action elements or highlighting interactive components. */
+        --base0F: #ff5370; /* (Brown): Rarely used, can act as a complementary or accent color. */
+    }
+}
+
+:root {
+    --chat-width: 50rem;
+}
