@@ -147,6 +147,104 @@ test.describe('Generated Snippets', () => {
     // 5. Verify mocks
     chatMocker.verifyComplete();
   });
+
+  test('resolves snippets in the prompt before generation', async () => {
+    // 1. Create a standard snippet that will be referenced.
+    await settingsPage.createNewSnippet('topic', 'space exploration');
+
+    // 2. Mock the API call for the generated snippet.
+    // The key part is that the 'content' of the user message must be the *resolved* prompt.
+    chatMocker.mock({
+      request: {
+        model: 'mock-model/mock-model',
+        messages: [{ role: 'user', content: 'Tell me a story about space exploration' }],
+      },
+      response: { role: 'assistant', content: 'Once upon a time, in a galaxy far, far away...' },
+    });
+
+    // 3. Create the generated snippet that references the first snippet.
+    await settingsPage.createGeneratedSnippet(
+      'story',
+      'Tell me a story about @topic',
+      'mock-model/mock-model',
+      'Mock Model'
+    );
+
+    // 4. Assert that the generated content is correct.
+    await settingsPage.expectGeneratedSnippetContent('story', /Once upon a time/);
+
+    // 5. Verify the mock was hit with the correct, resolved prompt.
+    chatMocker.verifyComplete();
+  });
+});
+
+test.describe('Automatic Regeneration', () => {
+	let settingsPage: SettingsPage;
+	let chatMocker: ChatCompletionMocker;
+
+	test.beforeEach(async ({ context, page }) => {
+		await mockGlobalApis(context);
+		await seedLocalStorage(context, {
+			'tomatic-storage': {
+				state: { apiKey: OPENROUTER_API_KEY, snippets: [] },
+				version: 1,
+			},
+		});
+
+		settingsPage = new SettingsPage(page);
+		chatMocker = new ChatCompletionMocker(page);
+		await chatMocker.setup();
+		await settingsPage.goto();
+	});
+
+	test('regenerates a dependent snippet when its dependency is updated', async () => {
+		// 1. Mock the initial generation of snippet B
+		chatMocker.mock({
+			request: {
+				model: 'mock-model/mock-model',
+				messages: [{ role: 'user', content: 'Hello World' }],
+			},
+			response: { role: 'assistant', content: 'Initial content for B' },
+		});
+
+		// 2. Create the snippets
+		await settingsPage.createNewSnippet('A', 'World');
+		await settingsPage.createGeneratedSnippet(
+			'B',
+			'Hello @A',
+			'mock-model/mock-model',
+			'Mock Model',
+		);
+		await settingsPage.expectGeneratedSnippetContent('B', /Initial content for B/);
+
+		// 3. Mock the regeneration of snippet B, which will be triggered by updating A
+		chatMocker.mock({
+			request: {
+				model: 'mock-model/mock-model',
+				messages: [{ role: 'user', content: 'Hello Universe' }],
+			},
+			response: { role: 'assistant', content: 'Updated content for B' },
+			delay_ms: 100, // Add a small delay to ensure the spinner is visible
+		});
+
+		// 4. Update snippet A
+		await settingsPage.startEditingSnippet('A');
+		await settingsPage.fillSnippetForm('A', 'Universe');
+		await settingsPage.saveSnippet();
+
+		// 5. Wait for the regeneration to start and finish
+		const snippetBItem = settingsPage.getSnippetItem('B');
+		const spinner = snippetBItem.locator('.spinner');
+
+		await expect(spinner).toBeVisible({ timeout: 10000 });
+		await expect(spinner).not.toBeVisible({ timeout: 10000 });
+
+		// 6. Assert that snippet B's content has been updated
+		await settingsPage.expectGeneratedSnippetContent('B', /Updated content for B/);
+
+		// 7. Verify all mocks were consumed
+		chatMocker.verifyComplete();
+	});
 });
 
 test.describe('Generated Snippets (Error Handling)', () => {
@@ -491,4 +589,105 @@ test.describe('Snippet Editor Validation', () => {
 
     chatMocker.verifyComplete(); // Verifies no API call was made
   });
+});
+
+test.describe('Chat Regeneration with Snippets', () => {
+	let settingsPage: SettingsPage;
+	let chatPage: ChatPage;
+	let chatMocker: ChatCompletionMocker;
+
+	test('uses updated snippet content when regenerating a response', async ({
+		context,
+		page,
+	}) => {
+		// 1. Define Mock Data
+		const MOCK_SNIPPET = {
+			name: 'greet',
+			content: 'Hello',
+			isGenerated: false,
+			createdAt_ms: 0,
+			updatedAt_ms: 0,
+			generationError: null,
+			isDirty: false,
+		};
+
+		const SESSION_WITH_SNIPPET = {
+			session_id: 'session-with-snippet',
+			name: null,
+			messages: [
+				{
+					id: 'msg1',
+					role: 'user' as const,
+					content: 'Hello world',
+					raw_content: '@greet world',
+				},
+				{
+					id: 'msg2',
+					role: 'assistant' as const,
+					content: 'Initial response',
+					model_name: 'google/gemini-2.5-pro',
+				},
+			],
+			created_at_ms: 1000,
+			updated_at_ms: 1000,
+		};
+
+		// 2. Seed Data and Mock APIs
+		await seedLocalStorage(context, {
+			'tomatic-storage': {
+				state: { apiKey: OPENROUTER_API_KEY },
+				version: 1,
+			},
+		});
+		await seedIndexedDB(context, {
+			snippets: [MOCK_SNIPPET],
+			chat_sessions: [SESSION_WITH_SNIPPET],
+		});
+		chatMocker = new ChatCompletionMocker(page);
+		await chatMocker.setup();
+
+		// 3. Navigate and create POMs
+		await page.goto(`/chat/${SESSION_WITH_SNIPPET.session_id}`);
+		chatPage = new ChatPage(page);
+		settingsPage = new SettingsPage(page);
+
+		// 4. Verify initial state
+		await chatPage.expectMessage(0, 'user', /@greet world/);
+		await chatPage.expectMessage(1, 'assistant', /Initial response/);
+
+		// 5. Go to settings and edit the snippet
+		await chatPage.navigation.goToSettings();
+		await settingsPage.startEditingSnippet('greet');
+		await settingsPage.fillSnippetForm('greet', 'Bonjour');
+		await settingsPage.saveSnippet();
+
+		// 6. Go back to the chat
+		await settingsPage.navigation.goBackToChat();
+		await page.waitForURL(`**/chat/session-with-snippet`);
+
+		// The user message display should remain unchanged
+		await chatPage.expectMessage(0, 'user', /@greet world/);
+
+		// 7. Mock the regeneration API call with the *new* snippet content
+		chatMocker.mock({
+			request: {
+				model: 'google/gemini-2.5-pro',
+				messages: [{ role: 'user', content: 'Bonjour world' }],
+			},
+			response: { role: 'assistant', content: 'Bonjour, le monde!' },
+		});
+
+		// 8. Regenerate
+		const responsePromise = page.waitForResponse(
+			'https://openrouter.ai/api/v1/chat/completions',
+		);
+		await chatPage.regenerateMessage(1); // Regenerate assistant message at index 1
+		await responsePromise;
+
+		// 9. Assert the UI now shows the new response
+		await chatPage.expectMessage(1, 'assistant', /Bonjour, le monde!/);
+
+		// 10. Verify all mocks were consumed
+		chatMocker.verifyComplete();
+	});
 });

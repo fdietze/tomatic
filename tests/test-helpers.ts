@@ -249,6 +249,7 @@ export interface ChatCompletionResponseMock {
 export interface ChatCompletionMock {
   request: ChatCompletionRequestMock;
   response: ChatCompletionResponseMock;
+  delay_ms?: number;
 }
 
 /**
@@ -293,6 +294,9 @@ export class ChatCompletionMocker {
     const messagesMatch = JSON.stringify(nextMock.request.messages) === JSON.stringify(requestBody.messages);
 
     if (modelsMatch && messagesMatch) {
+      if (nextMock.delay_ms) {
+        await this.page.waitForTimeout(nextMock.delay_ms);
+      }
       const responseBody = createStreamResponse(
         requestBody.model,
         nextMock.response.content,
