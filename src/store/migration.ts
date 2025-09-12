@@ -1,4 +1,4 @@
-import { saveSystemPrompt } from '@/services/persistence';
+import { saveSystemPrompt } from '@/services/db';
 import type { AppState } from './types';
 
 const STORAGE_KEY = 'tomatic-storage';
