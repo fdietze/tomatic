@@ -7,6 +7,10 @@ import type { Snippet, SystemPrompt } from '@/types/storage';
 // For DB version < 2
 type V1Message = Omit<Message, 'id' | 'prompt_name'> & { id?: string, prompt_name?: string | null };
 
+// For DB version < 3
+type V2Snippet = Omit<Snippet, 'createdAt_ms' | 'updatedAt_ms' | 'generationError' | 'isDirty'>;
+
+
 // --- Zod Schemas for Runtime Validation ---
 const messageCostSchema = z.object({
   prompt: z.number(),
@@ -42,6 +46,10 @@ const snippetSchema = z.object({
   isGenerated: z.boolean(),
   prompt: z.string().optional(),
   model: z.string().optional(),
+  createdAt_ms: z.number(),
+  updatedAt_ms: z.number(),
+  generationError: z.string().nullable(),
+  isDirty: z.boolean(),
 });
 
 
@@ -124,6 +132,25 @@ const dbPromise = openDB<TomaticDB>(DB_NAME, DB_VERSION, {
       if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
         db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
       }
+
+      // Migrate existing snippets to include new fields for regeneration tracking
+      void tx.objectStore(SNIPPETS_STORE_NAME).openCursor().then(function migrateSnippets(cursor) {
+        if (!cursor) return;
+        
+        const oldSnippet = cursor.value as V2Snippet;
+        const now = Date.now();
+
+        const newSnippet: Snippet = {
+          ...oldSnippet,
+          createdAt_ms: now,
+          updatedAt_ms: now,
+          generationError: null,
+          isDirty: false,
+        };
+
+        void cursor.update(newSnippet);
+        void cursor.continue().then(migrateSnippets);
+      });
     }
   },
 });
@@ -267,8 +294,14 @@ export async function deleteSystemPrompt(promptName: string): Promise<void> {
 
 export async function saveSnippet(snippet: Snippet): Promise<void> {
   const db = await dbPromise;
+  const now = Date.now();
+  const snippetToSave: Snippet = {
+    ...snippet,
+    createdAt_ms: snippet.createdAt_ms || now,
+    updatedAt_ms: now,
+  };
   try {
-    await db.put(SNIPPETS_STORE_NAME, snippet);
+    await db.put(SNIPPETS_STORE_NAME, snippetToSave);
   } catch (error) {
     console.error('[DB] Save: Failed to save snippet:', error);
     throw new Error('Failed to save snippet.');
@@ -300,5 +333,17 @@ export async function deleteSnippet(name: string): Promise<void> {
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete snippet '${name}':`, error);
     throw new Error('Failed to delete snippet.');
+  }
+}
+
+export async function saveSnippets(snippets: Snippet[]): Promise<void> {
+  const db = await dbPromise;
+  const tx = db.transaction(SNIPPETS_STORE_NAME, 'readwrite');
+  try {
+    await Promise.all(snippets.map(s => tx.store.put(s)));
+    await tx.done;
+  } catch (error) {
+    console.error('[DB] Save: Failed to save multiple snippets:', error);
+    throw new Error('Failed to save snippets.');
   }
 }

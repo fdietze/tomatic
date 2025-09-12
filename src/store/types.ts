@@ -62,6 +62,10 @@ export interface SnippetsSlice {
   deleteSnippet: (name: string) => Promise<void>;
   generateSnippetContent: (snippet: Snippet) => Promise<Snippet>;
   regenerateDependentSnippets: (updatedSnippetName: string) => Promise<void>;
+  _markDependentsAsDirty: (changedSnippetName: string) => Promise<void>;
+  processDirtySnippets: () => Promise<void>;
+  isRegenerating: boolean;
+  regeneratingSnippetNames: string[];
 }
 
 export interface ChatSlice {

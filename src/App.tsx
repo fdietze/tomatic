@@ -17,6 +17,7 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentSessionId = useAppStore((state) => state.currentSessionId);
+  const isRegenerating = useAppStore((state) => state.isRegenerating);
 
   const onChat = () => {
     if (currentSessionId) {
@@ -40,7 +41,7 @@ const Header: React.FC = () => {
           Chat
         </button>
         <button onClick={onSettings} data-active={isSettingsActive} data-testid="settings-button">
-          Settings
+          Settings {isRegenerating && <span className="spinner" />}
         </button>
       </div>
     </header>

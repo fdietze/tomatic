@@ -16,4 +16,8 @@ export interface Snippet {
   isGenerated: boolean; // Must be a required boolean
   prompt?: string;
   model?: string;
+  createdAt_ms: number;
+  updatedAt_ms: number;
+  generationError: string | null;
+  isDirty: boolean;
 }
