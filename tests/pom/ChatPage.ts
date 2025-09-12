@@ -57,11 +57,32 @@ export class ChatPage {
    * @param newContent The new content for the message.
    */
   async editMessage(messageIndex: number, newContent: string) {
-    const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByTestId('edit-button').click();
-    await messageLocator.getByTestId('edit-textarea').fill(newContent);
-    await messageLocator.getByTestId('resubmit-button').click();
+    await this.startEditingMessage(messageIndex);
+    await this.getEditTextArea(messageIndex).fill(newContent);
+    await this.resubmitEdit(messageIndex);
   }
+
+  // --- Granular Edit Actions ---
+
+  getMessageLocator(messageIndex: number): Locator {
+    return this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
+  }
+
+  async startEditingMessage(messageIndex: number) {
+    const messageLocator = this.getMessageLocator(messageIndex);
+    await messageLocator.getByTestId('edit-button').click();
+  }
+
+  getEditTextArea(messageIndex: number): Locator {
+    const messageLocator = this.getMessageLocator(messageIndex);
+    return messageLocator.getByTestId('edit-textarea');
+  }
+
+  async resubmitEdit(messageIndex: number) {
+      const messageLocator = this.getMessageLocator(messageIndex);
+      await messageLocator.getByTestId('resubmit-button').click();
+  }
+
 
   /**
    * Clicks the edit button for a message, then clicks the discard button.
