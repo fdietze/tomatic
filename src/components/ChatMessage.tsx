@@ -42,9 +42,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onEditAndResubmit,
   isMobile,
 }) => {
-  const contentToDisplay = message.role === 'user' && message.raw_content ? message.raw_content : message.content;
+  const contentToDisplay = message.raw_content ?? message.content;
+  const contentForEditing = message.raw_content ?? message.content;
   const [isEditing, setIsEditing] = useState(false);
-  const [editInput, setEditInput] = useState(contentToDisplay);
+  const [editInput, setEditInput] = useState(contentForEditing);
 
   const isSystemMessage = message.role === 'system';
   const [collapsed, setCollapsed] = useState(isSystemMessage);

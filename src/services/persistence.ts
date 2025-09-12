@@ -22,6 +22,7 @@ const messageSchema = z.object({
   prompt_name: z.string().nullable().optional(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+  raw_content: z.string().optional(),
   model_name: z.string().nullable().optional(),
   cost: messageCostSchema.nullable().optional(),
 });
