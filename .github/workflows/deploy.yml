@@ -45,11 +45,14 @@ jobs:
     - name: Typecheck
       run: devbox run -- npm run typecheck
 
+    - name: Test unit
+      run: devbox run -- npm run test:unit
+
+    - name: Test e2e
+      run: devbox run -- npm run test:e2e
+
     - name: Lint
       run: devbox run -- npm run lint
-
-    - name: Test
-      run: devbox run -- npm run test:e2e
 
     - name: Build
       run: devbox run -- npm run build
