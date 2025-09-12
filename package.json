@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test:e2e": "npx playwright test",
     "typecheck": "tsc --noEmit"
+,
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@types/markdown-it": "^14.1.2",
@@ -39,6 +41,7 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }

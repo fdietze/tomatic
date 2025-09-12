@@ -10,6 +10,7 @@ dev:
 
 check:
   npm run typecheck && \
+  npm run test:unit && \
   npm run test:e2e && \
   npm run lint
 
