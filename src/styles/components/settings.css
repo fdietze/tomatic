@@ -1,0 +1,123 @@
+.settings-section {
+    display: block;
+    margin: 12px;
+    margin-bottom: 20px;
+
+    input,
+    textarea,
+    select {
+        width: 100%;
+    }
+
+    textarea {
+        height: 120px;
+    }
+}
+
+.settings-label {
+    font-size: smaller;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.settings-system-prompt {
+    display: block;
+    margin-bottom: 20px;
+}
+.system-prompt-container {
+    display: flex;
+    flex-grow: 1;
+    min-width: 0;
+    gap: 4px;
+}
+
+.unselected-prompts {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-grow: 1;
+    gap: 4px;
+
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.system-prompt-list,
+.snippet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.system-prompt-item-view, .system-prompt-item-edit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.system-prompt-name {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.system-prompt-text {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--base03);
+}
+
+.system-prompt-inputs {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.system-prompt-inputs input,
+.system-prompt-inputs textarea {
+    width: 100%;
+}
+
+.system-prompt-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.system-prompt-item-edit {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.system-prompt-edit-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.error-message {
+    color: var(--base08);
+    font-size: smaller;
+}
+
+.system-prompt-item-view, .system-prompt-item-edit {
+    background-color: var(--base01);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.onboarding-message {
+    padding: 20px;
+    margin: 20px;
+    text-align: center;
+    background-color: var(--base01);
+    border-radius: 8px;
+}
