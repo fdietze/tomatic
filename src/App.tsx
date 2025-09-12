@@ -9,8 +9,9 @@ import {
 } from 'react-router-dom';
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
-import { useAppStore } from './store/appStore';
+import { useAppStore } from '@/store';
 import { useShallow } from 'zustand/react/shallow';
+import { AppState } from './store/types';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ const Header: React.FC = () => {
 
 const App: React.FC = () => {
   const { isInitializing, init } = useAppStore(
-    useShallow((state) => ({
+    useShallow((state: AppState) => ({
       isInitializing: state.isInitializing,
       init: state.init,
     }))

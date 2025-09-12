@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '@/store/appStore';
+import { useAppStore } from '@/store';
+import { AppState } from '@/store/types';
+import { DisplayModelInfo } from '@/types/storage';
+import { Message } from '@/types/chat';
 import ChatMessage from './ChatMessage';
 import ChatControls from './ChatControls';
 import Combobox, { ComboboxItem } from './Combobox';
@@ -32,7 +35,7 @@ const ChatInterface: React.FC = () => {
         apiKey,
         autoScrollEnabled,
     } = useAppStore(
-        useShallow((state) => ({
+useShallow((state: AppState) => ({
             messages: state.messages,
             input: state.input,
             setInput: state.setInput,
@@ -97,7 +100,7 @@ const ChatInterface: React.FC = () => {
 
 
     const modelComboboxItems = useMemo((): ComboboxItem[] => {
-        return cachedModels.map((model) => {
+return cachedModels.map((model: DisplayModelInfo) => {
             const priceDisplay = 
                 (model.prompt_cost_usd_pm !== null && model.completion_cost_usd_pm !== null)
                 ? `in: ${model.prompt_cost_usd_pm.toFixed(2)}$ out: ${model.completion_cost_usd_pm.toFixed(2)}$/MTok`
@@ -162,7 +165,7 @@ const ChatInterface: React.FC = () => {
                     </div>
                 )}
 
-                {messages.map((message, index) => (
+{messages.map((message: Message, index: number) => (
                     <ChatMessage
                         key={message.id} // Note: Using index is not ideal if messages can be deleted/inserted.
                         message={message}
