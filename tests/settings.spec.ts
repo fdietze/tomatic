@@ -47,13 +47,13 @@ test.describe('System Prompt CRUD', () => {
     await settingsPage.startEditing('Chef');
 
     // Edit the fields and save
-    await settingsPage.fillPromptForm('Master Chef', 'You are the greatest chef in the world.');
+    await settingsPage.fillPromptForm('Master_Chef', 'You are the greatest chef in the world.');
     await settingsPage.savePrompt();
 
     // Verify the update
     await settingsPage.expectPromptToNotExist('Chef');
-    await settingsPage.expectPromptToBeVisible('Master Chef');
-    await expect(settingsPage.getPromptItem('Master Chef')).toHaveText(/greatest chef/);
+    await settingsPage.expectPromptToBeVisible('Master_Chef');
+    await expect(settingsPage.getPromptItem('Master_Chef')).toHaveText(/greatest chef/);
   });
 
   test('deletes a system prompt', async () => {
@@ -94,10 +94,17 @@ test.describe('System Prompt CRUD', () => {
   test('prevents saving a prompt with a duplicate name', async () => {
     await settingsPage.startCreating();
     await settingsPage.fillPromptForm('Chef', 'Another chef prompt.'); // Duplicate name
-    await settingsPage.savePrompt();
 
-    // Should show an error and remain in edit mode
+    // Should show an error and the save button should be disabled
     await settingsPage.expectErrorMessage('A prompt with this name already exists.');
-    await expect(settingsPage.page.getByTestId('system-prompt-name-input')).toBeVisible();
+    await expect(settingsPage.page.getByTestId('system-prompt-save-button')).toBeDisabled();
+  });
+
+  test('prevents saving a prompt with invalid characters', async () => {
+    await settingsPage.startCreating();
+    await settingsPage.fillPromptForm('invalid name!', 'Some prompt text.');
+    
+    await settingsPage.expectErrorMessage('Name can only contain alphanumeric characters and underscores.');
+    await expect(settingsPage.page.getByTestId('system-prompt-save-button')).toBeDisabled();
   });
 });
