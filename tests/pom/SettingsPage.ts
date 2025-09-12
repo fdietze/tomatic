@@ -143,6 +143,33 @@ export class SettingsPage {
     await editContainer.getByTestId('snippet-regenerate-button').click();
     await editContainer.getByTestId('snippet-save-button').click();
   }
+
+  // --- Snippet Helpers ---
+
+  getSnippetItem(name: string): Locator {
+    return this.page.getByTestId(`snippet-item-${name}`);
+  }
+
+  getSnippetEditContainer(name: string): Locator {
+    return this.page.getByTestId(`snippet-item-edit-${name}`);
+  }
+
+  getNewSnippetEditContainer(): Locator {
+    return this.page.getByTestId('snippet-item-edit-new');
+  }
+
+  getSnippetNameInput(container: Locator): Locator {
+    return container.getByTestId('snippet-name-input');
+  }
+
+  getSnippetSaveButton(container: Locator): Locator {
+    return container.getByTestId('snippet-save-button');
+  }
+
+  getSnippetErrorMessage(container: Locator): Locator {
+    return container.getByTestId('error-message');
+  }
+
   // --- Helpers ---
 
   /**
@@ -154,9 +181,6 @@ export class SettingsPage {
   }
 
 
-  getSnippetItem(name: string): Locator {
-    return this.page.getByTestId(`snippet-item-${name}`);
-  }
   // --- Assertions ---
 
   /**
