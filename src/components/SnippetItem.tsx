@@ -47,6 +47,12 @@ useShallow((state: AppState) => ({
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  const { regeneratingSnippetNames } = useAppStore(useShallow(state => ({
+    regeneratingSnippetNames: state.regeneratingSnippetNames,
+  })));
+
+  const isCurrentSnippetRegenerating = regeneratingSnippetNames.includes(snippet.name);
+
   const modelItems = useMemo((): ComboboxItem[] => {
 return cachedModels.map((model: DisplayModelInfo) => ({
       id: model.id,
@@ -127,6 +133,7 @@ return cachedModels.map((model: DisplayModelInfo) => ({
     }
 
     onUpdate({
+        ...snippet,
       name: trimmedName,
       content: editingContent,
       isGenerated: editingIsGenerated,
@@ -142,6 +149,7 @@ return cachedModels.map((model: DisplayModelInfo) => ({
     setGenerationError(null);
 
     const snippetToGenerate: Snippet = {
+        ...snippet,
       name: editingName.trim(),
       content: '', // This will be replaced by the generated content
       isGenerated: true,
@@ -295,12 +303,15 @@ return cachedModels.map((model: DisplayModelInfo) => ({
   return (
     <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
       <span className="system-prompt-name">{snippet.name}</span>
+      {isCurrentSnippetRegenerating && <span className="spinner" />}
       <span className="system-prompt-text">{snippet.content}</span>
+      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{snippet.generationError}</div>}
       <div className="system-prompt-buttons">
         <button
           onClick={() => { setIsEditing(true); }}
           data-size="compact"
           data-testid="snippet-edit-button"
+          disabled={isCurrentSnippetRegenerating}
         >
           Edit
         </button>
@@ -308,6 +319,7 @@ return cachedModels.map((model: DisplayModelInfo) => ({
           onClick={onRemove}
           data-size="compact"
           data-testid="snippet-delete-button"
+          disabled={isCurrentSnippetRegenerating}
         >
           Delete
         </button>

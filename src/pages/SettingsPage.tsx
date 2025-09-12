@@ -163,7 +163,7 @@ useShallow((state: AppState) => ({
         <div className="snippet-list">
           {isCreatingNewSnippet && (
             <SnippetItem
-              snippet={{ name: '', content: '', isGenerated: false }}
+              snippet={{ name: '', content: '', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }}
               isInitiallyEditing={true}
               allSnippets={snippets}
               onUpdate={(snippet) => { void handleCreateSnippet(snippet); }}

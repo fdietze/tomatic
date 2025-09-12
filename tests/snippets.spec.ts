@@ -210,12 +210,12 @@ test.describe('Snippet Usage in Chat', () => {
     // Seed all snippets needed for this test suite
     await seedIndexedDB(context, {
       snippets: [
-        { name: 'greet_simple', content: 'Hello, world!', isGenerated: false },
-        { name: 'greet_nested', content: 'Hello, @name!', isGenerated: false },
-        { name: 'name', content: 'World', isGenerated: false },
-        { name: 'cycle_a', content: 'This is a @cycle_b', isGenerated: false },
-        { name: 'cycle_b', content: 'which contains @cycle_a', isGenerated: false },
-        { name: 'cycle_self', content: 'This is a @cycle_self', isGenerated: false },
+        { name: 'greet_simple', content: 'Hello, world!', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'greet_nested', content: 'Hello, @name!', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'name', content: 'World', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'cycle_a', content: 'This is a @cycle_b', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'cycle_b', content: 'which contains @cycle_a', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'cycle_self', content: 'This is a @cycle_self', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
       ],
     });
 
@@ -318,10 +318,10 @@ test.describe('Snippet Editor Validation', () => {
 
     await seedIndexedDB(context, {
       snippets: [
-        { name: 'a', content: 'alpha', isGenerated: false },
-        { name: 'b', content: '', isGenerated: true, prompt: 'no cycle here' },
-        { name: 'c', content: 'charlie', isGenerated: false },
-        { name: 'empty', content: '   ', isGenerated: false },
+        { name: 'a', content: 'alpha', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'b', content: '', isGenerated: true, prompt: 'no cycle here', createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'c', content: 'charlie', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'empty', content: '   ', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
       ],
     });
 

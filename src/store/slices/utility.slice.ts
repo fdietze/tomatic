@@ -22,6 +22,7 @@ export const createUtilitySlice: StateCreator<
             .then(() => {
                 console.debug('[STORE|init] System prompts, snippets, and model list loaded successfully.');
                 set({ isInitializing: false });
+                void get().processDirtySnippets();
             })
             .catch((error: unknown) => {
                 console.error('[STORE|init] Initialization failed:', error);
