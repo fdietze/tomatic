@@ -83,7 +83,23 @@ export const createChatSlice: StateCreator<
             void navigate(`/chat/${sessionId}`, { replace: true });
         }
 
-        const messagesToSubmit = messagesToRegenerate || get().messages;
+        let messagesToSubmit = messagesToRegenerate || get().messages;
+        
+        // If this is a regeneration, we need to replace the last user message with the newly resolved content
+        if (isRegeneration) {
+            const lastUserMessageIndex = messagesToSubmit.map(m => m.role).lastIndexOf('user');
+            if (lastUserMessageIndex !== -1) {
+                const updatedMessages = [...messagesToSubmit];
+                const originalMessage = updatedMessages[lastUserMessageIndex];
+                updatedMessages[lastUserMessageIndex] = {
+                    ...originalMessage,
+                    content: processedContent,
+                    raw_content: rawContent,
+                };
+                messagesToSubmit = updatedMessages;
+            }
+        }
+        
         console.debug(`[STORE|submitMessage] Submitting ${String(messagesToSubmit.length)} messages to API.`);
         set({ isStreaming: true, error: null });
 
@@ -97,18 +113,22 @@ export const createChatSlice: StateCreator<
                 apiKey
             );
 
-            if (isRegeneration) {
-                set({ 
-                    messages: [...messagesToSubmit, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-                });
-            } else {
-                set((state) => ({ 
-                    messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-                }));
-            }
+            let isFirstChunk = true;
             console.debug('[STORE|submitMessage] Entering stream processing loop...');
             let finalChunk: ChatCompletionChunk | undefined;
             for await (const chunk of stream) {
+                if (isFirstChunk) {
+                    if (isRegeneration) {
+                        set({ 
+                            messages: [...messagesToSubmit, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
+                        });
+                    } else {
+                        set((state) => ({ 
+                            messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
+                        }));
+                    }
+                    isFirstChunk = false;
+                }
                 finalChunk = chunk;
                 if (controller.signal.aborted) {
                     stream.controller.abort();
@@ -196,13 +216,13 @@ export const createChatSlice: StateCreator<
             const contentForRegeneration = lastUserMessage.raw_content || lastUserMessage.content;
             
             console.debug(`[STORE|regenerateMessage] Regenerating with raw content: "${contentForRegeneration}"`);
-            
+
             // Re-resolve snippets before submitting
             const { snippets } = get();
             try {
                 // We resolve the snippets here just to update the `content` field of the last user message.
                 const resolvedContent = resolveSnippets(contentForRegeneration, snippets);
-                messagesToRegenerate[lastUserMessageIndex] = { ...lastUserMessage, content: resolvedContent };
+                messagesToRegenerate[lastUserMessageIndex] = { ...lastUserMessage, content: resolvedContent, raw_content: contentForRegeneration };
                 console.debug(`[STORE|regenerateMessage] Snippets re-resolved. New content: "${resolvedContent}"`);
             } catch (e) {
                 const error = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -211,23 +231,21 @@ export const createChatSlice: StateCreator<
             }
 
             await get().submitMessage({ 
-                promptOverride: contentForRegeneration, // This is still needed to trigger resolution in submitMessage
+                promptOverride: contentForRegeneration, 
                 isRegeneration: true, 
                 messagesToRegenerate 
             });
         }
     },
     editAndResubmitMessage: async (index, newContent) => {
-        const newMessages = [...get().messages];
-        newMessages[index] = { ...newMessages[index], content: newContent, raw_content: newContent };
+        const currentMessages = get().messages;
+        const messagesToRegenerate = [...currentMessages.slice(0, index + 1)];
         
-        set({ messages: newMessages.slice(0, index + 1) });
-        
-        await get().submitMessage({ 
-            promptOverride: newContent, 
+        // Pass the new raw content directly to submitMessage for resolution.
+        await get().submitMessage({
+            promptOverride: newContent,
             isRegeneration: true,
-            // Pass the *updated* message history to submitMessage
-            messagesToRegenerate: newMessages.slice(0, index + 1) 
+            messagesToRegenerate: messagesToRegenerate,
         });
     },
     cancelStream: () => {
