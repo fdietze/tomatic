@@ -17,6 +17,13 @@ export const test = base.extend<TestOptions>({
       const msgType = msg.type().toUpperCase();
       const msgText = msg.text();
 
+      // Filter out noisy Vite HMR messages for cleaner test logs
+      if (
+        msgText.startsWith('[vite]') ||
+        msgText.includes('Download the React DevTools for a better development experience')
+      ) {
+        return;
+      }
       // Always capture all messages
       consoleMessages.push(`[BROWSER CONSOLE|${msgType}]: ${msgText}`);
 
@@ -35,13 +42,6 @@ export const test = base.extend<TestOptions>({
         }
       }
 
-      // Filter out noisy Vite HMR messages for cleaner test logs
-      if (
-        msgText.startsWith('[vite]') ||
-        msgText.includes('Download the React DevTools for a better development experience')
-      ) {
-        return;
-      }
     });
 
     await use(page);
