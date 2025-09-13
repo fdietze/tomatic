@@ -12,8 +12,7 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
   };
   try {
     await db.put(SNIPPETS_STORE_NAME, snippetToSave);
-  } catch (error) {
-    console.error('[DB] Save: Failed to save snippet:', error);
+  } catch {
     throw new Error('Failed to save snippet.');
   }
 }
@@ -27,11 +26,10 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
     if (validation.success) {
       return validation.data;
     } else {
-      console.error('[DB] Load: Zod validation failed for snippets:', validation.error);
+      console.log('[DB|loadAllSnippets] Zod validation failed for snippets:', JSON.stringify(validation.error, null, 2));
       return [];
     }
-  } catch (error) {
-    console.error('[DB] Load: Failed to load snippets:', error);
+  } catch {
     throw new Error('Failed to load snippets.');
   }
 }
@@ -40,8 +38,7 @@ export async function deleteSnippet(name: string): Promise<void> {
   const db = await dbPromise;
   try {
     await db.delete(SNIPPETS_STORE_NAME, name);
-  } catch (error) {
-    console.error(`[DB] Delete: Failed to delete snippet '${name}':`, error);
+  } catch {
     throw new Error('Failed to delete snippet.');
   }
 }
@@ -50,10 +47,12 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
   const db = await dbPromise;
   const tx = db.transaction(SNIPPETS_STORE_NAME, 'readwrite');
   try {
-    await Promise.all(snippets.map(s => tx.store.put(s)));
+    const putPromises = snippets.map(s => {
+      return tx.store.put(s);
+    });
+    await Promise.all(putPromises);
     await tx.done;
-  } catch (error) {
-    console.error('[DB] Save: Failed to save multiple snippets:', error);
+  } catch {
     throw new Error('Failed to save snippets.');
   }
 }

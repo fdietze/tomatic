@@ -2,12 +2,11 @@ import { StateCreator } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { AppState, ChatSlice } from '@/store/types';
 import { Message } from '@/types/chat';
-import { requestMessageContentStreamed } from '@/api/openrouter';
+import { requestMessageContent } from '@/api/openrouter';
 import { resolveSnippets } from '@/utils/snippetUtils';
-import { ChatCompletionChunk } from 'openai/resources/chat';
+import { SystemPrompt } from '@/types/storage';
 import {findNeighbourSessionIds, loadSession} from "@/services/db";
 
-import { SystemPrompt } from '@/types/storage';
 
 const getCurrentSystemPrompt = (systemPrompts: SystemPrompt[], name: string | null): SystemPrompt | null => {
     if (!name) return null;
@@ -103,80 +102,30 @@ export const createChatSlice: StateCreator<
         console.debug(`[STORE|submitMessage] Submitting ${String(messagesToSubmit.length)} messages to API.`);
         set({ isStreaming: true, error: null });
 
-        const controller = new AbortController();
-        set({ streamController: controller });
-
         try {
-            const stream = await requestMessageContentStreamed(
+            const assistantResponse = await requestMessageContent(
                 messagesToSubmit,
                 modelName,
                 apiKey
             );
 
-            let isFirstChunk = true;
-            console.debug('[STORE|submitMessage] Entering stream processing loop...');
-            let finalChunk: ChatCompletionChunk | undefined;
-            for await (const chunk of stream) {
-                if (isFirstChunk) {
-                    if (isRegeneration) {
-                        set({ 
-                            messages: [...messagesToSubmit, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-                        });
-                    } else {
-                        set((state) => ({ 
-                            messages: [...state.messages, { id: uuidv4(), role: 'assistant', content: '', model_name: modelName, cost: null, prompt_name: null }] 
-                        }));
-                    }
-                    isFirstChunk = false;
-                }
-                finalChunk = chunk;
-                if (controller.signal.aborted) {
-                    stream.controller.abort();
-                    break;
-                }
-                const contentChunk = chunk.choices[0]?.delta?.content || '';
-                set((state) => {
-                    if (state.messages.length === 0 || state.messages[state.messages.length - 1].role !== 'assistant') {
-                        console.warn('[STORE|submitMessage] Stream update skipped: no assistant message found at the end of the message array.');
-                        return state;
-                    }
-                    const lastMessage = state.messages[state.messages.length - 1];
-                    const updatedMessage = { ...lastMessage, content: lastMessage.content + contentChunk };
-                    return { messages: [...state.messages.slice(0, -1), updatedMessage] };
-                });
+            const assistantMessage: Message = {
+                id: uuidv4(),
+                role: 'assistant',
+                content: assistantResponse,
+                model_name: modelName,
+                cost: null, // Cost calculation would need to be re-implemented if usage data is not available from the non-streaming endpoint
+                prompt_name: null,
+            };
+
+            if (isRegeneration) {
+                set({ messages: [...messagesToSubmit, assistantMessage] });
+            } else {
+                set(state => ({ messages: [...state.messages, assistantMessage] }));
             }
             
-            if (finalChunk?.usage) {
-                console.debug('[STORE|submitMessage] Usage data received:', finalChunk.usage);
-                const { prompt_tokens, completion_tokens } = finalChunk.usage;
-                const { cachedModels, modelName } = get();
-                const modelInfo = cachedModels.find(m => m.id === modelName);
-
-                if (modelInfo && prompt_tokens && completion_tokens) {
-                    const promptCost = (prompt_tokens / 1_000_000) * (modelInfo.prompt_cost_usd_pm || 0);
-                    const completionCost = (completion_tokens / 1_000_000) * (modelInfo.completion_cost_usd_pm || 0);
-
-                    set(state => {
-                        const lastMessage = state.messages[state.messages.length - 1];
-                        if (lastMessage.role === 'assistant') {
-                            const updatedMessage = {
-                                ...lastMessage,
-                                cost: {
-                                    prompt: promptCost,
-                                    completion: completionCost,
-                                    prompt_tokens: prompt_tokens,
-                                    completion_tokens: completion_tokens,
-                                }
-                            };
-                            return { messages: [...state.messages.slice(0, -1), updatedMessage] };
-                        }
-                        return state;
-                    });
-                }
-            }
-
-            console.debug('[STORE|submitMessage] Stream finished.');
-            set({ isStreaming: false, streamController: null });
+            console.debug('[STORE|submitMessage] Non-streaming response received.');
+            set({ isStreaming: false });
             await get().saveCurrentSession();
             const sessionId = get().currentSessionId;
             if (sessionId) {
@@ -186,16 +135,17 @@ export const createChatSlice: StateCreator<
                     set({ prevSessionId: prevId, nextSessionId: nextId });
                 }
             }
+
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(error);
             set(state => ({ messages: state.messages.filter(m => m.role !== 'assistant' || m.content !== '') }));
-            set({ isStreaming: false, streamController: null });
+            set({ isStreaming: false });
         }
     },
     regenerateMessage: async (index) => {
         console.debug(`[STORE|regenerateMessage] Called for index: ${String(index)}`);
-        const { messages, systemPrompts } = get();
+        const { messages, systemPrompts, snippets } = get();
         const messagesToRegenerate = [...messages.slice(0, index)];
 
         const systemMessageIndex = messagesToRegenerate.findIndex(m => m.role === 'system');
@@ -209,46 +159,40 @@ export const createChatSlice: StateCreator<
             }
         }
         
+        // We need to re-resolve snippets in the user message to get the latest content.
         const lastUserMessageIndex = messagesToRegenerate.map(m => m.role).lastIndexOf('user');
         
+        let promptOverride: string | undefined;
+
         if (lastUserMessageIndex !== -1) {
             const lastUserMessage = messagesToRegenerate[lastUserMessageIndex];
-            const contentForRegeneration = lastUserMessage.raw_content || lastUserMessage.content;
-            
-            console.debug(`[STORE|regenerateMessage] Regenerating with raw content: "${contentForRegeneration}"`);
+            const rawContent = lastUserMessage.raw_content ?? lastUserMessage.content;
+            promptOverride = rawContent;
+            console.debug(`[STORE|regenerateMessage] Regenerating with raw content: "${rawContent}"`);
 
-            // Re-resolve snippets before submitting
-            const { snippets } = get();
             try {
-                // We resolve the snippets here just to update the `content` field of the last user message.
-                const resolvedContent = resolveSnippets(contentForRegeneration, snippets);
-                messagesToRegenerate[lastUserMessageIndex] = { ...lastUserMessage, content: resolvedContent, raw_content: contentForRegeneration };
-                console.debug(`[STORE|regenerateMessage] Snippets re-resolved. New content: "${resolvedContent}"`);
+                const resolvedContent = resolveSnippets(rawContent, snippets);
+                messagesToRegenerate[lastUserMessageIndex] = { ...lastUserMessage, content: resolvedContent, raw_content: rawContent };
             } catch (e) {
                 const error = e instanceof Error ? e.message : 'An unknown error occurred.';
                 get().setError(error);
-                return;
+                return; 
             }
-
-            await get().submitMessage({ 
-                promptOverride: contentForRegeneration, 
-                isRegeneration: true, 
-                messagesToRegenerate 
-            });
         }
+        
+        set({ messages: messages.slice(0, index) });
+        await get().submitMessage({ isRegeneration: true, messagesToRegenerate, promptOverride });
     },
     editAndResubmitMessage: async (index, newContent) => {
-        const currentMessages = get().messages;
-        const messagesToRegenerate = [...currentMessages.slice(0, index + 1)];
+        const { messages } = get();
+        const messagesToRegenerate = [...messages.slice(0, index + 1)];
         
         // Pass the new raw content directly to submitMessage for resolution.
-        await get().submitMessage({
-            promptOverride: newContent,
-            isRegeneration: true,
-            messagesToRegenerate: messagesToRegenerate,
-        });
+        await get().submitMessage({ promptOverride: newContent, isRegeneration: true, messagesToRegenerate });
     },
     cancelStream: () => {
-        get().streamController?.abort();
+        // Since we're no longer streaming, this could be a no-op,
+        // but we'll leave it in case we re-introduce cancellable requests.
+        console.warn("[STORE|cancelStream] Stream cancellation is not supported in the current non-streaming implementation.");
     },
 });

@@ -1,6 +1,7 @@
-import type { ChatSession } from '@/types/chat';
 import { dbPromise, SESSIONS_STORE_NAME, UPDATED_AT_INDEX } from '../persistence';
 import { chatSessionSchema } from './schemas';
+import type { ChatSession } from '@/types/chat';
+
 export async function saveSession(session: ChatSession): Promise<void> {
   const db = await dbPromise;
   try {
@@ -76,7 +77,7 @@ export async function getMostRecentSessionId(): Promise<string | null> {
       .store.index(UPDATED_AT_INDEX)
       .openKeyCursor(null, 'prev'); // 'prev' direction gets the newest item first
 
-    return cursor ? cursor.primaryKey as string : null;
+    return cursor ? cursor.primaryKey : null;
   } catch (error) {
     console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
     return null;

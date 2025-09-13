@@ -69,15 +69,16 @@ useShallow((state: AppState) => ({
   // --- Snippet Handlers ---
   const handleNewSnippet = () => { setIsCreatingNewSnippet(true); };
   const handleCancelNewSnippet = () => { setIsCreatingNewSnippet(false); };
-  const handleCreateSnippet = async (newSnippet: Snippet) => {
-    await addSnippet(newSnippet);
-    setIsCreatingNewSnippet(false);
+  const handleCreateSnippet = (newSnippet: Snippet) => {
+    return addSnippet(newSnippet).then(() => {
+        setIsCreatingNewSnippet(false);
+    });
   };
-  const handleUpdateSnippet = async (oldName: string, updatedSnippet: Snippet) => {
-    await updateSnippet(oldName, updatedSnippet);
+  const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet) => {
+    return updateSnippet(oldName, updatedSnippet);
   };
-  const handleRemoveSnippet = async (name: string) => {
-    await deleteSnippet(name);
+  const handleRemoveSnippet = (name: string) => {
+    return deleteSnippet(name);
   };
 
 
@@ -166,8 +167,11 @@ useShallow((state: AppState) => ({
               snippet={{ name: '', content: '', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }}
               isInitiallyEditing={true}
               allSnippets={snippets}
-              onUpdate={(snippet) => { void handleCreateSnippet(snippet); }}
-              onRemove={handleCancelNewSnippet}
+              onUpdate={handleCreateSnippet}
+              onRemove={() => {
+                handleCancelNewSnippet();
+                return Promise.resolve();
+              }}
               onCancel={handleCancelNewSnippet}
             />
           )}
@@ -177,8 +181,8 @@ useShallow((state: AppState) => ({
               snippet={snippet}
               isInitiallyEditing={false}
               allSnippets={snippets}
-              onUpdate={(updatedSnippet) => { void handleUpdateSnippet(snippet.name, updatedSnippet); }}
-              onRemove={() => { void handleRemoveSnippet(snippet.name); }}
+              onUpdate={(updatedSnippet) => handleUpdateSnippet(snippet.name, updatedSnippet)}
+              onRemove={() => handleRemoveSnippet(snippet.name)}
             />
           ))}
         </div>

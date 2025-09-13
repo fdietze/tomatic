@@ -228,4 +228,38 @@ test.describe('Automatic Regeneration', () => {
 		// 7. Verify all mocks were consumed in the correct order
 		chatMocker.verifyComplete();
 	});
+
+	test('skips automatic regeneration if the resolved prompt is empty', async () => {
+		// 1. Mock the initial generation of snippet B
+		chatMocker.mock({
+			request: {
+				model: 'mock-model/mock-model',
+				messages: [{ role: 'user', content: 'Initial Text' }],
+			},
+			response: { role: 'assistant', content: 'Initial content for B' },
+		});
+
+		// 2. Create the snippets
+		await settingsPage.createNewSnippet('A', 'Initial Text');
+		await settingsPage.createGeneratedSnippet(
+			'B',
+			'@A',
+			'mock-model/mock-model',
+			'Mock Model',
+		);
+		await settingsPage.expectGeneratedSnippetContent('B', /Initial content for B/);
+
+		// No more mocks are needed as the regeneration should be skipped.
+
+		// 3. Update snippet A to be empty (whitespace)
+		await settingsPage.startEditingSnippet('A');
+		await settingsPage.fillSnippetForm('A', '   ');
+		await settingsPage.saveSnippet();
+
+		// 4. Assert that snippet B's content has been cleared.
+		await settingsPage.expectGeneratedSnippetContent('B', '');
+
+		// 5. Verify no unexpected API calls were made
+		chatMocker.verifyComplete();
+	});
 });

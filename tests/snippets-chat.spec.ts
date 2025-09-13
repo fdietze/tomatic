@@ -74,41 +74,41 @@ test.describe('Snippet Usage in Chat', () => {
     chatMocker.verifyComplete();
   });
 
-  test('shows an error when a snippet is not found', async () => {
-    // No API call should be made, so no mock is needed.
-    await chatPage.sendMessage('Hello @fake_snippet');
+  test.describe('error handling', () => {
+    test.describe('shows an error when a snippet is not found', () => {
+      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Snippet not found: @fake_snippet/] });
+      test('shows an error in the UI', async () => {
+        await chatPage.sendMessage('Hello @fake_snippet');
+        await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
+          "Snippet '@fake_snippet' not found."
+        );
+        await chatPage.expectMessageCount(0);
+        chatMocker.verifyComplete();
+      });
+    });
 
-    // Assert that the error message is visible in the UI
-    await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
-      "Snippet '@fake_snippet' not found."
-    );
+    test.describe('shows an error when a snippet self-references', () => {
+      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_self -> @cycle_self/] });
+      test('shows an error in the UI', async () => {
+        await chatPage.sendMessage('@cycle_self');
+        await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
+          'Snippet cycle detected: @cycle_self -> @cycle_self'
+        );
+        await chatPage.expectMessageCount(0);
+        chatMocker.verifyComplete();
+      });
+    });
 
-    // Assert that no messages were sent
-    await chatPage.expectMessageCount(0);
-
-    // Verify no unexpected API calls were made
-    chatMocker.verifyComplete();
-  });
-
-  test('shows an error when a snippet self-references', async () => {
-    await chatPage.sendMessage('@cycle_self');
-
-    await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
-      'Snippet cycle detected: @cycle_self -> @cycle_self'
-    );
-
-    await chatPage.expectMessageCount(0);
-    chatMocker.verifyComplete();
-  });
-
-  test('shows an error when a multi-step snippet cycle is detected', async () => {
-    await chatPage.sendMessage('@cycle_a');
-
-    await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
-      'Snippet cycle detected: @cycle_a -> @cycle_b -> @cycle_a'
-    );
-
-    await chatPage.expectMessageCount(0);
-    chatMocker.verifyComplete();
+    test.describe('shows an error when a multi-step snippet cycle is detected', () => {
+      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_a -> @cycle_b -> @cycle_a/] });
+      test('shows an error in the UI', async () => {
+        await chatPage.sendMessage('@cycle_a');
+        await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
+          'Snippet cycle detected: @cycle_a -> @cycle_b -> @cycle_a'
+        );
+        await chatPage.expectMessageCount(0);
+        chatMocker.verifyComplete();
+      });
+    });
   });
 });

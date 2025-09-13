@@ -98,6 +98,8 @@ export class SettingsPage {
     await editContainer.getByTestId('snippet-name-input').fill(name);
     await editContainer.getByTestId('snippet-content-input').fill(content);
     await editContainer.getByTestId('snippet-save-button').click();
+    await expect(editContainer).not.toBeVisible();
+    await expect(this.getSnippetItem(name)).toBeVisible();
   }
 
   async deleteSnippet(name: string) {
@@ -139,13 +141,15 @@ export class SettingsPage {
     await editContainer.getByText('Generated Snippet').click();
     await this.modelCombobox.selectModel(modelName ?? modelId, modelId);
     await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
-    // With the new flow, we must regenerate then save.
-    await editContainer.getByTestId('snippet-regenerate-button').click();
-
-    // Wait for the regeneration to complete before trying to save.
-    await expect(editContainer.getByTestId('snippet-regenerate-button')).toHaveText('Regenerate');
-
+    // With the new refactored flow, we no longer need to manually regenerate.
+    // The save button now handles generation.
     await editContainer.getByTestId('snippet-save-button').click();
+
+    // Wait for the save operation (which includes generation) to complete.
+    await expect(editContainer).not.toBeVisible();
+    await expect(this.getSnippetItem(name)).toBeVisible();
+    // Also wait for the spinner to disappear to ensure generation is complete
+    await expect(this.getSnippetItem(name).getByTestId('regenerating-spinner')).not.toBeVisible({ timeout: 10000 });
   }
 
   // --- Snippet Helpers ---
