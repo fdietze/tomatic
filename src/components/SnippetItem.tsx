@@ -55,8 +55,9 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     regeneratingSnippetNames: state.regeneratingSnippetNames,
   })));
 
-  const isCurrentSnippetRegenerating = regeneratingSnippetNames.includes(snippet.name);
-  console.log(`[SnippetItem|render] @${snippet.name} isCurrentSnippetRegenerating: ${String(isCurrentSnippetRegenerating)}`);
+  const isActuallyRegenerating = regeneratingSnippetNames.includes(snippet.name);
+  const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
+  console.log(`[SnippetItem|render] @${snippet.name} isActuallyRegenerating: ${String(isActuallyRegenerating)}, isDirty: ${String(snippet.isDirty)}`);
 
   const modelItems = useMemo((): ComboboxItem[] => {
     return cachedModels.map((model: DisplayModelInfo) => ({
@@ -331,28 +332,32 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
   return (
     <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
-      <span className="system-prompt-name">{snippet.name}</span>
-      {isCurrentSnippetRegenerating && <span className="spinner" data-testid="regenerating-spinner" />}
+      <div className="system-prompt-header">
+        <span className="system-prompt-name">{snippet.name}</span>
+        <div className="system-prompt-actions">
+          {shouldShowSpinner && <span className="spinner" data-testid="regenerating-spinner" />}
+          <div className="system-prompt-buttons">
+            <button
+              onClick={() => { console.log(`[SnippetItem|onClick] Edit button for @${snippet.name} clicked.`); setIsEditing(true); }}
+              data-size="compact"
+              data-testid="snippet-edit-button"
+              disabled={isActuallyRegenerating}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => { console.log(`[SnippetItem|onClick] Delete button for @${snippet.name} clicked.`); void onRemove(); }}
+              data-size="compact"
+              data-testid="snippet-delete-button"
+              disabled={isActuallyRegenerating}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
       <span className="system-prompt-text">{snippet.content}</span>
       {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{`Generation failed: ${snippet.generationError}`}</div>}
-      <div className="system-prompt-buttons">
-        <button
-          onClick={() => { console.log(`[SnippetItem|onClick] Edit button for @${snippet.name} clicked.`); setIsEditing(true); }}
-          data-size="compact"
-          data-testid="snippet-edit-button"
-          disabled={isCurrentSnippetRegenerating}
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => { console.log(`[SnippetItem|onClick] Delete button for @${snippet.name} clicked.`); void onRemove(); }}
-          data-size="compact"
-          data-testid="snippet-delete-button"
-          disabled={isCurrentSnippetRegenerating}
-        >
-          Delete
-        </button>
-      </div>
     </div>
   );
 };

@@ -57,6 +57,19 @@
 
 .system-prompt-item-view, .system-prompt-item-edit {
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.system-prompt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.system-prompt-actions {
+    display: flex;
     align-items: center;
     gap: 8px;
 }
