@@ -20,13 +20,11 @@ export function resolveSnippets(
     console.log(`[resolveSnippets] Found reference to @${snippetName}`);
     if (path.includes(snippetName)) {
       const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
-      console.error(`[resolveSnippets] Cycle detected: ${cyclePath}`);
       throw new Error(`Snippet cycle detected: ${cyclePath}`);
     }
 
     const snippet = allSnippets.find((s) => s.name === snippetName);
     if (!snippet) {
-      console.error(`[resolveSnippets] Snippet not found: @${snippetName}`);
       throw new Error(`Snippet '@${snippetName}' not found.`);
     }
     console.log(`[resolveSnippets] Found snippet @${snippetName} with content: "${snippet.content}"`);
@@ -70,7 +68,6 @@ export function validateSnippetDependencies(
 
     if (path.includes(snippetName)) {
       const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
-      console.error(`[validateSnippetDependencies] Cycle detected: ${cyclePath}`);
       throw new Error(`Snippet cycle detected: ${cyclePath}`);
     }
 
@@ -276,7 +273,7 @@ export function topologicalSort(allSnippets: Snippet[]): { sorted: Snippet[], cy
   }
 
   if (cyclic.length > 0) {
-    console.warn(`[topologicalSort] Cycles detected involving: ${cyclic.join(', ')}`);
+    console.log(`[topologicalSort] Cycles detected involving: ${cyclic.join(', ')}`);
   }
   console.log('[topologicalSort] Final sorted list:', sorted.map(s => s.name));
   console.log('[topologicalSort] Final cyclic list:', cyclic);
