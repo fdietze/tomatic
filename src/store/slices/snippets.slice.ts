@@ -189,11 +189,13 @@ export const createSnippetsSlice: StateCreator<
         console.log(`[STORE|_markDependentsAsDirty] ===== END for @${changedSnippetName} =====`);
     },
     processDirtySnippets: async () => {
+        console.log(`[STORE|processDirtySnippets] Invoked. Current isRegenerating: ${String(get().isRegenerating)}`);
          if (get().isRegenerating) {
             console.log('[STORE|processDirtySnippets] Regeneration already in progress. Skipping.');
             return;
         }
 
+        console.log('[STORE|processDirtySnippets] Setting isRegenerating to true.');
         set({ isRegenerating: true, regeneratingSnippetNames: [] });
         console.log('[STORE|processDirtySnippets] ===== START Regeneration Process =====');
 
@@ -277,6 +279,7 @@ export const createSnippetsSlice: StateCreator<
             get().setError(error);
         } finally {
             console.log('[STORE|processDirtySnippets] ===== END Regeneration Process =====');
+            console.log('[STORE|processDirtySnippets] Setting isRegenerating to false.');
             set({ isRegenerating: false, regeneratingSnippetNames: [] });
         }
     },
