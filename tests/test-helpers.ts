@@ -105,6 +105,35 @@ export function createStreamResponse(model: string, content: string, role: 'assi
   return Buffer.from(responseString);
 }
 
+/**
+ * Creates a Buffer that simulates a standard (non-streaming) API response from the /chat/completions endpoint.
+ * @param model The model name to include in the response.
+ * @param content The text content of the response.
+ * @returns A Buffer object with the simulated JSON data.
+ */
+export function createChatCompletionResponse(model: string, content: string, role: 'assistant'): Buffer {
+  const responseObject = {
+    id: 'chatcmpl-123',
+    object: 'chat.completion',
+    created: 1677652300,
+    model: model,
+    choices: [{
+      index: 0,
+      message: {
+        role: role,
+        content: content,
+      },
+      finish_reason: 'stop',
+    }],
+    usage: {
+      prompt_tokens: 8,
+      completion_tokens: 9,
+      total_tokens: 17,
+    },
+  };
+  return Buffer.from(JSON.stringify(responseObject));
+}
+
 
 export { expect };
 import type { ChatSession } from '../src/types/chat';
@@ -239,16 +268,22 @@ export interface ChatMessageMock {
 export interface ChatCompletionRequestMock {
   model: string;
   messages: ChatMessageMock[];
+  stream?: boolean; // Add stream property
 }
 
 export interface ChatCompletionResponseMock {
   role: 'assistant';
   content: string;
+  error?: {
+    status: number;
+    message: string;
+  };
 }
 
-export interface ChatCompletionMock {
+export interface MockedChatCompletion {
   request: ChatCompletionRequestMock;
   response: ChatCompletionResponseMock;
+  manualTrigger?: boolean;
 }
 
 /**
@@ -257,8 +292,9 @@ export interface ChatCompletionMock {
  * that tests are self-contained and deterministic.
  */
 export class ChatCompletionMocker {
-  private mocks: ChatCompletionMock[] = [];
+  private mocks: MockedChatCompletion[] = [];
   private page: Page;
+  private pendingTriggers: (() => void)[] = [];
 
   constructor(page: Page) {
     this.page = page;
@@ -272,48 +308,85 @@ export class ChatCompletionMocker {
    * Registers a new mock for a chat completion request.
    * @param mock The mock definition, including the request to match and the response to serve.
    */
-  mock(mock: ChatCompletionMock) {
+  mock(mock: MockedChatCompletion) {
     this.mocks.push(mock);
   }
 
-   private async handleRequest(route: Route) {
+  private async handleRequest(route: Route) {
     const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
-    const nextMock = this.mocks.shift();
+    
+    // Find a matching mock without removing it yet
+    const mockIndex = this.mocks.findIndex(m => 
+        m.request.model === requestBody.model &&
+        JSON.stringify(m.request.messages) === JSON.stringify(requestBody.messages)
+    );
 
-    if (!nextMock) {
-      const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions. No more mocks in the queue.\nRECEIVED:\n${JSON.stringify(
+    if (mockIndex === -1) {
+      const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions. No matching mock found.\nRECEIVED:\n${JSON.stringify(
         requestBody,
         null,
         2
-      )}`;
+      )}\n\nAVAILABLE MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
       throw new Error(errorMessage);
     }
+    
+    // Remove the matched mock from the queue
+    const nextMock = this.mocks.splice(mockIndex, 1)[0];
 
-    const modelsMatch = nextMock.request.model === requestBody.model;
-    const messagesMatch = JSON.stringify(nextMock.request.messages) === JSON.stringify(requestBody.messages);
+    if (nextMock.manualTrigger) {
+        const triggerPromise = new Promise<void>(resolve => {
+            this.pendingTriggers.push(resolve);
+        });
+        await triggerPromise;
+    }
 
-    if (modelsMatch && messagesMatch) {
-      const responseBody = createStreamResponse(
-        requestBody.model,
-        nextMock.response.content,
-        nextMock.response.role
-      );
+    if (nextMock.response.error) {
+      const errorBody = {
+        error: {
+          message: nextMock.response.error.message,
+          type: 'invalid_request_error', // A common error type
+          param: null,
+          code: 'invalid_request_error',
+        }
+      };
+      await route.fulfill({
+        status: nextMock.response.error.status,
+        contentType: 'application/json',
+        body: JSON.stringify(errorBody),
+      });
+    } else {
+      const isStreaming = requestBody.stream === true;
+      
+      const responseBody = isStreaming
+          ? createStreamResponse(requestBody.model, nextMock.response.content, nextMock.response.role)
+          : createChatCompletionResponse(requestBody.model, nextMock.response.content, nextMock.response.role);
+
       await route.fulfill({
         status: 200,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: responseBody,
       });
-    } else {
-      const errorMessage = `[ChatCompletionMocker] API call to /chat/completions did not match the expected request.\n\nEXPECTED:\n${JSON.stringify(
-        nextMock.request,
-        null,
-        2
-      )}\n\nRECEIVED:\n${JSON.stringify(requestBody, null, 2)}`;
-      // Put the mock back in the queue for better debugging
-      this.mocks.unshift(nextMock);
-      throw new Error(errorMessage);
     }
-   }
+  }
+
+  /**
+   * Resolves the next pending chat completion that was created with `manualTrigger: true`.
+   * This is the "trigger" that the test can call.
+   */
+  async resolveNextCompletion() {
+    if (this.pendingTriggers.length === 0) {
+      // It's possible this is called before the app has had time to make the request.
+      // Give it a very short moment to see if a trigger appears.
+      await this.page.waitForTimeout(100);
+    }
+    if (this.pendingTriggers.length === 0) {
+      throw new Error('[ChatCompletionMocker] No pending chat completions to resolve.');
+    }
+    const trigger = this.pendingTriggers.shift();
+    if(trigger) {
+      trigger();
+    }
+  }
 
   /**
    * Verifies that all registered mocks have been consumed by API calls.

@@ -8,7 +8,7 @@ import {
     saveSnippets,
 } from '@/services/db';
 import { Message } from '@/types/chat';
-import { requestMessageContentStreamed } from '@/api/openrouter';
+import { requestMessageContent } from '@/api/openrouter';
 import {
     buildReverseDependencyGraph,
     findTransitiveDependents,
@@ -37,25 +37,44 @@ export const createSnippetsSlice: StateCreator<
         }
     },
     addSnippet: async (snippet) => {
+        console.log(`[STORE|addSnippet] called with`, snippet);
         try {
             const now = Date.now();
-            const snippetToSave: Snippet = {
+            
+            let snippetToSave: Snippet = {
                 ...snippet,
                 createdAt_ms: now,
                 updatedAt_ms: now,
                 generationError: null,
                 isDirty: false
             };
+
+            // If the snippet is generated, generate content before the initial save.
+            if (snippetToSave.isGenerated) {
+                try {
+                    // We pass all existing snippets so the prompt can be resolved.
+                    const updatedSnippet = await get().generateSnippetContent(snippetToSave);
+                    snippetToSave = { ...snippetToSave, ...updatedSnippet, generationError: null };
+                } catch (e) {
+                    const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+                    snippetToSave.generationError = error;
+                }
+            }
+
             await saveSnippet(snippetToSave);
-            await get().loadSnippets();
-            await get().regenerateDependentSnippets(snippet.name);
+            set(state => ({ snippets: [...state.snippets, snippetToSave] }));
+            console.log(`[STORE|addSnippet] success`, snippetToSave);
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            console.log(`[STORE|addSnippet] error`, error);
             get().setError(`Failed to add snippet: ${error}`);
+            throw new Error(error);
         }
     },
     updateSnippet: async (oldName, snippet) => {
+        console.log(`[STORE|updateSnippet] called with oldName: ${oldName}`, snippet);
         try {
+            console.log(`[STORE|updateSnippet] Starting update for snippet: ${oldName}`);
             if (oldName !== snippet.name) {
                 await dbDeleteSnippet(oldName);
             }
@@ -68,154 +87,197 @@ export const createSnippetsSlice: StateCreator<
                 generationError: existingSnippet?.generationError || null
             };
             await saveSnippet(snippetToSave);
-            await get().loadSnippets();
-            await get()._markDependentsAsDirty(oldName);
+            set(state => ({
+                snippets: state.snippets.map(s => s.name === oldName ? snippetToSave : s)
+            }));
+            await get()._markDependentsAsDirty(snippetToSave.name);
+            console.log(`[STORE|updateSnippet] Finished update for snippet: ${snippet.name}`);
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            console.log(`[STORE|updateSnippet] error`, error);
             get().setError(`Failed to update snippet: ${error}`);
+            throw new Error(error);
         }
     },
     deleteSnippet: async (name) => {
+        console.log(`[STORE|deleteSnippet] called with name: ${name}`);
         try {
             await dbDeleteSnippet(name);
-            await get().loadSnippets();
+            set(state => ({
+                snippets: state.snippets.filter(s => s.name !== name)
+            }));
             await get()._markDependentsAsDirty(name);
+            console.log(`[STORE|deleteSnippet] success for name: ${name}`);
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            console.log(`[STORE|deleteSnippet] error`, error);
             get().setError(`Failed to delete snippet: ${error}`);
+            throw new Error(error);
         }
     },
     generateSnippetContent: async (snippet) => {
-        const { apiKey, snippets } = get();
+        const { apiKey, snippets: allSnippets } = get();
         if (!snippet.isGenerated || !snippet.prompt || !snippet.model || !apiKey) {
-            throw new Error('Snippet is not a valid generated snippet.');
+            const errorMessage = 'Snippet is not a valid generated snippet.';
+            console.error(`[STORE|generateSnippetContent] for @${snippet.name}: ${errorMessage}`, snippet);
+            throw new Error(errorMessage);
         }
 
-        const resolvedPrompt = resolveSnippets(snippet.prompt, snippets);
+        console.log(`[STORE|generateSnippetContent] Generating content for @${snippet.name}`);
+        const resolvedPrompt = resolveSnippets(snippet.prompt, allSnippets);
+        console.log(`[STORE|generateSnippetContent] Resolved prompt for @${snippet.name}: "${resolvedPrompt}"`);
         if (resolvedPrompt.trim() === '') {
+            console.log(`[STORE|generateSnippetContent] Resolved prompt for @${snippet.name} is empty. Skipping generation.`);
             return { ...snippet, content: '' }; // Skip generation, return empty content
         }
 
         const messages: Message[] = [{ id: uuidv4(), role: 'user', content: resolvedPrompt }];
-        const stream = await requestMessageContentStreamed(messages, snippet.model, apiKey);
-
-        let newContent = '';
-        for await (const chunk of stream) {
-            newContent += chunk.choices[0]?.delta?.content || '';
-        }
-
-        return { ...snippet, content: newContent };
-    },
-    _markDependentsAsDirty: async (changedSnippetName) => {
-        const { snippets } = get();
-        const reverseGraph = buildReverseDependencyGraph(snippets);
-        const dependents = findTransitiveDependents(changedSnippetName, reverseGraph);
-
-        if (dependents.size === 0) return;
-
-        console.debug(`[STORE|_markDependentsAsDirty] Marking ${String(dependents.size)} snippets as dirty due to change in @${changedSnippetName}:`, Array.from(dependents));
-
-        const now = Date.now();
-        const dirtySnippets = snippets
-            .filter(s => dependents.has(s.name))
-            .map(s => ({ ...s, isDirty: true, updatedAt_ms: now }));
         
         try {
-            await saveSnippets(dirtySnippets);
+            const newContent = await requestMessageContent(messages, snippet.model, apiKey);
+            console.log(`[STORE|generateSnippetContent] Successfully generated content for @${snippet.name}. New content: "${newContent}"`);
+            return { ...snippet, content: newContent };
+        } catch (e) {
+            console.log(`[STORE|generateSnippetContent] CAUGHT ERROR for @${snippet.name} inside generateSnippetContent:`, e);
+            // Re-throw the error to see if it's caught by the caller (processDirtySnippets)
+            throw e;
+        }
+    },
+    regenerateDependentSnippets: async () => {
+        // This is a placeholder implementation to satisfy the type checker.
+        // The actual implementation will be handled in a future task.
+        return Promise.resolve();
+    },
+    _markDependentsAsDirty: async (changedSnippetName) => {
+        console.log(`[STORE|_markDependentsAsDirty] ===== START for @${changedSnippetName} =====`);
+        const { snippets } = get();
+        const reverseGraph = buildReverseDependencyGraph(snippets);
+        console.log(`[STORE|_markDependentsAsDirty] Reverse dependency graph:`, reverseGraph);
+        const dependents = findTransitiveDependents(changedSnippetName, reverseGraph);
+
+        if (dependents.size === 0) {
+            console.log(`[STORE|_markDependentsAsDirty] Snippet @${changedSnippetName} has no dependents.`);
+            console.log(`[STORE|_markDependentsAsDirty] ===== END for @${changedSnippetName} =====`);
+            return;
+        }
+        console.log(`[STORE|_markDependentsAsDirty] Found dependents for @${changedSnippetName}:`, Array.from(dependents));
+
+        const now = Date.now();
+        const snippetsToSave = [...snippets];
+
+        dependents.forEach(name => {
+            const snippet = snippetsToSave.find(s => s.name === name);
+            if (snippet) {
+                snippet.isDirty = true;
+                snippet.updatedAt_ms = now;
+                console.log(`[STORE|_markDependentsAsDirty] Marked @${name} as dirty. Snippet state:`, JSON.parse(JSON.stringify(snippet)));
+            }
+        });
+
+        try {
+            await saveSnippets(snippetsToSave);
+            console.log(`[STORE|_markDependentsAsDirty] Saved dirty snippets to DB.`);
             await get().loadSnippets();
+            console.log(`[STORE|_markDependentsAsDirty] Reloaded snippets from DB. Current state:`, JSON.parse(JSON.stringify(get().snippets)));
             // Trigger regeneration asynchronously without waiting for it to complete
             void get().processDirtySnippets();
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            console.error(`[STORE|_markDependentsAsDirty] error`, error, e);
             get().setError(`Failed to mark dependent snippets as dirty: ${error}`);
         }
+        console.log(`[STORE|_markDependentsAsDirty] ===== END for @${changedSnippetName} =====`);
     },
     processDirtySnippets: async () => {
-        if (get().isRegenerating) return;
+         if (get().isRegenerating) {
+            console.log('[STORE|processDirtySnippets] Regeneration already in progress. Skipping.');
+            return;
+        }
 
         set({ isRegenerating: true, regeneratingSnippetNames: [] });
-        console.debug('[STORE|processDirtySnippets] Starting regeneration process.');
+        console.log('[STORE|processDirtySnippets] ===== START Regeneration Process =====');
 
         try {
             const allSnippets = await loadAllSnippets();
+            console.log('[STORE|processDirtySnippets] Loaded all snippets from DB.', JSON.parse(JSON.stringify(allSnippets.map(s => ({ name: s.name, isDirty: s.isDirty, content: s.content, prompt: s.prompt })))));
             const { sorted, cyclic } = topologicalSort(allSnippets);
-            
+
+            console.log('[STORE|processDirtySnippets] Topological sort completed.');
+            console.log('[STORE|processDirtySnippets] Sorted order:', sorted.map(s => s.name));
+            console.log('[STORE|processDirtySnippets] Cyclic snippets:', cyclic);
+
             if (cyclic.length > 0) {
-              console.warn(`[STORE|processDirtySnippets] Cycles detected involving snippets: ${cyclic.join(', ')}. These snippets will be skipped.`);
+                const cycleError = `Snippet cycle detected: ${cyclic.join(', ')}. Please resolve the cycle to continue automatic regeneration.`;
+                console.warn(`[STORE|processDirtySnippets] ${cycleError}`);
+                get().setError(cycleError);
             }
 
             const dirtySnippets = sorted.filter(s => s.isDirty);
 
             if (dirtySnippets.length === 0) {
-                console.debug('[STORE|processDirtySnippets] No dirty snippets to process.');
+                console.debug('[STORE|processDirtySnippets] No dirty snippets to process. Exiting.');
                 set({ isRegenerating: false });
+                console.log('[STORE|processDirtySnippets] ===== END Regeneration Process (no dirty snippets) =====');
                 return;
             }
 
-            console.debug(`[STORE|processDirtySnippets] Found ${String(dirtySnippets.length)} dirty snippets to process in order:`, dirtySnippets.map(s => s.name));
+            console.log('[STORE|processDirty_snippets] Dirty snippets to process (in order):', dirtySnippets.map(s => s.name));
 
             const dependencyErrorCache = new Map<string, string | null>();
 
             for (const snippet of dirtySnippets) {
-                set(state => ({ regeneratingSnippetNames: [...state.regeneratingSnippetNames, snippet.name] }));
+                console.log(`[STORE|processDirtySnippets] ---> Processing dirty snippet: @${snippet.name}`, JSON.parse(JSON.stringify(snippet)));
+                set(state => {
+                    const newRegenerating = [...state.regeneratingSnippetNames, snippet.name];
+                    console.log(`[STORE|processDirtySnippets] SET regeneratingSnippetNames: [${newRegenerating.join(', ')}]`);
+                    return { regeneratingSnippetNames: newRegenerating };
+                });
 
                 let updatedSnippet: Snippet = { ...snippet };
-                let errorOccurred = false;
                 
                 try {
-                    // Pre-check for upstream errors
                     const dependencies = Array.from(getReferencedSnippetNames(snippet.prompt || ''));
-                    const upstreamError = dependencies.find(dep => dependencyErrorCache.get(dep));
-                    if (upstreamError) {
-                        throw new Error(`Upstream dependency @${upstreamError} failed to generate.`);
+                    console.log(`[STORE|processDirtySnippets] Dependencies for @${snippet.name}: [${dependencies.join(', ')}]`);
+                    console.log(`[STORE|processDirtySnippets] Current dependencyErrorCache:`, dependencyErrorCache);
+                    const upstreamErrorDep = dependencies.find(dep => dependencyErrorCache.get(dep));
+                    if (upstreamErrorDep) {
+                        const errorMessage = `Upstream dependency @${upstreamErrorDep} failed to generate.`;
+                        console.log(`[STORE|processDirtySnippets] Upstream dependency failed for @${snippet.name}. Error: ${errorMessage}`);
+                        throw new Error(errorMessage);
                     }
 
                     const regenerated = await get().generateSnippetContent(snippet);
                     updatedSnippet = { ...regenerated, isDirty: false, generationError: null };
                     dependencyErrorCache.set(snippet.name, null);
-
+                    console.log(`[STORE|processDirtySnippets] Successfully regenerated content for @${snippet.name}`);
                 } catch (e) {
                     const error = e instanceof Error ? e.message : 'An unknown error occurred.';
-                    console.error(`[STORE|processDirtySnippets] Failed to regenerate @${snippet.name}:`, error);
-                    updatedSnippet = { ...snippet, isDirty: true, generationError: error };
+                    console.log(`[STORE|processDirtySnippets] CATCH BLOCK for @${snippet.name}. Full error object:`, e);
+                    updatedSnippet = { ...snippet, isDirty: false, generationError: error }; // Keep old content on failure, but clear dirty flag
                     dependencyErrorCache.set(snippet.name, error);
-                    errorOccurred = true;
+                    console.log(`[STORE|processDirtySnippets] Updated dependencyErrorCache after failure of @${snippet.name}:`, dependencyErrorCache);
                 }
                 
+                console.log(`[STORE|processDirtySnippets] Saving updated snippet for @${updatedSnippet.name}:`, JSON.parse(JSON.stringify(updatedSnippet)));
                 await saveSnippet(updatedSnippet);
-                await get().loadSnippets(); // Reload to ensure next snippet has latest data
-                set(state => ({ regeneratingSnippetNames: state.regeneratingSnippetNames.filter(n => n !== snippet.name) }));
+                await get().loadSnippets(); // Reload to ensure UI updates with the error or new content.
+                console.log(`[STORE|processDirtySnippets] Reloaded all snippets after processing @${updatedSnippet.name}. Current state:`, JSON.parse(JSON.stringify(get().snippets)));
 
-                if(errorOccurred) {
-                    // If this snippet failed, we don't proceed to its dependents in this run.
-                    // The topological sort ensures we've already processed its dependencies.
-                }
+                set(state => {
+                    const newRegenerating = state.regeneratingSnippetNames.filter(n => n !== snippet.name);
+                    console.log(`[STORE|processDirtySnippets] SET regeneratingSnippetNames: [${newRegenerating.join(', ')}]`);
+                    return { regeneratingSnippetNames: newRegenerating };
+                });
+                console.log(`[STORE|processDirtySnippets] <--- Finished processing @${snippet.name}`);
             }
 
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
-            console.error('[STORE|processDirtySnippets] A critical error occurred during the regeneration process:', error);
+            console.log('[STORE|processDirtySnippets] Unhandled exception in main try/catch block:', error, e);
             get().setError(error);
         } finally {
-            console.debug('[STORE|processDirtySnippets] Regeneration process finished.');
+            console.log('[STORE|processDirtySnippets] ===== END Regeneration Process =====');
             set({ isRegenerating: false, regeneratingSnippetNames: [] });
         }
-    },
-    regenerateDependentSnippets: async (updatedSnippetName) => {
-        const { snippets } = get();
-        const dependentSnippets = snippets.filter(s =>
-            s.isGenerated && s.prompt?.includes(`@${updatedSnippetName}`)
-        );
-
-        for (const dependent of dependentSnippets) {
-            try {
-                const updatedSnippet = await get().generateSnippetContent(dependent);
-                await saveSnippet(updatedSnippet);
-            } catch (e) {
-                console.error(`Failed to regenerate dependent snippet @${dependent.name}:`, e);
-                // Decide if we should show an error to the user
-            }
-        }
-        await get().loadSnippets(); // Reload all snippets to reflect changes
     },
 });

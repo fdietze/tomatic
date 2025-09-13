@@ -285,4 +285,53 @@ describe('topologicalSort', () => {
     expect(sorted).toEqual([]);
     expect(cyclic).toEqual([]);
   });
+
+  it('should correctly sort a more complex Directed Acyclic Graph', () => {
+    const allSnippets: Snippet[] = [
+      { id: '1', name: 'a', content: '@b @c', isGenerated: false, prompt: '' },
+      { id: '2', name: 'b', content: '@d', isGenerated: false, prompt: '' },
+      { id: '3', name: 'c', content: '@d @e', isGenerated: false, prompt: '' },
+      { id: '4', name: 'd', content: '', isGenerated: false, prompt: '' },
+      { id: '5', name: 'e', content: '', isGenerated: false, prompt: '' },
+    ];
+    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+    
+    // Valid topological orders must have d and e before b and c, and b and c before a.
+    // The relative order of d and e doesn't matter.
+    // The relative order of b and c doesn't matter.
+    expect(cyclic).toEqual([]);
+    expect(sortedNames.length).toBe(5);
+    expect(sortedNames.indexOf('d')).toBeLessThan(sortedNames.indexOf('b'));
+    expect(sortedNames.indexOf('d')).toBeLessThan(sortedNames.indexOf('c'));
+    expect(sortedNames.indexOf('e')).toBeLessThan(sortedNames.indexOf('c'));
+    expect(sortedNames.indexOf('b')).toBeLessThan(sortedNames.indexOf('a'));
+    expect(sortedNames.indexOf('c')).toBeLessThan(sortedNames.indexOf('a'));
+  });
+
+  it('should correctly handle a graph with a cycle, returning only the non-cyclic parts sorted', () => {
+    const allSnippets: Snippet[] = [
+        { id: '1', name: 'a', content: '@b', isGenerated: false, prompt: '' }, // part of cycle
+        { id: '2', name: 'b', content: '@a', isGenerated: false, prompt: '' }, // part of cycle
+        { id: '3', name: 'c', content: '@d', isGenerated: false, prompt: '' }, // acyclic part
+        { id: '4', name: 'd', content: '', isGenerated: false, prompt: '' },   // acyclic part
+    ];
+    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+    
+    expect(sortedNames).toEqual(['d', 'c']);
+    expect(new Set(cyclic)).toEqual(new Set(['a', 'b']));
+  });
+
+  it('should identify a snippet that directly references itself as cyclic', () => {
+    const allSnippets: Snippet[] = [
+        { id: '1', name: 'a', content: 'self @a', isGenerated: false, prompt: '' },
+        { id: '2', name: 'b', content: 'normal', isGenerated: false, prompt: '' },
+    ];
+    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+
+    expect(sortedNames).toEqual(['b']);
+    expect(cyclic).toEqual(['a']);
+  });
 });

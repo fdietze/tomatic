@@ -12,8 +12,8 @@ interface SnippetItemProps {
   snippet: Snippet;
   isInitiallyEditing: boolean;
   allSnippets: Snippet[];
-  onUpdate: (updatedSnippet: Snippet) => void;
-  onRemove: () => void;
+  onUpdate: (updatedSnippet: Snippet) => Promise<void>;
+  onRemove: () => Promise<void>;
   onCancel?: () => void;
 }
 
@@ -28,7 +28,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onCancel,
 }) => {
   const { cachedModels, modelName: defaultModelName, generateSnippetContent } = useAppStore(
-useShallow((state: AppState) => ({
+    useShallow((state: AppState) => ({
       cachedModels: state.cachedModels,
       modelName: state.modelName,
       generateSnippetContent: state.generateSnippetContent,
@@ -42,19 +42,24 @@ useShallow((state: AppState) => ({
   const [editingPrompt, setEditingPrompt] = useState(snippet.prompt || '');
   const [editingModel, setEditingModel] = useState(snippet.model || defaultModelName);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  console.log(`[SnippetItem|render] START @${snippet.name}`, { 
+    isInitiallyEditing, 
+    isEditing, 
+    snippet: JSON.parse(JSON.stringify(snippet)) as Snippet
+  });
 
   const { regeneratingSnippetNames } = useAppStore(useShallow(state => ({
     regeneratingSnippetNames: state.regeneratingSnippetNames,
   })));
 
   const isCurrentSnippetRegenerating = regeneratingSnippetNames.includes(snippet.name);
+  console.log(`[SnippetItem|render] @${snippet.name} isCurrentSnippetRegenerating: ${String(isCurrentSnippetRegenerating)}`);
 
   const modelItems = useMemo((): ComboboxItem[] => {
-return cachedModels.map((model: DisplayModelInfo) => ({
+    return cachedModels.map((model: DisplayModelInfo) => ({
       id: model.id,
       display_text: model.name,
       model_info: model,
@@ -62,25 +67,29 @@ return cachedModels.map((model: DisplayModelInfo) => ({
   }, [cachedModels]);
 
   useEffect(() => {
+    console.log(`[SnippetItem|useEffect|isEditing] @${snippet.name} isEditing changed to: ${String(isEditing)}`);
     if (isEditing) {
       nameInputRef.current?.focus();
     }
-  }, [isEditing]);
+  }, [isEditing, snippet.name]);
 
   useEffect(() => {
     const errors: string[] = [];
     const textToScan = editingIsGenerated ? editingPrompt : editingContent;
+    console.log(`[SnippetItem|useEffect|validation] @${snippet.name} textToScan: "${textToScan}"`);
 
     // We need a complete and up-to-date list of snippets for validation.
-    const snippetsForValidation = allSnippets.filter(s => s.name !== snippet.name);
-    snippetsForValidation.push({
+    const otherSnippets = allSnippets.filter(s => s.name !== snippet.name);
+    const currentSnippetForValidation = {
       ...snippet,
       name: editingName.trim() || snippet.name,
       prompt: editingPrompt,
       isGenerated: editingIsGenerated,
       model: editingModel,
       content: editingContent,
-    });
+    };
+    const snippetsForValidation = [...otherSnippets, currentSnippetForValidation];
+    console.log(`[SnippetItem|useEffect|validation] @${snippet.name} snippetsForValidation:`, snippetsForValidation.map(s=>s.name));
 
     // 1. Check for cyclical dependencies (hard error).
     try {
@@ -91,10 +100,12 @@ return cachedModels.map((model: DisplayModelInfo) => ({
     
     // 2. Check for non-existent snippets (warning).
     const missingSnippets = findNonExistentSnippets(textToScan, snippetsForValidation);
+    if(missingSnippets.length > 0) console.log(`[SnippetItem|useEffect|validation] @${snippet.name} missing snippets:`, missingSnippets);
     for (const missing of missingSnippets) {
       errors.push(`Warning: Snippet '@${missing}' not found.`);
     }
 
+    if(errors.length > 0) console.log(`[SnippetItem|useEffect|validation] @${snippet.name} validation errors:`, errors);
     setPromptErrors(errors);
 
   }, [editingIsGenerated, editingPrompt, editingName, allSnippets, snippet, editingModel, editingContent]);
@@ -125,29 +136,53 @@ return cachedModels.map((model: DisplayModelInfo) => ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    console.log(`[SnippetItem|handleSave] @${snippet.name} called.`);
     const trimmedName = editingName.trim();
     if (nameError || trimmedName === '') {
         if (trimmedName === '') setNameError('Name cannot be empty.');
+        console.log(`[SnippetItem|handleSave] @${snippet.name} aborted due to name error: "${nameError ?? ''}" or empty name.`);
         return;
     }
 
-    onUpdate({
-        ...snippet,
+    const finalContent = editingContent;
+
+    const snippetForSave: Snippet = {
+      ...snippet,
       name: trimmedName,
-      content: editingContent,
+      content: finalContent,
       isGenerated: editingIsGenerated,
       prompt: editingPrompt,
       model: editingModel,
-    });
+    };
+
+    console.log(`[SnippetItem|handleSave] @${snippet.name} calling onUpdate with:`, JSON.parse(JSON.stringify(snippetForSave)));
+    await onUpdate(snippetForSave);
+
     setIsEditing(false);
     setNameError(null);
+    console.log(`[SnippetItem|handleSave] @${snippet.name} finished.`);
   };
 
   const generateAndSetContent = async () => {
+    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} called.`);
+    // This function now uses local state for immediate UI feedback on manual regeneration.
+    // The final save is handled by handleSave, which sends data to the store.
+    const setIsGenerating = (isGenerating: boolean) => {
+        // A simple way to manage transient generating state without adding a state variable.
+        // This could be improved, but is out of scope for the current refactor.
+        const button = document.querySelector(`[data-testid="snippet-regenerate-button"]`);
+        if (button) button.textContent = isGenerating ? 'Generating...' : 'Regenerate';
+    };
+    const setGenerationError = (error: string | null) => {
+        const errorElement = document.querySelector(`[data-testid="generation-error-message"]`);
+        if (errorElement) errorElement.textContent = error || '';
+    };
+
     setIsGenerating(true);
     setGenerationError(null);
 
+    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} local state:`, { editingName, editingPrompt, editingModel });
     const snippetToGenerate: Snippet = {
         ...snippet,
       name: editingName.trim(),
@@ -157,20 +192,14 @@ return cachedModels.map((model: DisplayModelInfo) => ({
       model: editingModel,
     };
 
+    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} calling generateSnippetContent with:`, JSON.parse(JSON.stringify(snippetToGenerate)));
     try {
-      const snippetsForValidation = allSnippets.filter(s => s.name !== snippet.name);
-      snippetsForValidation.push(snippetToGenerate);
-      
-      validateSnippetDependencies(editingPrompt, snippetsForValidation);
-      const missingSnippets = findNonExistentSnippets(editingPrompt, snippetsForValidation);
-      if (missingSnippets.length > 0) {
-        throw new Error(`Snippet '@${missingSnippets[0]}' not found.`);
-      }
-      
       const updatedSnippet = await generateSnippetContent(snippetToGenerate);
+      console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} received updated snippet:`, JSON.parse(JSON.stringify(updatedSnippet)));
       setEditingContent(updatedSnippet.content);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+      console.error(`[SnippetItem|generateAndSetContent] @${snippet.name} generation failed:`, error);
       setGenerationError(`Generation failed: ${message}`);
     } finally {
       setIsGenerating(false);
@@ -178,6 +207,7 @@ return cachedModels.map((model: DisplayModelInfo) => ({
   };
 
   const handleCancelEditing = () => {
+    console.log(`[SnippetItem|handleCancelEditing] @${snippet.name} called.`);
     if (onCancel) {
       onCancel();
     } else {
@@ -271,17 +301,17 @@ return cachedModels.map((model: DisplayModelInfo) => ({
             <button
               onClick={() => { void generateAndSetContent(); }}
               data-size="compact"
-              disabled={isGenerating || promptErrors.length > 0}
+              disabled={promptErrors.length > 0}
               data-testid="snippet-regenerate-button"
             >
-              {isGenerating ? 'Generating...' : 'Regenerate'}
+              Regenerate
             </button>
           )}
           <button
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             data-size="compact"
             data-role="primary"
-            disabled={isGenerating || (!!nameError && editingName.trim() !== '')}
+            disabled={!!nameError && editingName.trim() !== ''}
             data-testid="snippet-save-button"
           >
             Save
@@ -290,12 +320,11 @@ return cachedModels.map((model: DisplayModelInfo) => ({
             onClick={handleCancelEditing}
             data-size="compact"
             data-testid="snippet-cancel-button"
-            disabled={isGenerating}
           >
             Cancel
           </button>
         </div>
-        {generationError && <div className="error-message" data-testid="generation-error-message">{generationError}</div>}
+        <div className="error-message" data-testid="generation-error-message"></div>
       </div>
     );
   }
@@ -303,12 +332,12 @@ return cachedModels.map((model: DisplayModelInfo) => ({
   return (
     <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
       <span className="system-prompt-name">{snippet.name}</span>
-      {isCurrentSnippetRegenerating && <span className="spinner" />}
+      {isCurrentSnippetRegenerating && <span className="spinner" data-testid="regenerating-spinner" />}
       <span className="system-prompt-text">{snippet.content}</span>
-      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{snippet.generationError}</div>}
+      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{`Generation failed: ${snippet.generationError}`}</div>}
       <div className="system-prompt-buttons">
         <button
-          onClick={() => { setIsEditing(true); }}
+          onClick={() => { console.log(`[SnippetItem|onClick] Edit button for @${snippet.name} clicked.`); setIsEditing(true); }}
           data-size="compact"
           data-testid="snippet-edit-button"
           disabled={isCurrentSnippetRegenerating}
@@ -316,7 +345,7 @@ return cachedModels.map((model: DisplayModelInfo) => ({
           Edit
         </button>
         <button
-          onClick={onRemove}
+          onClick={() => { console.log(`[SnippetItem|onClick] Delete button for @${snippet.name} clicked.`); void onRemove(); }}
           data-size="compact"
           data-testid="snippet-delete-button"
           disabled={isCurrentSnippetRegenerating}

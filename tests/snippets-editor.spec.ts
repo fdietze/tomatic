@@ -27,29 +27,19 @@ test.describe('Snippet Editor Validation', () => {
     await settingsPage.goto();
   });
 
-  test('shows a live error when an edit introduces a snippet cycle', async () => {
-    // 1. Start editing snippet 'b'
-    await settingsPage.startEditingSnippet('b');
-    const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
-
-    // 2. Introduce a cycle by making 'b's prompt reference itself
-    await editContainer.getByTestId('snippet-prompt-input').fill('this prompt now references @b');
-    
-    // 3. Assert that the error is shown in the content preview area
-    const contentDisplay = editContainer.getByTestId('snippet-content-display');
-    await expect(contentDisplay.locator('.error-message')).toHaveText('Snippet cycle detected: @b -> @b');
-    
-    // 4. The regenerate button should be disabled due to the cycle error.
-    await expect(editContainer.getByTestId('snippet-regenerate-button')).toBeDisabled();
-    
-    // 5. The save button should still be enabled.
-    await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
-
-    // 6. Save the snippet (which is allowed)
-    await settingsPage.saveSnippet();
-    
-    // 7. The editor should close
-    await expect(editContainer).not.toBeVisible();
+  test.describe('shows a live error when an edit introduces a snippet cycle', () => {
+    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
+    test('shows a live error in the UI', async () => {
+      await settingsPage.startEditingSnippet('b');
+      const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
+      await editContainer.getByTestId('snippet-prompt-input').fill('this prompt now references @b');
+      const contentDisplay = editContainer.getByTestId('snippet-content-display');
+      await expect(contentDisplay.locator('.error-message')).toHaveText('Snippet cycle detected: @b -> @b');
+      await expect(editContainer.getByTestId('snippet-regenerate-button')).toBeDisabled();
+      await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
+      await settingsPage.saveSnippet();
+      await expect(editContainer).not.toBeVisible();
+    });
   });
 
   test('shows a warning when a generated snippet prompt references a non-existent snippet', async () => {
@@ -74,41 +64,47 @@ test.describe('Snippet Editor Validation', () => {
     await editContainer.getByTestId('snippet-content-input').fill('this content references @nonexistent');
 
     // 3. Assert that the warning is shown below the content input
-    await expect(editContainer.locator('.error-message')).toHaveText("Warning: Snippet '@nonexistent' not found.");
+    await expect(editContainer.getByTestId('prompt-error-message')).toHaveText("Warning: Snippet '@nonexistent' not found.");
     
     // 4. Save should still be enabled
     await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
   });
 
-  test('shows both a cycle error and a non-existent snippet warning', async () => {
-    await settingsPage.startEditingSnippet('b');
-    const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
+  test.describe('shows both a cycle error and a non-existent snippet warning', () => {
+    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
+    test('shows both errors in the UI', async () => {
+      await settingsPage.startEditingSnippet('b');
+      const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
 
-    // Introduce a cycle and a reference to a non-existent snippet
-    await editContainer.getByTestId('snippet-prompt-input').fill('this prompt references @nonexistent and also @b');
+      // Introduce a cycle and a reference to a non-existent snippet
+      await editContainer.getByTestId('snippet-prompt-input').fill('this prompt references @nonexistent and also @b');
 
-    const errorContainer = editContainer.getByTestId('prompt-error-message');
-    await expect(errorContainer).toContainText('Snippet cycle detected: @b -> @b');
-    await expect(errorContainer).toContainText("Warning: Snippet '@nonexistent' not found.");
+      const errorContainer = editContainer.getByTestId('prompt-error-message');
+      await expect(errorContainer).toContainText('Snippet cycle detected: @b -> @b');
+      await expect(errorContainer).toContainText("Warning: Snippet '@nonexistent' not found.");
+    });
   });
 
-  test('shows a cycle error for mixed-type snippet cycles', async () => {
-    // 1. Create a new standard snippet 'd' that references generated snippet 'b'
-    await settingsPage.createNewSnippet('d', 'Standard snippet referencing @b');
+  test.describe('shows a cycle error for mixed-type snippet cycles', () => {
+    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @d -> @b -> @d/] });
+    test('shows the cycle error in the UI', async () => {
+      // 1. Create a new standard snippet 'd' that references generated snippet 'b'
+      await settingsPage.createNewSnippet('d', 'Standard snippet referencing @b');
 
-    // 2. Start editing generated snippet 'b'
-    await settingsPage.startEditingSnippet('b');
-    const editContainer = settingsPage.page.locator('[data-testid="snippet-item-edit-b"]');
+      // 2. Start editing generated snippet 'b'
+      await settingsPage.startEditingSnippet('b');
+      const editContainer = settingsPage.page.locator('[data-testid="snippet-item-edit-b"]');
 
-    // 3. Update 'b's prompt to reference standard snippet 'd', creating a cycle: b (prompt) -> d (content) -> b
-    await editContainer.getByTestId('snippet-prompt-input').fill('Generated prompt referencing @d');
-    
-    // 4. Assert that the cycle error is shown in 'b's editor
-    const errorContainer = editContainer.getByTestId('prompt-error-message');
-    // The starting point of the cycle detection can vary, so we check for the presence of both snippets.
-    await expect(errorContainer).toContainText('Snippet cycle detected:');
-    await expect(errorContainer).toContainText('@b');
-    await expect(errorContainer).toContainText('@d');
+      // 3. Update 'b's prompt to reference standard snippet 'd', creating a cycle: b (prompt) -> d (content) -> b
+      await editContainer.getByTestId('snippet-prompt-input').fill('Generated prompt referencing @d');
+      
+      // 4. Assert that the cycle error is shown in 'b's editor
+      const errorContainer = editContainer.getByTestId('prompt-error-message');
+      // The starting point of the cycle detection can vary, so we check for the presence of both snippets.
+      await expect(errorContainer).toContainText('Snippet cycle detected:');
+      await expect(errorContainer).toContainText('@b');
+      await expect(errorContainer).toContainText('@d');
+    });
   });
 
   test('can save a generated snippet that references a non-existent snippet', async () => {
