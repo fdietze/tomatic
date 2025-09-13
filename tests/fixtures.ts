@@ -36,7 +36,14 @@ export const testWithConsoleErrors = base.extend<ConsoleErrorOptions>({
 	},
 });
 
-export const test = mergeTests(testWithConsoleErrors, testWithLogging);
+export const test = mergeTests(testWithConsoleErrors, testWithLogging).extend({
+	context: async ({ context }, use) => {
+		await context.addInitScript(() => {
+			window.__IS_TESTING__ = true;
+		});
+		await use(context);
+	},
+});
 
 
 
