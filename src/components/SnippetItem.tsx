@@ -45,19 +45,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  console.log(`[SnippetItem|render] START @${snippet.name}`, { 
-    isInitiallyEditing, 
-    isEditing, 
-    snippet: JSON.parse(JSON.stringify(snippet)) as Snippet
-  });
-
   const { regeneratingSnippetNames } = useAppStore(useShallow(state => ({
     regeneratingSnippetNames: state.regeneratingSnippetNames,
   })));
 
   const isActuallyRegenerating = regeneratingSnippetNames.includes(snippet.name);
   const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
-  console.log(`[SnippetItem|render] @${snippet.name} isActuallyRegenerating: ${String(isActuallyRegenerating)}, isDirty: ${String(snippet.isDirty)}`);
 
   const modelItems = useMemo((): ComboboxItem[] => {
     return cachedModels.map((model: DisplayModelInfo) => ({
@@ -68,7 +61,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   }, [cachedModels]);
 
   useEffect(() => {
-    console.log(`[SnippetItem|useEffect|isEditing] @${snippet.name} isEditing changed to: ${String(isEditing)}`);
     if (isEditing) {
       nameInputRef.current?.focus();
     }
@@ -77,7 +69,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   useEffect(() => {
     const errors: string[] = [];
     const textToScan = editingIsGenerated ? editingPrompt : editingContent;
-    console.log(`[SnippetItem|useEffect|validation] @${snippet.name} textToScan: "${textToScan}"`);
 
     // We need a complete and up-to-date list of snippets for validation.
     const otherSnippets = allSnippets.filter(s => s.name !== snippet.name);
@@ -90,7 +81,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       content: editingContent,
     };
     const snippetsForValidation = [...otherSnippets, currentSnippetForValidation];
-    console.log(`[SnippetItem|useEffect|validation] @${snippet.name} snippetsForValidation:`, snippetsForValidation.map(s=>s.name));
 
     // 1. Check for cyclical dependencies (hard error).
     try {
@@ -101,12 +91,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     
     // 2. Check for non-existent snippets (warning).
     const missingSnippets = findNonExistentSnippets(textToScan, snippetsForValidation);
-    if(missingSnippets.length > 0) console.log(`[SnippetItem|useEffect|validation] @${snippet.name} missing snippets:`, missingSnippets);
-    for (const missing of missingSnippets) {
-      errors.push(`Warning: Snippet '@${missing}' not found.`);
+    if(missingSnippets.length > 0) {
+      for (const missing of missingSnippets) {
+        errors.push(`Warning: Snippet '@${missing}' not found.`);
+      }
     }
 
-    if(errors.length > 0) console.log(`[SnippetItem|useEffect|validation] @${snippet.name} validation errors:`, errors);
     setPromptErrors(errors);
 
   }, [editingIsGenerated, editingPrompt, editingName, allSnippets, snippet, editingModel, editingContent]);
@@ -166,7 +156,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const generateAndSetContent = async () => {
-    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} called.`);
     // This function now uses local state for immediate UI feedback on manual regeneration.
     // The final save is handled by handleSave, which sends data to the store.
     const setIsGenerating = (isGenerating: boolean) => {
@@ -183,7 +172,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     setIsGenerating(true);
     setGenerationError(null);
 
-    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} local state:`, { editingName, editingPrompt, editingModel });
     const snippetToGenerate: Snippet = {
         ...snippet,
       name: editingName.trim(),
@@ -193,10 +181,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       model: editingModel,
     };
 
-    console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} calling generateSnippetContent with:`, JSON.parse(JSON.stringify(snippetToGenerate)));
     try {
       const updatedSnippet = await generateSnippetContent(snippetToGenerate);
-      console.log(`[SnippetItem|generateAndSetContent] @${snippet.name} received updated snippet:`, JSON.parse(JSON.stringify(updatedSnippet)));
       setEditingContent(updatedSnippet.content);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -208,7 +194,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const handleCancelEditing = () => {
-    console.log(`[SnippetItem|handleCancelEditing] @${snippet.name} called.`);
     if (onCancel) {
       onCancel();
     } else {
