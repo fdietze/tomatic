@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store';
 import { AppState } from '@/store/types';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import SnippetItem from '@/components/SnippetItem';
 import type { Snippet, SystemPrompt } from '@/types/storage';
 import { useShallow } from 'zustand/react/shallow';
+import { topologicalSort } from '@/utils/snippetUtils';
 
 const SettingsPage: React.FC = () => {
   const {
@@ -80,6 +81,17 @@ useShallow((state: AppState) => ({
   const handleRemoveSnippet = (name: string) => {
     return deleteSnippet(name);
   };
+
+  const sortedSnippets = useMemo(() => {
+    const { sorted, cyclic } = topologicalSort(snippets);
+
+    if (cyclic.length > 0) {
+      console.warn('[SettingsPage] Cycle detected in snippets, falling back to alphabetical sort for all items.');
+      return [...snippets].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return sorted;
+  }, [snippets]);
 
 
   return (
@@ -175,7 +187,7 @@ useShallow((state: AppState) => ({
               onCancel={handleCancelNewSnippet}
             />
           )}
-{snippets.map((snippet: Snippet) => (
+          {sortedSnippets.map((snippet: Snippet) => (
             <SnippetItem
               key={snippet.name}
               snippet={snippet}
