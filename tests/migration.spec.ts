@@ -71,7 +71,12 @@ test.describe('Database Migrations', () => {
     const migrationResult = await page.evaluate(
       async (
         sessionId: string,
-      ): Promise<{ session: ChatSession | null; hasPromptsStore: boolean; dbVersion: number }> => {
+      ): Promise<{
+        session: ChatSession | null;
+        hasPromptsStore: boolean;
+        hasSnippetsStore: boolean;
+        dbVersion: number;
+      }> => {
         const dbName = 'tomatic_chat_db';
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = window.indexedDB.open(dbName); // open with no version to get latest
@@ -86,6 +91,7 @@ test.describe('Database Migrations', () => {
 
         const dbVersion = db.version;
         const hasPromptsStore = db.objectStoreNames.contains('system_prompts');
+        const hasSnippetsStore = db.objectStoreNames.contains('snippets');
 
         const tx = db.transaction('chat_sessions', 'readonly');
         const store = tx.objectStore('chat_sessions');
@@ -99,14 +105,15 @@ test.describe('Database Migrations', () => {
           };
         });
         db.close();
-        return { session, hasPromptsStore, dbVersion };
+        return { session, hasPromptsStore, hasSnippetsStore, dbVersion };
       },
       V1_SESSION.session_id,
     );
 
     // 5. Assertions
-    expect(migrationResult.dbVersion).toBe(2);
+    expect(migrationResult.dbVersion).toBe(3);
     expect(migrationResult.hasPromptsStore).toBe(true);
+    expect(migrationResult.hasSnippetsStore).toBe(true);
     const migratedSession = migrationResult.session;
     expect(migratedSession).not.toBeNull();
     if (!migratedSession) return; // for type-safety

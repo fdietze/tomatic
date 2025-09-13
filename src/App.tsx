@@ -9,13 +9,15 @@ import {
 } from 'react-router-dom';
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
-import { useAppStore } from './store/appStore';
+import { useAppStore } from '@/store';
 import { useShallow } from 'zustand/react/shallow';
+import { AppState } from './store/types';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentSessionId = useAppStore((state) => state.currentSessionId);
+  const isRegenerating = useAppStore((state) => state.isRegenerating);
 
   const onChat = () => {
     if (currentSessionId) {
@@ -39,7 +41,7 @@ const Header: React.FC = () => {
           Chat
         </button>
         <button onClick={onSettings} data-active={isSettingsActive} data-testid="settings-button">
-          Settings
+          Settings {isRegenerating && <span className="spinner" />}
         </button>
       </div>
     </header>
@@ -49,7 +51,7 @@ const Header: React.FC = () => {
 
 const App: React.FC = () => {
   const { isInitializing, init } = useAppStore(
-    useShallow((state) => ({
+    useShallow((state: AppState) => ({
       isInitializing: state.isInitializing,
       init: state.init,
     }))

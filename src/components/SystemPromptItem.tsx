@@ -10,6 +10,8 @@ interface SystemPromptItemProps {
   onCancel?: () => void;
 }
 
+const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
+
 const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   prompt,
   isInitiallyEditing,
@@ -19,7 +21,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   onCancel,
 }) => {
   console.log(
-    `[DEBUG] SystemPromptItem render. Index: ${prompt.name}, Name: "${prompt.name}", isEditing initially: ${String(isInitiallyEditing)}`
+    `[DEBUG] SystemPromptItem render. Name: "${prompt.name}", isEditing initially: ${String(isInitiallyEditing)}`
   );
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(prompt.name);
@@ -35,24 +37,10 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
 
   const handleSave = () => {
     const trimmedName = editingName.trim();
-    if (trimmedName === '') {
-      setNameError('Name cannot be empty.');
-      return;
+    if (nameError || trimmedName === '') {
+        if (trimmedName === '') setNameError('Name cannot be empty.');
+        return;
     }
-    
-    // For existing prompts, the original name is `prompt.name`.
-    // For new prompts, `prompt.name` is empty.
-    const originalName = prompt.name;
-
-    const isDuplicate = allPrompts.some(
-      (p) => p.name.trim().toLowerCase() === trimmedName.toLowerCase() && p.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
-    );
-
-    if (isDuplicate) {
-      setNameError('A prompt with this name already exists.');
-      return;
-    }
-
     onUpdate({ name: trimmedName, prompt: editingPrompt });
     setIsEditing(false);
     setNameError(null);
@@ -71,8 +59,27 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
 
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingName(e.target.value);
-    if (nameError) {
+    const newName = e.target.value;
+    setEditingName(newName);
+
+    if (newName.trim() === '') {
+      setNameError('Name cannot be empty.');
+      return;
+    }
+
+    if (!NAME_REGEX.test(newName)) {
+      setNameError('Name can only contain alphanumeric characters and underscores.');
+      return;
+    }
+
+    const originalName = prompt.name;
+    const isDuplicate = allPrompts.some(
+      (p) => p.name.trim().toLowerCase() === newName.trim().toLowerCase() && p.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setNameError('A prompt with this name already exists.');
+    } else {
       setNameError(null);
     }
   };
@@ -102,7 +109,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             onClick={handleSave}
             data-size="compact"
             data-role="primary"
-            disabled={!!nameError && editingName.trim() !== ''}
+            disabled={!!nameError}
             data-testid="system-prompt-save-button"
           >
             Save

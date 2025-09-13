@@ -1,0 +1,183 @@
+body,
+html {
+    width: 100%;
+    height: 100%;
+    overscroll-behavior-y: contain; /* mobile: disable pull down to reload behavior */
+}
+
+body {
+    background-color: var(--base02);
+    color: var(--base05);
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    margin: 0;
+    padding: 4px 4px 0 4px;
+    background-color: var(--base01);
+}
+
+header .tabs {
+    display: flex;
+}
+
+header .tabs button {
+    background-color: var(--base01);
+    /* color: var(--base04); */
+    border: none;
+    padding: 5px 10px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+}
+
+header .tabs button[data-active="true"] {
+    background-color: var(--base02);
+    color: var(--base05);
+}
+
+main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+a {
+    color: var(--base0D);
+    text-decoration: underline;
+}
+
+textarea,
+input,
+select {
+    background-color: var(--base00);
+    color: var(--base05);
+    padding: 8px;
+    border-radius: 4px;
+    outline: none;
+    border: 2px solid transparent;
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+    border: 2px solid var(--base0B);
+}
+
+/* Custom arrow for select elements */
+select {
+    -webkit-appearance: none; /* Remove default arrow for Safari/Chrome */
+    -moz-appearance: none; /* Remove default arrow for Firefox */
+    appearance: none; /* Remove default arrow */
+
+    /* Add custom arrow using SVG with currentColor for theming */
+    /* SVG: down-pointing triangle */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='currentColor' d='M2 5h12l-6 6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center; /* Position arrow: 8px from the right edge, vertically centered */
+    background-size: 12px; /* Set the size of the arrow */
+
+    /* Adjust padding-right to make space for the arrow. */
+    /* The general rule `textarea, input, select` sets `padding: 8px;`. */
+    /* We need to ensure text doesn't overlap the arrow. */
+    /* Arrow is 12px wide, positioned 8px from right. So space needed > 20px. */
+    /* Let's set it to 30px for some comfortable spacing. */
+    padding-right: 30px;
+}
+
+button {
+    cursor: pointer;
+    font-family: system-ui, sans-serif;
+    flex-shrink: 0;
+
+    &:not([data-role]) {
+        background-color: var(--base02);
+        &[disabled] {
+            opacity: 0.5;
+        }
+    }
+
+    &[data-role="primary"] {
+        background-color: var(--base0D);
+        color: var(--base00);
+        &[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    &[data-role="destructive"] {
+        background-color: var(--base08);
+        color: var(--base00);
+        &[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    &:not([data-size]) {
+        padding: 8px 12px;
+        border-radius: 4px;
+    }
+
+    &[data-size="compact"] {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: smaller;
+    }
+
+    &[data-role="text"] {
+        display: inline;
+        padding: 0;
+        color: var(--base05);
+        text-decoration: underline;
+        &:hover {
+            color: var(--base0D);
+        }
+    }
+}
+
+hr {
+    margin: 2em 0;
+    opacity: 50%;
+}
+
+ul,
+ol {
+    margin: 1em 0;
+    padding-left: 1.5em;
+    list-style-position: outside;
+}
+
+ul {
+    list-style-type: disc;
+}
+
+ol {
+    list-style-type: decimal;
+}
+
+ul li::marker,
+ol li::marker {
+    color: var(--base05);
+}
+
+/* Nested lists */
+ul ul,
+ol ol {
+    list-style-type: circle;
+    padding-left: 1.5em;
+}
+
+li {
+    margin-bottom: 0.5em;
+    line-height: 1.5;
+}

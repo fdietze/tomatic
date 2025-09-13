@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useAppStore } from '@/store/appStore';
+import { useAppStore } from '@/store';
+import { AppState } from '@/store/types';
 import { useShallow } from 'zustand/react/shallow';
 import ChatHeader from '@/components/ChatHeader';
 import ChatInterface from '@/components/ChatInterface';
@@ -17,14 +18,18 @@ const ChatPage: React.FC = () => {
     setSelectedPromptName,
     prevSessionId,
     nextSessionId,
+    error,
+    setError,
   } = useAppStore(
-    useShallow((state) => ({
+useShallow((state: AppState) => ({
       loadSession: state.loadSession,
       systemPrompts: state.systemPrompts,
       selectedPromptName: state.selectedPromptName,
       setSelectedPromptName: state.setSelectedPromptName,
       prevSessionId: state.prevSessionId,
       nextSessionId: state.nextSessionId,
+      error: state.error,
+      setError: state.setError,
     }))
   );
 
@@ -69,6 +74,14 @@ const ChatPage: React.FC = () => {
         onPrev={onPrev}
         onNext={onNext}
       />
+      {error && (
+        <div className="error-display" data-testid="error-message">
+          <p>{error}</p>
+          <button onClick={() => { setError(null); }} className="close-button">
+            &times;
+          </button>
+        </div>
+      )}
       <ChatInterface />
     </>
   );

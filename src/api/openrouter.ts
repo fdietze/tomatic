@@ -1,6 +1,4 @@
-import OpenAI from 'openai';
-import type { Stream } from 'openai/streaming';
-import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
+import OpenAI, { APIError } from 'openai';
 import { z } from 'zod';
 
 import type { DisplayModelInfo } from '@/types/storage';
@@ -65,6 +63,8 @@ const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: apiKey,
+    // Disable retries for deterministic test behavior.
+    maxRetries: import.meta.env.VITE_IS_TESTING === 'true' ? 0 : 2,
     // Recommended headers to identify your app to OpenRouter.
     defaultHeaders: {
       'HTTP-Referer': window.location.host,
@@ -111,33 +111,37 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
   }
 }
 
-export async function requestMessageContentStreamed(
+export async function requestMessageContent(
   messages: Message[],
   model: string,
   apiKey: string
-): Promise<Stream<ChatCompletionChunk>> {
-  try {
+): Promise<string> {
+    const body = {
+        model: model,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    };
+    
+    console.debug(`[API] Requesting chat completion with model ${model} and ${String(messages.length)} messages.`);
+    
     const openai = getOpenAIClient(apiKey);
     
-    // Map our internal Message type to the type expected by the OpenAI client.
-    const openAiMessages = messages.map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
+    try {
+        const response = await openai.chat.completions.create({
+            model: body.model,
+            messages: body.messages,
+            stream: false,
+        });
 
-    console.debug(
-      `[API] Requesting chat completion with model ${model} and ${String(openAiMessages.length)} messages.`
-    );
-    const stream = await openai.chat.completions.create({
-      model: model,
-      messages: openAiMessages,
-      stream: true,
-    });
-    
-    return stream;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[API] requestMessageContentStreamed error: ${errorMessage}`);
-    throw new Error(`[API] requestMessageContentStreamed error: ${errorMessage}`);
-  }
+        const newContent = response.choices[0]?.message?.content || '';
+        return newContent;
+
+    } catch (e) {
+        if (e instanceof APIError) {
+            console.log(`[API|requestMessageContent] Caught APIError: ${e.constructor.name}: ${e.message}`);
+            // Re-throw a simpler error to be handled by the store
+            throw new Error(e.message);
+        }
+        console.log('[API|requestMessageContent] Caught unknown error:', e);
+        throw new Error('An unknown error occurred while fetching the model response.');
+    }
 }

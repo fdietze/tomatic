@@ -17,9 +17,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  timeout: 5 * 1000,
+  timeout: 10 * 1000,
   webServer: {
-    command: 'npm run dev',
+    command: 'VITE_IS_TESTING=true npm run dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',

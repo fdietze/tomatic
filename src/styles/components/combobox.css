@@ -1,0 +1,117 @@
+/* Combobox Styles */
+.combobox-wrapper {
+    position: relative; /* For positioning the suggestions list */
+    width: 100%;
+}
+
+.combobox-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--base04);
+}
+
+.combobox-input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: var(--base00);
+    color: var(--base05);
+    border: 2px solid transparent;
+    outline: none;
+    box-sizing: border-box; /* Ensure padding and border don't increase total width */
+}
+
+.combobox-input:focus {
+    border: 2px solid var(--base0B);
+}
+
+.combobox-input-disabled {
+    background-color: var(--base01);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.combobox-input-loading {
+    /* Add specific styles for loading state if needed, e.g., a spinner background */
+}
+
+.combobox-suggestions {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px; /* Or whatever height you prefer */
+    overflow-y: auto;
+    /* Remove absolute positioning from here as it's now on the container */
+}
+
+.combobox-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--base05);
+}
+
+.combobox-item:hover,
+.combobox-item-highlighted {
+    background-color: var(--base01);
+    color: var(--base07); /* Or a more prominent color like base0D */
+}
+
+.combobox-loading-indicator,
+.combobox-error-message,
+.combobox-no-results {
+    padding: 8px 12px;
+    color: var(--base03);
+    background-color: var(--base00); /* Match suggestions background */
+    border: 1px solid var(--base02);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.combobox-error-message {
+    color: var(--base08);
+}
+
+.model-price {
+    font-family: monospace;
+}
+
+
+
+.combobox-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.combobox-suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--base00);
+    border: 1px solid var(--base02);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.combobox-footer {
+    padding: 4px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--base02);
+}
+
+.combobox-reload-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
