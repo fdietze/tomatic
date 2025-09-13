@@ -8,4 +8,9 @@ declare global {
   interface Navigator {
     readonly userAgentData?: NavigatorUAData;
   }
+  interface Window {
+		__IS_TESTING__?: boolean;
+	}
 }
+
+export {};

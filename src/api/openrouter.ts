@@ -60,11 +60,13 @@ const getOpenAIClient = (apiKey: string) => {
   if (!apiKey) {
     throw new Error('OpenRouter API key is missing.');
   }
+  const maxRetries = window.__IS_TESTING__ ? 0 : 2;
+  console.log('New OpenAI client with maxRetries:', maxRetries);
   return new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: apiKey,
     // Disable retries for deterministic test behavior.
-    maxRetries: import.meta.env.VITE_IS_TESTING === 'true' ? 0 : 2,
+    maxRetries: maxRetries,
     // Recommended headers to identify your app to OpenRouter.
     defaultHeaders: {
       'HTTP-Referer': window.location.host,

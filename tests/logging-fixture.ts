@@ -32,7 +32,7 @@ import { test as base } from '@playwright/test';
 interface LogEntry {
 	type: 'BROWSER_CONSOLE' | 'NETWORK_REQUEST' | 'NETWORK_RESPONSE';
 	timestamp: number;
-	data: any;
+	data: unknown;
 }
 
 export const testWithLogging = base.extend({
@@ -56,7 +56,7 @@ export const testWithLogging = base.extend({
 						postDataLog,
 					},
 				});
-			} catch (e) {
+			} catch {
 				logs.push({
 					type: 'NETWORK_REQUEST',
 					timestamp: Date.now(),
@@ -69,7 +69,7 @@ export const testWithLogging = base.extend({
 			}
 		});
 
-		page.on('response', async (res) => {
+		page.on('response', (res) => {
 			try {
 				if ((baseURL && res.url().startsWith(baseURL)) || res.url().startsWith('data:')) {
 					return;
@@ -80,11 +80,11 @@ export const testWithLogging = base.extend({
 					type: 'NETWORK_RESPONSE',
 					timestamp: Date.now(),
 					data: {
-						status: `${status}${statusText}`,
+						status: `${String(status)}${statusText}`,
 						url: res.url(),
 					},
 				});
-			} catch (e) {
+			} catch {
 				logs.push({
 					type: 'NETWORK_RESPONSE',
 					timestamp: Date.now(),
@@ -119,7 +119,7 @@ export const testWithLogging = base.extend({
 
 		await use(page);
 
-		testInfo.attach('browser-logs', {
+		await testInfo.attach('browser-logs', {
 			body: JSON.stringify(logs, null, 2),
 			contentType: 'application/json',
 		});
