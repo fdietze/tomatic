@@ -2,6 +2,7 @@ import { test } from './fixtures';
 import { ChatPage } from './pom/ChatPage';
 import { DBV3_ChatSession, DBV3_Snippet } from '@/types/storage';
 import { ChatCompletionMocker, seedLocalStorage, seedIndexedDB, OPENROUTER_API_KEY, mockGlobalApis } from './test-helpers';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Chat Regeneration with Snippets', () => {
   let chatPage: ChatPage;
@@ -70,7 +71,7 @@ test.describe('Chat Regeneration with Snippets', () => {
     await chatMocker.setup();
     
     // 4. Navigate
-    await page.goto(`/chat/${SESSION_WITH_SNIPPET.session_id}`);
+    await page.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
   });
 
   test('uses updated snippet content when regenerating a response', async ({ context, page }) => {

@@ -1,6 +1,7 @@
 import { type Page, type Locator, expect } from '@playwright/test';
 import { ModelComboboxPage } from './ModelComboboxPage';
 import { NavigationComponent } from './NavigationComponent';
+import { ROUTES } from '@/utils/routes';
 
 /**
  * Page Object Model for the main chat interface.
@@ -29,7 +30,7 @@ export class ChatPage {
    * Navigates to a new chat page.
    */
   async goto() {
-     await this.page.goto('/chat/new');
+     await this.page.goto(ROUTES.chat.new);
   }
 
   /**

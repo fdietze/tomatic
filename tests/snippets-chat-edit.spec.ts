@@ -9,6 +9,7 @@ import {
   mockGlobalApis,
 } from './test-helpers';
 import { DBV3_Snippet, DBV3_ChatSession } from '@/types/storage';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Chat Editing with Snippets', () => {
   let chatPage: ChatPage;
@@ -80,7 +81,7 @@ test.describe('Chat Editing with Snippets', () => {
     });
 
     // 3. Navigate and create POMs
-    await page.goto(`/chat/${SESSION_WITH_SNIPPET.session_id}`);
+    await page.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
 
     // 4. Verify initial state
     await chatPage.expectMessage(0, 'user', /@greet world/);
