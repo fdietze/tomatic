@@ -1,5 +1,6 @@
 import { test as base, mergeTests } from '@playwright/test';
 import { testWithLogging } from './logging-fixture';
+import { networkSecurityTest } from './network-security-fixture';
 
 export interface ConsoleErrorOptions {
 	expectedConsoleErrors: (string | RegExp)[];
@@ -36,7 +37,7 @@ export const testWithConsoleErrors = base.extend<ConsoleErrorOptions>({
 	},
 });
 
-export const test = mergeTests(testWithConsoleErrors, testWithLogging).extend({
+export const test = mergeTests(testWithConsoleErrors, testWithLogging, networkSecurityTest).extend({
 	context: async ({ context }, use) => {
 		await context.addInitScript(() => {
 			window.__IS_TESTING__ = true;
@@ -44,6 +45,9 @@ export const test = mergeTests(testWithConsoleErrors, testWithLogging).extend({
 		await use(context);
 	},
 });
+
+
+export { expect } from '@playwright/test';
 
 
 
