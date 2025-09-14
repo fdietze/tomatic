@@ -145,7 +145,7 @@ export const createChatSlice: StateCreator<
     },
     regenerateMessage: async (index) => {
         console.debug(`[STORE|regenerateMessage] Called for index: ${String(index)}`);
-        const { messages, systemPrompts, snippets } = get();
+        const { messages, systemPrompts } = get();
         const messagesToRegenerate = [...messages.slice(0, index)];
 
         const systemMessageIndex = messagesToRegenerate.findIndex(m => m.role === 'system');
@@ -169,18 +169,8 @@ export const createChatSlice: StateCreator<
             const rawContent = lastUserMessage.raw_content ?? lastUserMessage.content;
             promptOverride = rawContent;
             console.debug(`[STORE|regenerateMessage] Regenerating with raw content: "${rawContent}"`);
-
-            try {
-                const resolvedContent = resolveSnippets(rawContent, snippets);
-                messagesToRegenerate[lastUserMessageIndex] = { ...lastUserMessage, content: resolvedContent, raw_content: rawContent };
-            } catch (e) {
-                const error = e instanceof Error ? e.message : 'An unknown error occurred.';
-                get().setError(error);
-                return; 
-            }
         }
         
-        set({ messages: messages.slice(0, index) });
         await get().submitMessage({ isRegeneration: true, messagesToRegenerate, promptOverride });
     },
     editAndResubmitMessage: async (index, newContent) => {

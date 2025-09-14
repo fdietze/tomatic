@@ -24,6 +24,7 @@ test.describe('Snippet Editor Validation', () => {
         { name: 'a', content: 'alpha', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
         { name: 'b', content: '', isGenerated: true, prompt: 'no cycle here', createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
         { name: 'c', content: 'charlie', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+        { name: 'd', content: 'Standard snippet referencing @b', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
         { name: 'empty', content: '   ', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
       ],
     });
@@ -106,17 +107,14 @@ test.describe('Snippet Editor Validation', () => {
       // Purpose: This test verifies that cycle detection works correctly across different snippet
       // types (e.g., a standard snippet referencing a generated snippet, which in turn
       // references the standard one).
-      // 1. Create a new standard snippet 'd' that references generated snippet 'b'
-      await settingsPage.createNewSnippet('d', 'Standard snippet referencing @b');
-
-      // 2. Start editing generated snippet 'b'
+      // 1. Start editing generated snippet 'b'
       await settingsPage.startEditingSnippet('b');
       const editContainer = settingsPage.page.locator('[data-testid="snippet-item-edit-b"]');
 
-      // 3. Update 'b's prompt to reference standard snippet 'd', creating a cycle: b (prompt) -> d (content) -> b
+      // 2. Update 'b's prompt to reference standard snippet 'd', creating a cycle: b (prompt) -> d (content) -> b
       await editContainer.getByTestId('snippet-prompt-input').fill('Generated prompt referencing @d');
       
-      // 4. Assert that the cycle error is shown in 'b's editor
+      // 3. Assert that the cycle error is shown in 'b's editor
       const errorContainer = editContainer.getByTestId('prompt-error-message');
       // The starting point of the cycle detection can vary, so we check for the presence of both snippets.
       await expect(errorContainer).toContainText('Snippet cycle detected:');

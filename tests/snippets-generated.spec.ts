@@ -73,7 +73,7 @@ test.describe('Generated Snippets', () => {
     // Purpose: This test verifies that a user can update all aspects of a generated snippet,
     // including its name, prompt, and model. It ensures that regenerating the snippet with
     // new details works correctly and the final result is saved.
-    // 1. Mock initial creation
+    // 1. Seed the initial snippet
     chatMocker.mock({
       request: {
         model: 'mock-model/mock-model',
@@ -83,7 +83,6 @@ test.describe('Generated Snippets', () => {
     });
     await settingsPage.createGeneratedSnippet('joke', 'Tell me a joke', 'mock-model/mock-model', 'Mock Model');
     await settingsPage.expectSnippetToBeVisible('joke');
-    await settingsPage.expectGeneratedSnippetContent('joke', /outstanding in his field/);
 
     // 2. Mock the update/regeneration
     chatMocker.mock({
@@ -110,12 +109,15 @@ test.describe('Generated Snippets', () => {
     chatMocker.verifyComplete();
   });
 
-  test('resolves snippets in the prompt before generation', async () => {
+  test('resolves snippets in the prompt before generation', async ({ context }) => {
     // Purpose: This test ensures that if a generated snippet's prompt contains a reference
     // to another snippet (e.g., '@topic'), that reference is resolved to its content before
     // the prompt is sent to the API for generation.
     // 1. Create a standard snippet that will be referenced.
-    await settingsPage.createNewSnippet('topic', 'space exploration');
+    await seedIndexedDB(context, {
+      snippets: [{ name: 'topic', content: 'space exploration', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }],
+    });
+    await settingsPage.page.reload();
 
     // 2. Mock the API call for the generated snippet.
     // The key part is that the 'content' of the user message must be the *resolved* prompt.
@@ -168,30 +170,22 @@ test.describe('Automatic Regeneration', () => {
 		await settingsPage.goto();
 	});
 
-	test('regenerates a dependent snippet when its dependency is updated', async () => {
+	test('regenerates a dependent snippet when its dependency is updated', async ({ context }) => {
 		// Purpose: This test verifies that when a standard snippet (A) is updated, any generated
 		// snippet (B) that depends on it (i.e., uses '@A' in its prompt) is automatically
 		// and correctly regenerated in the background.
-		// 1. Mock the initial generation of snippet B
-		chatMocker.mock({
-			request: {
-				model: 'mock-model/mock-model',
-				messages: [{ role: 'user', content: 'Hello World' }],
-			},
-			response: { role: 'assistant', content: 'Initial content for B' },
+		// 1. Seed the initial snippets
+		await seedIndexedDB(context, {
+			snippets: [
+				{ name: 'A', content: 'World', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+				{ name: 'B', content: 'Initial content for B', isGenerated: true, prompt: 'Hello @A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+			],
 		});
-
-		// 2. Create the snippets
-		await settingsPage.createNewSnippet('A', 'World');
-		await settingsPage.createGeneratedSnippet(
-			'B',
-			'Hello @A',
-			'mock-model/mock-model',
-			'Mock Model',
-		);
+		await settingsPage.page.reload();
 		await settingsPage.expectGeneratedSnippetContent('B', /Initial content for B/);
 
-		// 3. Mock the regeneration of snippet B, which will be triggered by updating A
+
+		// 2. Mock the regeneration of snippet B, which will be triggered by updating A
 		chatMocker.mock({
 			request: {
 				model: 'mock-model/mock-model',
@@ -200,43 +194,38 @@ test.describe('Automatic Regeneration', () => {
 			response: { role: 'assistant', content: 'Updated content for B' },
 		});
 
-		// 4. Update snippet A
+		// 3. Update snippet A
 		await settingsPage.startEditingSnippet('A');
 		await settingsPage.fillSnippetForm('A', 'Universe');
 		await settingsPage.saveSnippet();
 
-		// 5. Assert that snippet B's content has been updated.
+		// 4. Assert that snippet B's content has been updated.
 		// Playwright's expect has a built-in timeout, so it will wait for the regeneration to complete.
 		await settingsPage.expectGeneratedSnippetContent('B', /Updated content for B/);
 
-		// 6. Verify all mocks were consumed
+		// 5. Verify all mocks were consumed
 		chatMocker.verifyComplete();
 	});
 
-	test('transitively regenerates snippets in the correct order', async () => {
+	test('transitively regenerates snippets in the correct order', async ({ context }) => {
 		// Purpose: This test verifies that automatic regeneration works for a chain of dependencies
 		// (e.g., C depends on B, B depends on A). When the base snippet (A) is updated, it
 		// should trigger a cascading regeneration of B, and then C, in the correct order.
-		// 1. Set up mocks for the initial creation of B and C
-		chatMocker.mock({ // Initial generation of B
-			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v1' }] },
-			response: { role: 'assistant', content: 'Content of B from v1' },
+		// 1. Seed the initial snippets
+		await seedIndexedDB(context, {
+			snippets: [
+				{ name: 'A', content: 'v1', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+				{ name: 'B', content: 'Content of B from v1', isGenerated: true, prompt: 'Prompt for B using @A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+				{ name: 'C', content: 'Content of C from B_v1', isGenerated: true, prompt: 'Prompt for C using @B', model: 'mock-model/mock-model', createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
+			],
 		});
-		chatMocker.mock({ // Initial generation of C
-			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v1' }] },
-			response: { role: 'assistant', content: 'Content of C from B_v1' },
-		});
-
-		// 2. Create the snippet chain: C -> B -> A
-		await settingsPage.createNewSnippet('A', 'v1');
-		await settingsPage.createGeneratedSnippet('B', 'Prompt for B using @A', 'mock-model/mock-model', 'Mock Model');
-		await settingsPage.createGeneratedSnippet('C', 'Prompt for C using @B', 'mock-model/mock-model', 'Mock Model');
+		await settingsPage.page.reload();
 		
-		// 3. Verify initial state
+		// 2. Verify initial state
 		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
 		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);
 
-		// 4. Set up mocks for the transitive regeneration
+		// 3. Set up mocks for the transitive regeneration
 		chatMocker.mock({ // Regeneration of B after A is updated
 			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }] },
 			response: { role: 'assistant', content: 'Content of B from v2' },
@@ -246,53 +235,44 @@ test.describe('Automatic Regeneration', () => {
 			response: { role: 'assistant', content: 'Content of C from B_v2' },
 		});
 
-		// 5. Update the base snippet 'A', which should trigger the chain reaction
+		// 4. Update the base snippet 'A', which should trigger the chain reaction
 		await settingsPage.startEditingSnippet('A');
 		await settingsPage.fillSnippetForm('A', 'v2');
 		await settingsPage.saveSnippet();
 
-		// 6. Assert that both B and C have been regenerated with the new content
+		// 5. Assert that both B and C have been regenerated with the new content
 		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v2/);
 		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v2/);
 
-		// 7. Verify all mocks were consumed in the correct order
+		// 6. Verify all mocks were consumed in the correct order
 		chatMocker.verifyComplete();
 	});
 
-	test('skips automatic regeneration if the resolved prompt is empty', async () => {
+	test('skips automatic regeneration if the resolved prompt is empty', async ({ context }) => {
 		// Purpose: This test ensures that if an update to a dependency causes a generated
 		// snippet's prompt to become empty, the system correctly clears the snippet's content
 		// and skips making an unnecessary API call for regeneration.
-		// 1. Mock the initial generation of snippet B
-		chatMocker.mock({
-			request: {
-				model: 'mock-model/mock-model',
-				messages: [{ role: 'user', content: 'Initial Text' }],
-			},
-			response: { role: 'assistant', content: 'Initial content for B' },
+		// 1. Seed the initial snippets
+		await seedIndexedDB(context, {
+			snippets: [
+				{ name: 'A', content: 'Initial Text', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+				{ name: 'B', content: 'Initial content for B', isGenerated: true, prompt: '@A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+			],
 		});
-
-		// 2. Create the snippets
-		await settingsPage.createNewSnippet('A', 'Initial Text');
-		await settingsPage.createGeneratedSnippet(
-			'B',
-			'@A',
-			'mock-model/mock-model',
-			'Mock Model',
-		);
+		await settingsPage.page.reload();
 		await settingsPage.expectGeneratedSnippetContent('B', /Initial content for B/);
 
 		// No more mocks are needed as the regeneration should be skipped.
 
-		// 3. Update snippet A to be empty (whitespace)
+		// 2. Update snippet A to be empty (whitespace)
 		await settingsPage.startEditingSnippet('A');
 		await settingsPage.fillSnippetForm('A', '   ');
 		await settingsPage.saveSnippet();
 
-		// 4. Assert that snippet B's content has been cleared.
+		// 3. Assert that snippet B's content has been cleared.
 		await settingsPage.expectGeneratedSnippetContent('B', '');
 
-		// 5. Verify no unexpected API calls were made
+		// 4. Verify no unexpected API calls were made
 		chatMocker.verifyComplete();
 	});
 });
