@@ -25,6 +25,8 @@ test.describe('Snippet Management (CRUD)', () => {
   });
 
   test('creates a new standard snippet', async () => {
+    // Purpose: This test verifies the basic functionality of creating a new, standard
+    // (non-generated) snippet on the settings page.
     await settingsPage.createNewSnippet('greet', 'Hello, world!');
 
     await settingsPage.expectSnippetToBeVisible('greet');
@@ -32,6 +34,8 @@ test.describe('Snippet Management (CRUD)', () => {
   });
 
   test('updates an existing snippet', async () => {
+    // Purpose: This test verifies that a user can edit an existing snippet's name and
+    // content and save the changes.
     await settingsPage.createNewSnippet('my_snippet', 'Initial content');
     await settingsPage.expectSnippetToBeVisible('my_snippet');
 
@@ -45,6 +49,8 @@ test.describe('Snippet Management (CRUD)', () => {
   });
 
   test('deletes a snippet', async () => {
+    // Purpose: This test verifies that a snippet can be successfully deleted from the
+    // settings page.
     await settingsPage.createNewSnippet('to_delete', 'I am temporary');
     await settingsPage.expectSnippetToBeVisible('to_delete');
 
@@ -76,6 +82,8 @@ test.describe('Snippet Name Validation', () => {
     });
   
     test('prevents saving a new snippet with an empty name', async () => {
+      // Purpose: This test verifies input validation, ensuring a snippet cannot be saved
+      // if its name is empty.
       await settingsPage.newSnippetButton.click();
       const editContainer = settingsPage.getNewSnippetEditContainer();
       
@@ -88,6 +96,8 @@ test.describe('Snippet Name Validation', () => {
     });
   
     test('prevents saving a new snippet with invalid characters', async () => {
+        // Purpose: This test verifies input validation, ensuring that a snippet name can only
+        // contain alphanumeric characters and underscores.
         await settingsPage.newSnippetButton.click();
         const editContainer = settingsPage.getNewSnippetEditContainer();
         const nameInput = settingsPage.getSnippetNameInput(editContainer);
@@ -99,6 +109,8 @@ test.describe('Snippet Name Validation', () => {
     });
   
     test('prevents saving a new snippet with a duplicate name', async () => {
+        // Purpose: This test verifies input validation, ensuring a new snippet cannot be saved
+        // if its name already exists (case-insensitively).
         // 1. Create an initial snippet
         await settingsPage.createNewSnippet('existing_snippet', 'some content');
         await settingsPage.expectSnippetToBeVisible('existing_snippet');

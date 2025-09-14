@@ -12,6 +12,10 @@ test.describe('System Prompt Interaction', () => {
     await mockGlobalApis(context);
   });
    test('uses the updated system prompt when regenerating a response', async ({ context, page }) => {
+    // Purpose: This test verifies that when regenerating an assistant's response, the system
+    // uses the most up-to-date version of the active system prompt. Even though the originally
+    // displayed system prompt message in the chat remains for historical accuracy, the API
+    // request for regeneration must include the edited prompt content.
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: 'Chef', prompt: 'You are a master chef.' },

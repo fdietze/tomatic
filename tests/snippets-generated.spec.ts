@@ -27,6 +27,9 @@ test.describe('Generated Snippets', () => {
   });
 
   test('UI shows correct fields for a generated snippet', async ({ page }) => {
+    // Purpose: This test verifies that the UI correctly toggles between the fields for a
+    // standard snippet (editable content) and a generated snippet (prompt, model, and
+    // read-only content display).
     await settingsPage.newSnippetButton.click();
     const editContainer = page.getByTestId('snippet-item-edit-new');
 
@@ -47,6 +50,9 @@ test.describe('Generated Snippets', () => {
   });
 
   test('creates a new generated snippet', async () => {
+    // Purpose: This test verifies the end-to-end flow of creating a new generated snippet.
+    // It checks that the prompt is sent to the API and the resulting content is displayed
+    // and saved correctly.
     chatMocker.mock({
       request: {
         model: 'mock-model/mock-model',
@@ -64,6 +70,9 @@ test.describe('Generated Snippets', () => {
   });
 
   test('updates a generated snippet', async () => {
+    // Purpose: This test verifies that a user can update all aspects of a generated snippet,
+    // including its name, prompt, and model. It ensures that regenerating the snippet with
+    // new details works correctly and the final result is saved.
     // 1. Mock initial creation
     chatMocker.mock({
       request: {
@@ -102,6 +111,9 @@ test.describe('Generated Snippets', () => {
   });
 
   test('resolves snippets in the prompt before generation', async () => {
+    // Purpose: This test ensures that if a generated snippet's prompt contains a reference
+    // to another snippet (e.g., '@topic'), that reference is resolved to its content before
+    // the prompt is sent to the API for generation.
     // 1. Create a standard snippet that will be referenced.
     await settingsPage.createNewSnippet('topic', 'space exploration');
 
@@ -157,6 +169,9 @@ test.describe('Automatic Regeneration', () => {
 	});
 
 	test('regenerates a dependent snippet when its dependency is updated', async () => {
+		// Purpose: This test verifies that when a standard snippet (A) is updated, any generated
+		// snippet (B) that depends on it (i.e., uses '@A' in its prompt) is automatically
+		// and correctly regenerated in the background.
 		// 1. Mock the initial generation of snippet B
 		chatMocker.mock({
 			request: {
@@ -199,6 +214,9 @@ test.describe('Automatic Regeneration', () => {
 	});
 
 	test('transitively regenerates snippets in the correct order', async () => {
+		// Purpose: This test verifies that automatic regeneration works for a chain of dependencies
+		// (e.g., C depends on B, B depends on A). When the base snippet (A) is updated, it
+		// should trigger a cascading regeneration of B, and then C, in the correct order.
 		// 1. Set up mocks for the initial creation of B and C
 		chatMocker.mock({ // Initial generation of B
 			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v1' }] },
@@ -242,6 +260,9 @@ test.describe('Automatic Regeneration', () => {
 	});
 
 	test('skips automatic regeneration if the resolved prompt is empty', async () => {
+		// Purpose: This test ensures that if an update to a dependency causes a generated
+		// snippet's prompt to become empty, the system correctly clears the snippet's content
+		// and skips making an unnecessary API call for regeneration.
 		// 1. Mock the initial generation of snippet B
 		chatMocker.mock({
 			request: {

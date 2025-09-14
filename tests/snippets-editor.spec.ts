@@ -35,6 +35,9 @@ test.describe('Snippet Editor Validation', () => {
   test.describe('shows a live error when an edit introduces a snippet cycle', () => {
     test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
     test('shows a live error in the UI', async () => {
+      // Purpose: This test verifies that the snippet editor provides immediate feedback when an
+      // edit to a generated snippet's prompt would create a dependency cycle. It checks that
+      // an error message is displayed and the regenerate/save buttons are in the correct state.
       await settingsPage.startEditingSnippet('b');
       const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
       await editContainer.getByTestId('snippet-prompt-input').fill('this prompt now references @b');
@@ -48,6 +51,8 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test('shows a warning when a generated snippet prompt references a non-existent snippet', async () => {
+    // Purpose: This test verifies that the snippet editor displays a non-blocking warning if
+    // a generated snippet's prompt refers to a snippet that does not exist.
     await settingsPage.startEditingSnippet('b');
     const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
 
@@ -61,6 +66,8 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test('shows a warning when a standard snippet content references a non-existent snippet', async () => {
+    // Purpose: This test verifies that the snippet editor displays a non-blocking warning if
+    // a standard snippet's content refers to a snippet that does not exist.
     // 1. Create a new standard snippet
     await settingsPage.newSnippetButton.click();
     const editContainer = settingsPage.page.getByTestId('snippet-item-edit-new');
@@ -78,6 +85,9 @@ test.describe('Snippet Editor Validation', () => {
   test.describe('shows both a cycle error and a non-existent snippet warning', () => {
     test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
     test('shows both errors in the UI', async () => {
+      // Purpose: This test ensures the UI can display multiple validation messages simultaneously,
+      // showing both a cycle error and a non-existent snippet warning when an edit introduces
+      // both issues.
       await settingsPage.startEditingSnippet('b');
       const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
 
@@ -93,6 +103,9 @@ test.describe('Snippet Editor Validation', () => {
   test.describe('shows a cycle error for mixed-type snippet cycles', () => {
     test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @d -> @b -> @d/] });
     test('shows the cycle error in the UI', async () => {
+      // Purpose: This test verifies that cycle detection works correctly across different snippet
+      // types (e.g., a standard snippet referencing a generated snippet, which in turn
+      // references the standard one).
       // 1. Create a new standard snippet 'd' that references generated snippet 'b'
       await settingsPage.createNewSnippet('d', 'Standard snippet referencing @b');
 
@@ -113,6 +126,9 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test('can save a generated snippet that references a non-existent snippet', async () => {
+    // Purpose: This test ensures that a user can save a generated snippet even if its prompt
+    // contains a warning (like a non-existent snippet reference), as warnings should not
+    // block saving.
     await settingsPage.startEditingSnippet('b');
     const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
     await editContainer.getByTestId('snippet-prompt-input').fill('this prompt references @nope');
@@ -135,6 +151,9 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test('regenerates content and saves separately', async ({ page }) => {
+    // Purpose: This test verifies the two-step process for updating a generated snippet: first,
+    // the user can regenerate the content based on a new prompt, see the result in the
+    // editor, and only then save the entire snippet.
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
     chatMocker.mock({
@@ -166,6 +185,9 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test('skips generation if resolved prompt is empty', async ({ page }) => {
+    // Purpose: This test verifies that if a generated snippet's prompt resolves to an empty or
+    // whitespace-only string, the system skips making an API call and simply clears the
+    // snippet's content.
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup(); // No mocks, as no API call should be made
 

@@ -9,6 +9,10 @@ test.describe('Chat Session Navigation', () => {
     await mockGlobalApis(context);
   });
   test('navigates between sessions and disables buttons at boundaries', async ({ context, page }) => {
+    // Purpose: This test verifies the chat session navigation functionality. It checks that a user
+    // can move between previous and next sessions, that the correct session content is displayed,
+    // and that the navigation buttons are correctly disabled when at the beginning or end of
+    // the session history.
     // 1. Define Mock Data
     const sessions: DBV3_ChatSession[] = [
       {

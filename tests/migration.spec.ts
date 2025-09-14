@@ -19,6 +19,10 @@ test.describe('Database Migrations', () => {
   });
 
   test('migrates database from v1 to v2', async ({ context, page }) => {
+    // Purpose: This test verifies the IndexedDB migration from version 1 to version 2. It ensures
+    // that session data from V1 is correctly transformed to the V2 schema (adding 'id' to
+    // messages, adding a null 'name' to sessions) and that the new 'system_prompts' object
+    // store is created. The final db version should be 3, as migrations run sequentially.
     // 1. Define V1 data
     const V1_SESSION: DBV1_ChatSession = {
       session_id: 'v1-session-1',

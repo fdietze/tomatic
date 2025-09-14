@@ -79,6 +79,9 @@ test.describe('Chat Regeneration with Deleted Snippets', () => {
         test('shows an error and does not regenerate', async ({
             page,
         }) => {
+            // Purpose: This test ensures that if a chat message refers to a snippet that has been
+            // deleted, the user is prevented from regenerating the assistant's response. It
+            // verifies that an appropriate error message is displayed and no API call is made.
             // 1. Verify initial state
             await chatPage.expectMessage(0, 'user', /@greet world/);
             await chatPage.expectMessage(1, 'assistant', /Initial response/);

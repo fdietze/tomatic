@@ -39,6 +39,9 @@ test.describe('Snippet Usage in Chat', () => {
   });
 
   test('resolves a standard snippet in the chat input', async ({ page }) => {
+    // Purpose: This test verifies that a simple snippet (e.g., '@greet_simple') used in the
+    // chat input is correctly resolved to its content before being sent to the API. It also
+    // ensures the user message in the UI displays the original raw input.
     chatMocker.mock({
       request: {
         model: 'google/gemini-2.5-pro',
@@ -60,6 +63,9 @@ test.describe('Snippet Usage in Chat', () => {
   });
 
   test('resolves nested snippets in the chat input', async ({ page }) => {
+    // Purpose: This test verifies that snippets which themselves contain other snippets are
+    // resolved recursively. It ensures that a nested snippet like '@greet_nested' (containing
+    // '@name') is fully expanded before the content is sent to the API.
     chatMocker.mock({
       request: {
         model: 'google/gemini-2.5-pro',
@@ -81,6 +87,9 @@ test.describe('Snippet Usage in Chat', () => {
     test.describe('shows an error when a snippet is not found', () => {
       test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Snippet not found: @fake_snippet/] });
       test('shows an error in the UI', async () => {
+        // Purpose: This test ensures that if a user tries to use a snippet that does not
+        // exist (e.g., '@fake_snippet'), an error message is displayed in the UI and no
+        // message is sent to the API.
         await chatPage.sendMessage('Hello @fake_snippet');
         await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
           "Snippet '@fake_snippet' not found."
@@ -93,6 +102,9 @@ test.describe('Snippet Usage in Chat', () => {
     test.describe('shows an error when a snippet self-references', () => {
       test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_self -> @cycle_self/] });
       test('shows an error in the UI', async () => {
+        // Purpose: This test verifies that the application detects and prevents infinite
+        // loops caused by self-referencing snippets (e.g., '@cycle_self' containing
+        // '@cycle_self'). An error should be shown and no message sent.
         await chatPage.sendMessage('@cycle_self');
         await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
           'Snippet cycle detected: @cycle_self -> @cycle_self'
@@ -105,6 +117,9 @@ test.describe('Snippet Usage in Chat', () => {
     test.describe('shows an error when a multi-step snippet cycle is detected', () => {
       test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_a -> @cycle_b -> @cycle_a/] });
       test('shows an error in the UI', async () => {
+        // Purpose: This test verifies that the application can detect more complex, multi-step
+        // snippet cycles (e.g., A -> B -> A). It ensures an error is displayed and the
+        // message is not sent.
         await chatPage.sendMessage('@cycle_a');
         await expect(chatPage.page.getByTestId('error-message').locator('p')).toHaveText(
           'Snippet cycle detected: @cycle_a -> @cycle_b -> @cycle_a'

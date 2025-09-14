@@ -15,6 +15,9 @@ test.beforeEach(async ({ context }) => {
   await mockGlobalApis(context);
 });
 test('sends a message and sees the response', async ({ context, page }) => {
+  // Purpose: This test verifies that a user can send a message in the chat interface and
+  // receive a response from the AI assistant. It also checks that the conversation history
+  // is correctly maintained by sending a second message.
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
@@ -69,6 +72,8 @@ test('sends a message and sees the response', async ({ context, page }) => {
 });
 
 test('can select a model and get a model-specific response', async ({ context, page }) => {
+  // Purpose: This test ensures that a user can change the selected language model and that
+  // subsequent messages are processed by the newly selected model, returning a model-specific response.
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
@@ -129,6 +134,9 @@ test('can select a model and get a model-specific response', async ({ context, p
 });
 
 test('can regenerate an assistant response', async ({ context, page }) => {
+  // Purpose: This test verifies the "regenerate" functionality. It checks that when a user requests
+  // a regeneration of an assistant's message, a new request is sent with the same user prompt,
+  // and the original assistant message is replaced with the new response.
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
@@ -189,6 +197,8 @@ test('can regenerate an assistant response', async ({ context, page }) => {
   });
 
 test('shows system prompt immediately in a new chat', async ({ page, context }) => {
+  // Purpose: This test ensures that if a system prompt is selected, it is displayed as the
+  // first message when a new chat session is initiated.
   const chatPage = new ChatPage(page);
 
   // 1. Setup State and Mock APIs
@@ -216,6 +226,9 @@ test('shows system prompt immediately in a new chat', async ({ page, context }) 
 });
 
 test('can edit a user message and resubmit', async ({ context, page }) => {
+  // Purpose: This test verifies that a user can edit one of their previous messages. It checks
+  // that editing truncates the chat history to that point and resubmits the conversation with
+  // the modified message, yielding a new assistant response.
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
@@ -276,6 +289,8 @@ test('can edit a user message and resubmit', async ({ context, page }) => {
 });
 
 test('can edit a user message and discard changes', async ({ context, page }) => {
+  // Purpose: This test ensures that a user can start editing a message but then cancel the edit.
+  // It verifies that the original message remains unchanged and no new API request is sent.
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,

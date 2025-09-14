@@ -74,6 +74,10 @@ test.describe('Chat Regeneration with Snippets', () => {
   });
 
   test('uses updated snippet content when regenerating a response', async ({ context, page }) => {
+    // Purpose: This test verifies that when regenerating an assistant's response, the system
+    // uses the most up-to-date content of any referenced snippets. It ensures that if a
+    // snippet has been changed since the original message was sent, the regeneration
+    // request is made with the new, resolved snippet content.
 
     // 1. Verify initial state
     await chatPage.expectMessage(0, 'user', /@greet world/);

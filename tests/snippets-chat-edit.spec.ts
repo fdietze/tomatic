@@ -25,6 +25,10 @@ test.describe('Chat Editing with Snippets', () => {
     context,
     page,
   }) => {
+    // Purpose: This test verifies that when editing a user message containing a snippet, the
+    // editor is populated with the original raw content (e.g., '@greet world') rather than the
+    // resolved content. It also confirms that the message can be edited to use a different
+    // snippet, and upon resubmission, the new snippet is correctly resolved for the API request.
     // 1. Define Mock Data
     const MOCK_SNIPPETS: DBV3_Snippet[] = [
         { name: 'greet', content: 'Hello', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
