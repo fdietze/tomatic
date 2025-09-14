@@ -12,6 +12,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import { useAppStore } from '@/store';
 import { useShallow } from 'zustand/react/shallow';
 import { AppState } from './store/types';
+import { ROUTES } from '@/utils/routes';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -21,14 +22,14 @@ const Header: React.FC = () => {
 
   const onChat = () => {
     if (currentSessionId) {
-      void navigate(`/chat/${currentSessionId}`);
+      void navigate(ROUTES.chat.session(currentSessionId));
     } else {
-      void navigate('/chat/new');
+      void navigate(ROUTES.chat.new);
     }
   };
 
   const onSettings = () => {
-    void navigate('/settings');
+    void navigate(ROUTES.settings);
   };
 
   const isChatActive = location.pathname.startsWith('/chat');
@@ -73,10 +74,10 @@ const App: React.FC = () => {
       <Header />
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/chat/new" replace />} />
-          <Route path="/chat" element={<Navigate to="/chat/new" replace />} />
-          <Route path="/chat/:id" element={<ChatPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/" element={<Navigate to={ROUTES.chat.new} replace />} />
+          <Route path="/chat" element={<Navigate to={ROUTES.chat.new} replace />} />
+          <Route path={ROUTES.chat.byId} element={<ChatPage />} />
+          <Route path={ROUTES.settings} element={<SettingsPage />} />
           <Route path="*" element={<h1>Not Found</h1>} />
         </Routes>
       </main>

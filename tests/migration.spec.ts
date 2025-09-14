@@ -1,6 +1,7 @@
 import { test } from './fixtures';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
 import { DBV1_ChatSession, DBV2_ChatSession, DBV2_Message } from '@/types/storage';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Database Migrations', () => {
   test.beforeEach(async ({ context }) => {
@@ -71,7 +72,7 @@ test.describe('Database Migrations', () => {
     }, V1_SESSION);
 
     // 3. Navigate to a page to trigger the app's DB initialization and migration
-    await page.goto('/chat/new');
+    await page.goto(ROUTES.chat.new);
 
     // Wait for migration logs to appear in console
     await page.waitForEvent('console', {

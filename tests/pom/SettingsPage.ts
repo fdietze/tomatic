@@ -2,6 +2,7 @@ import { type Page, type Locator, expect } from '@playwright/test';
 
 import { NavigationComponent } from './NavigationComponent';
 import { ModelComboboxPage } from './ModelComboboxPage';
+import { ROUTES } from '@/utils/routes';
 /**
  * Page Object Model for the Settings page.
  * This class encapsulates locators and actions for managing system prompts,
@@ -27,7 +28,7 @@ export class SettingsPage {
    * Navigates to the settings page.
    */
   async goto() {
-     await this.page.goto('/settings');
+     await this.page.goto(ROUTES.settings);
   }
 
   /**

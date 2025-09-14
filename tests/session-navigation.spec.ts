@@ -2,6 +2,7 @@ import { test } from './fixtures';
 import { ChatPage } from './pom/ChatPage';
 import { DBV3_ChatSession } from '@/types/storage';
 import { expect, mockGlobalApis, seedIndexedDB, seedLocalStorage, OPENROUTER_API_KEY } from './test-helpers';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Chat Session Navigation', () => {
 
@@ -53,7 +54,7 @@ test.describe('Chat Session Navigation', () => {
     await seedIndexedDB(context, { chat_sessions: sessions });
 
     // 3. Navigate to the newest session
-    await page.goto('/chat/session-new');
+    await page.goto(ROUTES.chat.session('session-new'));
     const chatPage = new ChatPage(page);
     await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
     await expect(chatPage.navigation.prevSessionButton).toBeEnabled();

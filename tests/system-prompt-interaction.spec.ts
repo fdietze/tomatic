@@ -4,6 +4,7 @@ import { DBV3_ChatSession } from '@/types/storage';
 import { ChatCompletionMocker } from './test-helpers';
 import { ChatPage } from './pom/ChatPage';
 import { mockGlobalApis, OPENROUTER_API_KEY, seedIndexedDB, seedLocalStorage } from './test-helpers';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('System Prompt Interaction', () => {
 
@@ -49,7 +50,7 @@ test.describe('System Prompt Interaction', () => {
     await chatMocker.setup();
 
     // 3. Navigate and create POMs
-    await page.goto(`/chat/${SESSION_WITH_PROMPT.session_id}`);
+    await page.goto(ROUTES.chat.session(SESSION_WITH_PROMPT.session_id));
     const chatPage = new ChatPage(page);
 
     // 4. Verify initial state

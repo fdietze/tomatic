@@ -9,6 +9,7 @@ import {
   seedLocalStorage,
   seedIndexedDB,
 } from './test-helpers';
+import { ROUTES } from '@/utils/routes';
 
 
 test.beforeEach(async ({ context }) => {
@@ -218,7 +219,7 @@ test('shows system prompt immediately in a new chat', async ({ page, context }) 
   });
 
   // 2. Navigate
-  await page.goto('/settings');
+  await page.goto(ROUTES.settings);
   await chatPage.navigation.goToNewChat();
 
   // 3. Assert

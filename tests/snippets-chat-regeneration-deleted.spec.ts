@@ -2,6 +2,7 @@ import { test } from './fixtures';
 import { ChatPage } from './pom/ChatPage';
 import { OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB, expect, mockGlobalApis } from './test-helpers';
 import { DBV3_ChatSession } from '@/types/storage';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Chat Regeneration with Deleted Snippets', () => {
     let chatPage: ChatPage;
@@ -63,7 +64,7 @@ test.describe('Chat Regeneration with Deleted Snippets', () => {
             chatMocker = new ChatCompletionMocker(page);
             await chatMocker.setup();
             
-            await page.goto(`/chat/${SESSION_WITH_SNIPPET.session_id}`);
+            await page.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
         });
 
         test('blocks regeneration and shows an error', async () => {

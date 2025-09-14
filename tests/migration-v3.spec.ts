@@ -1,6 +1,7 @@
 import { test } from './fixtures';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
 import { DBV2_ChatSession, DBV2_SystemPrompt } from '@/types/storage';
+import { ROUTES } from '@/utils/routes';
 
 test.describe('Database Migrations V3', () => {
   test.beforeEach(async ({ context }) => {
@@ -77,7 +78,7 @@ test.describe('Database Migrations V3', () => {
       timeout: 5000,
     });
 
-    await page.goto('/chat/new');
+    await page.goto(ROUTES.chat.new);
 
     await consolePromise;
 
