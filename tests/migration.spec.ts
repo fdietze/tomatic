@@ -1,20 +1,28 @@
 import { test } from './fixtures';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
-import type { ChatSession, Message } from '../src/types/chat';
+import { DBV1_ChatSession, DBV2_ChatSession, DBV2_Message } from '@/types/storage';
 
 test.describe('Database Migrations', () => {
   test.beforeEach(async ({ context }) => {
     await mockGlobalApis(context);
     await seedLocalStorage(context, {
-      'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
+      },
+      version: 1,
     });
   });
 
   test('migrates database from v1 to v2', async ({ context, page }) => {
     // 1. Define V1 data
-    const V1_SESSION = {
+    const V1_SESSION: DBV1_ChatSession = {
       session_id: 'v1-session-1',
-      // 'name' is missing
+      // 'name' is missing in V1
       messages: [
         { role: 'user', content: 'Hello' }, // No 'id', no 'prompt_name'
         { role: 'assistant', content: 'Hi from V1' },
@@ -72,7 +80,7 @@ test.describe('Database Migrations', () => {
       async (
         sessionId: string,
       ): Promise<{
-        session: ChatSession | null;
+        session: DBV2_ChatSession | null;
         hasPromptsStore: boolean;
         hasSnippetsStore: boolean;
         dbVersion: number;
@@ -95,10 +103,10 @@ test.describe('Database Migrations', () => {
 
         const tx = db.transaction('chat_sessions', 'readonly');
         const store = tx.objectStore('chat_sessions');
-        const session = await new Promise<ChatSession>((resolve, reject) => {
+        const session = await new Promise<DBV2_ChatSession>((resolve, reject) => {
           const req = store.get(sessionId);
           req.onsuccess = () => {
-            resolve(req.result as ChatSession);
+             resolve(req.result as DBV2_ChatSession);
           };
           req.onerror = () => {
             reject(new Error(req.error?.message ?? 'Unknown get error'));
@@ -122,7 +130,7 @@ test.describe('Database Migrations', () => {
     expect(migratedSession.name).toBeNull(); // name was missing, so it should be set to null
     expect(migratedSession.messages).toHaveLength(2);
 
-    migratedSession.messages.forEach((message: Message) => {
+    migratedSession.messages.forEach((message: DBV2_Message) => {
       expect(typeof message.id).toBe('string');
       expect(message.id).not.toBe('');
       expect(message.prompt_name).toBeNull();

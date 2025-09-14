@@ -1,7 +1,7 @@
 import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
 import type { SystemPrompt } from '../src/types/storage';
-import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
+import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, seedIndexedDB } from './test-helpers';
 
 test.describe('System Prompt CRUD', () => {
   let settingsPage: SettingsPage;
@@ -17,11 +17,17 @@ test.describe('System Prompt CRUD', () => {
 
     // 2. Setup Test State
     await seedLocalStorage(context, {
-      'tomatic-storage': {
-        state: { apiKey: OPENROUTER_API_KEY, systemPrompts: MOCK_PROMPTS },
-        version: 0,
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
       },
+      version: 1,
     });
+    await seedIndexedDB(context, { system_prompts: MOCK_PROMPTS });
 
     // 3. Navigate and provide POM
     settingsPage = new SettingsPage(page);

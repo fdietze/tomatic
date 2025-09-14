@@ -2,6 +2,7 @@ import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
 import { ChatPage } from './pom/ChatPage';
 import { OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB, expect } from './test-helpers';
+import { DBV3_Snippet, DBV3_ChatSession } from '@/types/storage';
 
 test.describe('Chat Regeneration with Snippets', () => {
 let settingsPage: SettingsPage;
@@ -13,7 +14,7 @@ context,
 page,
 }) => {
 // 1. Define Mock Data
-const MOCK_SNIPPET = {
+const MOCK_SNIPPET: DBV3_Snippet = {
 name: 'greet',
 content: 'Hello',
 isGenerated: false,
@@ -23,7 +24,7 @@ generationError: null,
 isDirty: false,
 };
 
-const SESSION_WITH_SNIPPET = {
+const SESSION_WITH_SNIPPET: DBV3_ChatSession = {
 session_id: 'session-with-snippet',
 name: null,
 messages: [
@@ -32,12 +33,18 @@ id: 'msg1',
 role: 'user' as const,
 content: 'Hello world',
 raw_content: '@greet world',
+prompt_name: null,
+model_name: null,
+cost: null,
 },
 {
 id: 'msg2',
 role: 'assistant' as const,
 content: 'Initial response',
 model_name: 'google/gemini-2.5-pro',
+prompt_name: null,
+cost: null,
+raw_content: undefined,
 },
 ],
 created_at_ms: 1000,
@@ -46,10 +53,15 @@ updated_at_ms: 1000,
 
 // 2. Seed Data and Mock APIs
 await seedLocalStorage(context, {
-'tomatic-storage': {
-state: { apiKey: OPENROUTER_API_KEY },
-version: 1,
+state: {
+apiKey: OPENROUTER_API_KEY,
+modelName: 'google/gemini-2.5-pro',
+cachedModels: [],
+input: '',
+selectedPromptName: null,
+autoScrollEnabled: false,
 },
+version: 1,
 });
 await seedIndexedDB(context, {
 snippets: [MOCK_SNIPPET],

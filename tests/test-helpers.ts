@@ -137,7 +137,7 @@ export function createChatCompletionResponse(model: string, content: string, rol
 
 export { expect };
 import type { ChatSession } from '../src/types/chat';
-import type { Snippet, SystemPrompt } from '../src/types/storage';
+import type { Snippet, SystemPrompt, LocalStorageCurrent, IndexedDBDataCurrent } from '../src/types/storage';
 
 interface InjectedState {
   localStorage: Record<string, string>;
@@ -154,10 +154,9 @@ interface InjectedState {
 }
 
 /**
- * Injects data into IndexedDB.
+ * Injects strongly-typed data into IndexedDB.
  */
-export async function seedIndexedDB(context: BrowserContext, data: { chat_sessions?: ChatSession[], system_prompts?: SystemPrompt[], snippets?: Snippet[] }) {
-
+export async function seedIndexedDB(context: BrowserContext, data: Partial<IndexedDBDataCurrent>) {
   const injectedState: InjectedState = {
     localStorage: {},
     indexedDB: {
@@ -173,8 +172,6 @@ export async function seedIndexedDB(context: BrowserContext, data: { chat_sessio
         {
           storeName: 'system_prompts',
           keyPath: 'name',
-          // Data is empty here because the new implementation uses localStorage for prompts
-          // and the DB store is created via migration, which we are simulating.
           data: data.system_prompts || [],
         },
         {
@@ -188,7 +185,6 @@ export async function seedIndexedDB(context: BrowserContext, data: { chat_sessio
 
   // This script runs in the browser context
   await context.addInitScript((state: InjectedState) => {
-
     // 2. Populate IndexedDB
     return new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(state.indexedDB.dbName, state.indexedDB.version);
@@ -250,10 +246,14 @@ export async function seedIndexedDB(context: BrowserContext, data: { chat_sessio
     });
   }, injectedState);
 }
-
 /**
- * Injects key-value pairs into localStorage.
+ * Injects a strongly-typed object into localStorage under the 'tomatic-storage' key.
  */
+export async function seedLocalStorage(context: BrowserContext, data: LocalStorageCurrent) {
+  await context.addInitScript((data) => {
+    window.localStorage.setItem('tomatic-storage', JSON.stringify(data));
+  }, data);
+}
 
 
 import type { Page, Route } from '@playwright/test';
@@ -401,12 +401,5 @@ export class ChatCompletionMocker {
       throw new Error(errorMessage);
     }
    }
-}
-export async function seedLocalStorage(context: BrowserContext, data: Record<string, object>) {
-  await context.addInitScript((data) => {
-    for (const [key, value] of Object.entries(data)) {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    }
-  }, data)
 }
 

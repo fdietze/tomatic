@@ -1,6 +1,6 @@
 import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
-import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker } from './test-helpers';
+import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
 test.describe('Generated Snippets', () => {
   let settingsPage: SettingsPage;
   let chatMocker: ChatCompletionMocker;
@@ -8,11 +8,17 @@ test.describe('Generated Snippets', () => {
   test.beforeEach(async ({ context, page }) => {
     await mockGlobalApis(context);
     await seedLocalStorage(context, {
-      'tomatic-storage': {
-        state: { apiKey: OPENROUTER_API_KEY, snippets: [] },
-        version: 1,
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
       },
+      version: 1,
     });
+    await seedIndexedDB(context, { snippets: [] });
 
     settingsPage = new SettingsPage(page);
     chatMocker = new ChatCompletionMocker(page);
@@ -132,11 +138,17 @@ test.describe('Automatic Regeneration', () => {
 	test.beforeEach(async ({ context, page }) => {
 		await mockGlobalApis(context);
 		await seedLocalStorage(context, {
-			'tomatic-storage': {
-				state: { apiKey: OPENROUTER_API_KEY, snippets: [] },
-				version: 1,
+			state: {
+				apiKey: OPENROUTER_API_KEY,
+				modelName: 'google/gemini-2.5-pro',
+				cachedModels: [],
+				input: '',
+				selectedPromptName: null,
+				autoScrollEnabled: false,
 			},
+			version: 1,
 		});
+		await seedIndexedDB(context, { snippets: [] });
 
 		settingsPage = new SettingsPage(page);
 		chatMocker = new ChatCompletionMocker(page);

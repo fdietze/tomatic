@@ -1,27 +1,36 @@
 import { test } from './fixtures';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
+import { DBV2_ChatSession, DBV2_SystemPrompt } from '@/types/storage';
 
 test.describe('Database Migrations V3', () => {
   test.beforeEach(async ({ context }) => {
     await mockGlobalApis(context);
     await seedLocalStorage(context, {
-      'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 1 },
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
+      },
+      version: 1,
     });
   });
 
   test('migrates database from v2 to v3', async ({ context, page }) => {
     // 1. Define V2 data
-    const V2_SESSION = {
+    const V2_SESSION: DBV2_ChatSession = {
       session_id: 'v2-session-1',
       name: 'Test Session',
       messages: [
-        { id: 'msg1', role: 'user', content: 'Hello' },
-        { id: 'msg2', role: 'assistant', content: 'Hi from V2' },
+        { id: 'msg1', role: 'user', content: 'Hello', prompt_name: null, model_name: null, cost: null, raw_content: undefined },
+        { id: 'msg2', role: 'assistant', content: 'Hi from V2', prompt_name: null, model_name: null, cost: null, raw_content: undefined },
       ],
       created_at_ms: 2000,
       updated_at_ms: 2000,
     };
-    const V2_PROMPT = {
+    const V2_PROMPT: DBV2_SystemPrompt = {
       name: 'test_prompt',
       prompt: 'This is a test prompt.',
     };
