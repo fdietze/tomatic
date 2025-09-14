@@ -6,12 +6,20 @@ import {
   ChatCompletionMocker,
   seedIndexedDB,
   expect,
+  mockGlobalApis,
 } from './test-helpers';
 import { DBV3_Snippet, DBV3_ChatSession } from '@/types/storage';
 
 test.describe('Chat Editing with Snippets', () => {
   let chatPage: ChatPage;
   let chatMocker: ChatCompletionMocker;
+
+  test.beforeEach(async ({ context, page }) => {
+    await mockGlobalApis(context);
+    chatPage = new ChatPage(page);
+    chatMocker = new ChatCompletionMocker(page);
+    await chatMocker.setup();
+  });
 
   test('can edit a message to use a different snippet and preserves raw content', async ({
     context,
@@ -66,12 +74,9 @@ test.describe('Chat Editing with Snippets', () => {
       snippets: MOCK_SNIPPETS,
       chat_sessions: [SESSION_WITH_SNIPPET],
     });
-    chatMocker = new ChatCompletionMocker(page);
-    await chatMocker.setup();
 
     // 3. Navigate and create POMs
     await page.goto(`/chat/${SESSION_WITH_SNIPPET.session_id}`);
-    chatPage = new ChatPage(page);
 
     // 4. Verify initial state
     await chatPage.expectMessage(0, 'user', /@greet world/);
