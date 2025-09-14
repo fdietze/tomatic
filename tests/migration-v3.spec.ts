@@ -19,6 +19,9 @@ test.describe('Database Migrations V3', () => {
   });
 
   test('migrates database from v2 to v3', async ({ context, page }) => {
+    // Purpose: This test verifies that the application correctly migrates the IndexedDB database
+    // from version 2 to version 3. It checks that the new 'snippets' object store is created
+    // while preserving existing data in 'chat_sessions' and 'system_prompts'.
     // 1. Define V2 data
     const V2_SESSION: DBV2_ChatSession = {
       session_id: 'v2-session-1',

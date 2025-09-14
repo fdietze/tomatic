@@ -34,6 +34,9 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 	test.describe('halts regeneration when an update introduces a cycle', () => {
 		test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected/] });
 		test('halts regeneration', async ({ page }) => {
+			// Purpose: This test ensures that if updating a snippet introduces a dependency cycle,
+			// the automatic regeneration process is halted to prevent an infinite loop. The existing
+			// content of the dependent snippets should remain unchanged.
 			const chatMocker = new ChatCompletionMocker(page);
 			await chatMocker.setup();
 			chatMocker.mock({ // Initial generation of B
@@ -66,6 +69,10 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 			expectedConsoleErrors: [/Failed to load resource.*500/],
 		});
 		test('propagates failures transitively', async ({ page }) => {
+			// Purpose: This test verifies that if a snippet in a dependency chain fails to
+			// regenerate, the failure is propagated to all downstream snippets. For example, if
+			// C depends on B and B's regeneration fails, C's regeneration should also be
+			// marked as failed with a dependency-related error, without attempting an API call.
 			const chatMocker = new ChatCompletionMocker(page);
 			await chatMocker.setup();
 

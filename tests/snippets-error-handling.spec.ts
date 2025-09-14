@@ -28,6 +28,9 @@ test.describe('Generated Snippets (Error Handling)', () => {
   });
 
   test('shows an error if snippet generation fails', async () => {
+    // Purpose: This test verifies that if the API call for generating a snippet's content fails
+    // (e.g., returns a 500 error), an appropriate error message is displayed to the user within
+    // the snippet editor.
     await settingsPage.page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
       await route.fulfill({
         status: 500,
