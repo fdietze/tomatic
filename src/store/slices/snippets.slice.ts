@@ -229,6 +229,14 @@ export const createSnippetsSlice: StateCreator<
 
             for (const snippet of dirtySnippets) {
                 console.log(`[STORE|processDirtySnippets] ---> Processing dirty snippet: @${snippet.name}`, JSON.parse(JSON.stringify(snippet)));
+                
+                if (!snippet.isGenerated) {
+                    const updatedSnippet = { ...snippet, isDirty: false };
+                    await saveSnippet(updatedSnippet);
+                    console.log(`[STORE|processDirtySnippets] Cleared dirty flag for standard snippet @${snippet.name}`);
+                    continue;
+                }
+
                 set(state => {
                     const newRegenerating = [...state.regeneratingSnippetNames, snippet.name];
                     console.log(`[STORE|processDirtySnippets] SET regeneratingSnippetNames: [${newRegenerating.join(', ')}]`);

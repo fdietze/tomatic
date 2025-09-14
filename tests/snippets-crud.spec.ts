@@ -1,6 +1,6 @@
 import { test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
-import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
+import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, seedIndexedDB } from './test-helpers';
 
 test.describe('Snippet Management (CRUD)', () => {
   let settingsPage: SettingsPage;
@@ -33,11 +33,13 @@ test.describe('Snippet Management (CRUD)', () => {
     await expect(settingsPage.getSnippetItem('greet')).toHaveText(/Hello, world!/);
   });
 
-  test('updates an existing snippet', async () => {
+  test('updates an existing snippet', async ({ context }) => {
     // Purpose: This test verifies that a user can edit an existing snippet's name and
     // content and save the changes.
-    await settingsPage.createNewSnippet('my_snippet', 'Initial content');
-    await settingsPage.expectSnippetToBeVisible('my_snippet');
+    await seedIndexedDB(context, {
+      snippets: [{ name: 'my_snippet', content: 'Initial content', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }],
+    });
+    await settingsPage.page.reload(); // Reload to apply seeded data
 
     await settingsPage.startEditingSnippet('my_snippet');
     await settingsPage.fillSnippetForm('my_renamed_snippet', 'Updated content');
@@ -48,10 +50,14 @@ test.describe('Snippet Management (CRUD)', () => {
     await expect(settingsPage.getSnippetItem('my_renamed_snippet')).toHaveText(/Updated content/);
   });
 
-  test('deletes a snippet', async () => {
+  test('deletes a snippet', async ({ context }) => {
     // Purpose: This test verifies that a snippet can be successfully deleted from the
     // settings page.
-    await settingsPage.createNewSnippet('to_delete', 'I am temporary');
+    await seedIndexedDB(context, {
+      snippets: [{ name: 'to_delete', content: 'I am temporary', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }],
+    });
+    await settingsPage.page.reload(); // Reload to apply seeded data
+
     await settingsPage.expectSnippetToBeVisible('to_delete');
 
     await settingsPage.deleteSnippet('to_delete');
@@ -108,12 +114,14 @@ test.describe('Snippet Name Validation', () => {
         await expect(settingsPage.getSnippetSaveButton(editContainer)).toBeDisabled();
     });
   
-    test('prevents saving a new snippet with a duplicate name', async () => {
+    test('prevents saving a new snippet with a duplicate name', async ({ context }) => {
         // Purpose: This test verifies input validation, ensuring a new snippet cannot be saved
         // if its name already exists (case-insensitively).
-        // 1. Create an initial snippet
-        await settingsPage.createNewSnippet('existing_snippet', 'some content');
-        await settingsPage.expectSnippetToBeVisible('existing_snippet');
+        // 1. Seed an initial snippet
+        await seedIndexedDB(context, {
+          snippets: [{ name: 'existing_snippet', content: 'some content', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }],
+        });
+        await settingsPage.page.reload(); // Reload to apply seeded data
         
         // 2. Start creating a new one
         await settingsPage.newSnippetButton.click();

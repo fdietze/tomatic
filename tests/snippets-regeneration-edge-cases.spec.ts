@@ -33,34 +33,34 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 
 	test.describe('halts regeneration when an update introduces a cycle', () => {
 		test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected/] });
-		test('halts regeneration', async ({ page }) => {
+		test('halts regeneration', async ({ page, context }) => {
 			// Purpose: This test ensures that if updating a snippet introduces a dependency cycle,
 			// the automatic regeneration process is halted to prevent an infinite loop. The existing
 			// content of the dependent snippets should remain unchanged.
-			const chatMocker = new ChatCompletionMocker(page);
-			await chatMocker.setup();
-			chatMocker.mock({ // Initial generation of B
-				request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v1' }] },
-				response: { role: 'assistant', content: 'Content of B from v1' },
+			await seedIndexedDB(context, {
+				snippets: [
+					{ name: 'A', content: 'v1', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+					{ name: 'B', content: 'Content of B from v1', isGenerated: true, prompt: 'Prompt for B using @A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+					{ name: 'C', content: 'Content of C from B_v1', isGenerated: true, prompt: 'Prompt for C using @B', model: 'mock-model/mock-model', createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
+				],
 			});
-			chatMocker.mock({ // Initial generation of C
-				request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v1' }] },
-				response: { role: 'assistant', content: 'Content of C from B_v1' },
-			});
-			await settingsPage.createNewSnippet('A', 'v1');
-			await settingsPage.createGeneratedSnippet('B', 'Prompt for B using @A', 'mock-model/mock-model', 'Mock Model');
-			await settingsPage.createGeneratedSnippet('C', 'Prompt for C using @B', 'mock-model/mock-model', 'Mock Model');
-			await expect(settingsPage.getSnippetItem('B')).toBeVisible();
+			await page.reload();
+
+			// Verify initial state
 			await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
-			await expect(settingsPage.getSnippetItem('C')).toBeVisible();
 			await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);
+
+			// Edit snippet A to create a cycle (A -> C -> B -> A)
 			await settingsPage.startEditingSnippet('A');
 			await settingsPage.fillSnippetForm('A', 'v2 referencing @C');
 			await settingsPage.saveSnippet();
+
+			// Wait a moment to ensure no regeneration is triggered
 			await settingsPage.page.waitForTimeout(500);
+
+			// Assert that content has not changed
 			await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
 			await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);
-			chatMocker.verifyComplete();
 		});
 	});
 
@@ -68,7 +68,7 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 		test.use({
 			expectedConsoleErrors: [/Failed to load resource.*500/],
 		});
-		test('propagates failures transitively', async ({ page }) => {
+		test('propagates failures transitively', async ({ page, context }) => {
 			// Purpose: This test verifies that if a snippet in a dependency chain fails to
 			// regenerate, the failure is propagated to all downstream snippets. For example, if
 			// C depends on B and B's regeneration fails, C's regeneration should also be
@@ -76,17 +76,20 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 			const chatMocker = new ChatCompletionMocker(page);
 			await chatMocker.setup();
 
-			// Mocks for successful initial creation & regeneration
-			chatMocker.mock({ request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v1' }] }, response: { role: 'assistant', content: 'Content of B from v1' } });
-			chatMocker.mock({ request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v1' }] }, response: { role: 'assistant', content: 'Content of C from B_v1' } });
-			
-			await settingsPage.createNewSnippet('A', 'v1');
-			await settingsPage.createGeneratedSnippet('B', 'Prompt for B using @A', 'mock-model/mock-model', 'Mock Model');
-			await settingsPage.createGeneratedSnippet('C', 'Prompt for C using @B', 'mock-model/mock-model', 'Mock Model');
+			// Seed initial state
+			await seedIndexedDB(context, {
+				snippets: [
+					{ name: 'A', content: 'v1', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+					{ name: 'B', content: 'Content of B from v1', isGenerated: true, prompt: 'Prompt for B using @A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+					{ name: 'C', content: 'Content of C from B_v1', isGenerated: true, prompt: 'Prompt for C using @B', model: 'mock-model/mock-model', createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
+				],
+			});
+			await page.reload();
 			
 			await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
 			await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);
 			
+			// Mock the regeneration of B to fail
 			chatMocker.mock({
 				request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }] },
 				response: {
@@ -97,6 +100,7 @@ test.describe('Automatic Regeneration Edge Cases', () => {
 				manualTrigger: true,
 			});
 			
+			// Update snippet A to trigger the regeneration chain
 			await settingsPage.startEditingSnippet('A');
 			await settingsPage.fillSnippetForm('A', 'v2');
 			await settingsPage.saveSnippet();
