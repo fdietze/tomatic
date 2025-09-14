@@ -41,7 +41,7 @@ const Header: React.FC = () => {
           Chat
         </button>
         <button onClick={onSettings} data-active={isSettingsActive} data-testid="settings-button">
-          Settings {isRegenerating && <span className="spinner" />}
+          Settings {isRegenerating && <span className="spinner" data-testid="settings-tab-spinner" />}
         </button>
       </div>
     </header>

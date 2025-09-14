@@ -229,10 +229,12 @@ test.describe('Automatic Regeneration', () => {
 		chatMocker.mock({ // Regeneration of B after A is updated
 			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }] },
 			response: { role: 'assistant', content: 'Content of B from v2' },
+			manualTrigger: true,
 		});
 		chatMocker.mock({ // Regeneration of C after B is updated
 			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v2' }] },
 			response: { role: 'assistant', content: 'Content of C from B_v2' },
+			manualTrigger: true,
 		});
 
 		// 4. Update the base snippet 'A', which should trigger the chain reaction
@@ -240,9 +242,28 @@ test.describe('Automatic Regeneration', () => {
 		await settingsPage.fillSnippetForm('A', 'v2');
 		await settingsPage.saveSnippet();
 
-		// 5. Assert that both B and C have been regenerated with the new content
+		// 5. Assert that B regenerates first, then C, and that the global spinner is visible throughout
+		const snippetB = settingsPage.getSnippetItem('B');
+		const snippetC = settingsPage.getSnippetItem('C');
+
+		// Wait for B to start regenerating and resolve it
+		await expect(settingsPage.navigation.settingsTabSpinner).toBeVisible();
+		await expect(snippetB.getByTestId('regenerating-spinner')).toBeVisible();
+		await chatMocker.resolveNextCompletion();
+		await expect(snippetB.getByTestId('regenerating-spinner')).not.toBeVisible();
 		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v2/);
+
+		// Global spinner should still be visible as C is pending
+		await expect(settingsPage.navigation.settingsTabSpinner).toBeVisible();
+
+		// Wait for C to start regenerating and resolve it
+		await expect(snippetC.getByTestId('regenerating-spinner')).toBeVisible();
+		await chatMocker.resolveNextCompletion();
+		await expect(snippetC.getByTestId('regenerating-spinner')).not.toBeVisible();
 		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v2/);
+
+		// Global spinner should now be gone
+		await expect(settingsPage.navigation.settingsTabSpinner).not.toBeVisible();
 
 		// 6. Verify all mocks were consumed in the correct order
 		chatMocker.verifyComplete();

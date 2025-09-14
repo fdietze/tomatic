@@ -9,12 +9,14 @@ export class NavigationComponent {
   readonly settingsButton: Locator;
   readonly nextSessionButton: Locator;
   readonly prevSessionButton: Locator;
+  readonly settingsTabSpinner: Locator;
 
   constructor(public readonly page: Page) {
     this.newChatButton = page.getByTestId('chat-button');
     this.settingsButton = page.getByTestId('settings-button');
     this.nextSessionButton = page.getByTestId('next-session-button');
     this.prevSessionButton = page.getByTestId('prev-session-button');
+    this.settingsTabSpinner = page.getByTestId('settings-tab-spinner');
   }
 
   async goToNewChat() {
