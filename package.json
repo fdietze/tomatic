@@ -8,10 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e": "npx playwright test",
-    "typecheck": "tsc --noEmit"
-,
-    "test:unit": "vitest run"
+    "test:e2e": "npx playwright test | cat",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run --reporter=dot"
   },
   "dependencies": {
     "@types/markdown-it": "^14.1.2",

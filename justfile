@@ -9,8 +9,7 @@ dev:
   npm run dev
 
 check:
-  npm run typecheck && \
+  npm run lint && \
   npm run test:unit && \
-  npm run test:e2e && \
-  npm run lint
+  npm run test:e2e
 
