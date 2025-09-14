@@ -4,8 +4,8 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: 0,
+  workers: undefined,
   reporter: [['list'], ['./pw-actions-reporter.cjs']],
   use: {
     baseURL: 'http://127.0.0.1:5173',
@@ -22,8 +22,8 @@ export default defineConfig({
     command: 'VITE_IS_TESTING=true npm run dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: 'ignore',
+    stderr: 'ignore',
     timeout: 10 * 1000,
   },
 });
