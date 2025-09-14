@@ -28,9 +28,12 @@
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 
 - each test must be as explicit and self-contained as possible.
+- each test must have a comment stating its purpose
 - make the test's setup completely explicit and easy to understand without needing to look up a fixture's definition.
 - Keep simple fixtures for boilerplate that is truly generic and shared by all tests.
+- for test setup, prefer direct data seeding (e.g., of IndexedDB or localStorage) over UI interactions to keep tests fast and focused
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
+- when testing loading states, use manual mock triggers to assert that spinners appear before the mock is resolved and disappear after.
 
 # Big tasks
 - bigger tasks always have specification gaps. note, which decisions you have taken to fill those gaps. be conservative and don't do anything the user didn't ask for.
