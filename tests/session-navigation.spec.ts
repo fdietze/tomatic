@@ -1,6 +1,6 @@
 import { test } from './fixtures';
 import { ChatPage } from './pom/ChatPage';
-import type { ChatSession } from '../src/types/chat';
+import { DBV3_ChatSession } from '@/types/storage';
 import { expect, mockGlobalApis, seedIndexedDB, seedLocalStorage, OPENROUTER_API_KEY } from './test-helpers';
 
 test.describe('Chat Session Navigation', () => {
@@ -10,29 +10,42 @@ test.describe('Chat Session Navigation', () => {
   });
   test('navigates between sessions and disables buttons at boundaries', async ({ context, page }) => {
     // 1. Define Mock Data
-    const sessions: ChatSession[] = [
+    const sessions: DBV3_ChatSession[] = [
       {
         session_id: 'session-old',
-        messages: [{ id: 'msg1', role: 'user', content: 'Old message' }],
+        name: null,
+        messages: [{ id: 'msg1', role: 'user', content: 'Old message', prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
         created_at_ms: 1000,
         updated_at_ms: 1000,
       },
       {
         session_id: 'session-middle',
-        messages: [{ id: 'msg2', role: 'user', content: 'Middle message' }],
+        name: null,
+        messages: [{ id: 'msg2', role: 'user', content: 'Middle message', prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
         created_at_ms: 2000,
         updated_at_ms: 2000,
       },
       {
         session_id: 'session-new',
-        messages: [{ id: 'msg3', role: 'user', content: 'New message' }],
+        name: null,
+        messages: [{ id: 'msg3', role: 'user', content: 'New message', prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
         created_at_ms: 3000,
         updated_at_ms: 3000,
       },
     ];
 
     // 2. Setup Test State
-    await seedLocalStorage(context, { 'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 } });
+    await seedLocalStorage(context, {
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
+      },
+      version: 1,
+    });
     await seedIndexedDB(context, { chat_sessions: sessions });
 
     // 3. Navigate to the newest session

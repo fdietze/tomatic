@@ -9,12 +9,15 @@ test.describe('Snippet Management (CRUD)', () => {
     await mockGlobalApis(context);
 
     await seedLocalStorage(context, {
-      'tomatic-storage': {
-        state: {
-          apiKey: OPENROUTER_API_KEY,
-        },
-        version: 1,
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
       },
+      version: 1,
     });
 
     settingsPage = new SettingsPage(page);
@@ -57,10 +60,15 @@ test.describe('Snippet Name Validation', () => {
     test.beforeEach(async ({ context, page }) => {
       await mockGlobalApis(context);
       await seedLocalStorage(context, {
-        'tomatic-storage': {
-          state: { apiKey: OPENROUTER_API_KEY },
-          version: 1,
+        state: {
+          apiKey: OPENROUTER_API_KEY,
+          modelName: 'google/gemini-2.5-pro',
+          cachedModels: [],
+          input: '',
+          selectedPromptName: null,
+          autoScrollEnabled: false,
         },
+        version: 1,
       });
   
       settingsPage = new SettingsPage(page);

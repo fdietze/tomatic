@@ -8,10 +8,15 @@ test.describe('Snippet Editor Validation', () => {
     await mockGlobalApis(context);
 
     await seedLocalStorage(context, {
-      'tomatic-storage': {
-        state: { apiKey: OPENROUTER_API_KEY },
-        version: 1,
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: null,
+        autoScrollEnabled: false,
       },
+      version: 1,
     });
 
     await seedIndexedDB(context, {

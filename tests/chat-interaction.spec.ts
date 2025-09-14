@@ -7,6 +7,7 @@ import {
   mockGlobalApis,
   OPENROUTER_API_KEY,
   seedLocalStorage,
+  seedIndexedDB,
 } from './test-helpers';
 
 
@@ -15,7 +16,15 @@ test.beforeEach(async ({ context }) => {
 });
 test('sends a message and sees the response', async ({ context, page }) => {
   await seedLocalStorage(context, {
-    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: null,
+      autoScrollEnabled: false,
+    },
+    version: 1,
   });
   const chatPage = new ChatPage(page);
   await chatPage.goto();
@@ -61,7 +70,15 @@ test('sends a message and sees the response', async ({ context, page }) => {
 
 test('can select a model and get a model-specific response', async ({ context, page }) => {
   await seedLocalStorage(context, {
-    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: null,
+      autoScrollEnabled: false,
+    },
+    version: 1,
   });
   const chatPage = new ChatPage(page);
   const chatMocker = new ChatCompletionMocker(page);
@@ -113,7 +130,15 @@ test('can select a model and get a model-specific response', async ({ context, p
 
 test('can regenerate an assistant response', async ({ context, page }) => {
   await seedLocalStorage(context, {
-    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: null,
+      autoScrollEnabled: false,
+    },
+    version: 1,
   });
   const chatPage = new ChatPage(page);
   await chatPage.goto();
@@ -168,14 +193,18 @@ test('shows system prompt immediately in a new chat', async ({ page, context }) 
 
   // 1. Setup State and Mock APIs
   await seedLocalStorage(context, {
-    'tomatic-storage': {
-      state: {
-        apiKey: OPENROUTER_API_KEY,
-        systemPrompts: [{ name: 'TestPrompt', prompt: 'You are a test bot.' }],
-        selectedPromptName: 'TestPrompt',
-      },
-      version: 0,
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: 'TestPrompt',
+      autoScrollEnabled: false,
     },
+    version: 1,
+  });
+  await seedIndexedDB(context, {
+    system_prompts: [{ name: 'TestPrompt', prompt: 'You are a test bot.' }],
   });
 
   // 2. Navigate
@@ -188,7 +217,15 @@ test('shows system prompt immediately in a new chat', async ({ page, context }) 
 
 test('can edit a user message and resubmit', async ({ context, page }) => {
   await seedLocalStorage(context, {
-    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: null,
+      autoScrollEnabled: false,
+    },
+    version: 1,
   });
   const chatPage = new ChatPage(page);
   await chatPage.goto();
@@ -240,7 +277,15 @@ test('can edit a user message and resubmit', async ({ context, page }) => {
 
 test('can edit a user message and discard changes', async ({ context, page }) => {
   await seedLocalStorage(context, {
-    'tomatic-storage': { state: { apiKey: OPENROUTER_API_KEY }, version: 0 },
+    state: {
+      apiKey: OPENROUTER_API_KEY,
+      modelName: 'google/gemini-2.5-pro',
+      cachedModels: [],
+      input: '',
+      selectedPromptName: null,
+      autoScrollEnabled: false,
+    },
+    version: 1,
   });
   const chatPage = new ChatPage(page);
   await chatPage.goto();

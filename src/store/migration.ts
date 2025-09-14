@@ -1,17 +1,8 @@
 import { saveSystemPrompt } from '@/services/db';
 import type { AppState } from './types';
+import { LocalStorageV0State, SystemPrompt } from '@/types/storage';
 
 const STORAGE_KEY = 'tomatic-storage';
-
-// This is a partial type for the old, non-Zustand state.
-interface OldState {
-  apiKey: string;
-  modelName: string;
-  systemPrompts: unknown[];
-  cachedModels: unknown[];
-  input: string;
-  selectedPromptName: unknown;
-}
 
 // --- One-Time LocalStorage Migration ---
 // This function checks for data from the old, non-Zustand version of the app
@@ -31,7 +22,7 @@ const runLocalStorageMigration = () => {
   console.debug('[Migration] Migrating old localStorage data to new format...');
 
   try {
-    const oldState: OldState = {
+    const oldState: LocalStorageV0State = {
       apiKey: oldApiKey || '',
       modelName: localStorage.getItem('MODEL_NAME') || 'google/gemini-2.5-pro',
       systemPrompts: JSON.parse(localStorage.getItem('system_prompts') || '[]') as unknown[],
@@ -79,11 +70,13 @@ runLocalStorageMigration();
  */
 export const migrateStore = async (persistedState: unknown, version: number): Promise<AppState> => {
     if (version === 0) {
-        const oldState = persistedState as Partial<AppState>;
-        if (oldState.systemPrompts && Array.isArray(oldState.systemPrompts)) {
+        const oldState = persistedState as LocalStorageV0State;
+        if (oldState.systemPrompts.length > 0) {
             console.debug('[Migration] Migrating system prompts from localStorage to IndexedDB...');
             try {
-                const promptsToMigrate = oldState.systemPrompts;
+                // We can't be sure of the exact type from old LS, so we cast to the current SystemPrompt type.
+                // The saveSystemPrompt function will perform Zod validation.
+                const promptsToMigrate = oldState.systemPrompts as SystemPrompt[];
                 for (const prompt of promptsToMigrate) {
                     // This will overwrite existing prompts with the same name if any.
                     await saveSystemPrompt(prompt);

@@ -1,6 +1,6 @@
 import { test } from './fixtures';
-import type { ChatSession } from '@/types/chat';
-import type { SystemPrompt } from '../src/types/storage';
+import type { SystemPrompt } from '@/types/storage';
+import { DBV3_ChatSession } from '@/types/storage';
 import { ChatCompletionMocker } from './test-helpers';
 import { ChatPage } from './pom/ChatPage';
 import { SettingsPage } from './pom/SettingsPage';
@@ -17,25 +17,31 @@ test.describe('System Prompt Interaction', () => {
       { name: 'Chef', prompt: 'You are a master chef.' },
       { name: 'Pirate', prompt: 'You are a fearsome pirate.' },
     ];
-    const SESSION_WITH_PROMPT: ChatSession = {
+    const SESSION_WITH_PROMPT: DBV3_ChatSession = {
       session_id: 'session-with-prompt',
       messages: [
-        { id: 'msg1', role: 'system', content: 'You are a master chef.', prompt_name: 'Chef' },
-        { id: 'msg2', role: 'user', content: 'Hello chef' },
-        { id: 'msg3', role: 'assistant', content: 'Hello there!', model_name: 'openai/gpt-4o' },
+        { id: 'msg1', role: 'system', content: 'You are a master chef.', prompt_name: 'Chef', model_name: null, cost: null, raw_content: undefined },
+        { id: 'msg2', role: 'user', content: 'Hello chef', prompt_name: null, model_name: null, cost: null, raw_content: undefined },
+        { id: 'msg3', role: 'assistant', content: 'Hello there!', model_name: 'openai/gpt-4o', prompt_name: null, cost: null, raw_content: undefined },
       ],
+      name: null,
       created_at_ms: 1000,
       updated_at_ms: 1000,
     };
 
     // 2. Seed Data and Mock APIs
     await seedLocalStorage(context, {
-      'tomatic-storage': {
-        state: { apiKey: OPENROUTER_API_KEY, systemPrompts: MOCK_PROMPTS, selectedModelId: 'google/gemini-2.5-pro' },
-        version: 0,
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: 'google/gemini-2.5-pro',
+        cachedModels: [],
+        input: '',
+        selectedPromptName: 'Chef',
+        autoScrollEnabled: false,
       },
+      version: 1,
     });
-    await seedIndexedDB(context, { chat_sessions: [SESSION_WITH_PROMPT] });
+    await seedIndexedDB(context, { chat_sessions: [SESSION_WITH_PROMPT], system_prompts: MOCK_PROMPTS });
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
 
