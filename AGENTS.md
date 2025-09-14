@@ -1,9 +1,8 @@
-# Project specific
+# Validating Changes
 
-- Where appropriate, add a new unit and/or e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test. Always run all tests using the `just check` command
-- automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation steps. Always mention at which points you will execute `just check`.
-- always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
-- before commiting, opening a PR or considering a task as done, just check must have run successfully
+- automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation milestones. Always plan at which points you will execute `just check`.
+- Where appropriate, add a new unit and/or e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test. Always run all tests using the `just check` command.
+- before commiting, opening a PR or considering a task as done, `just check` must have run successfully
 
 # General
 - trust the type checker.
@@ -31,6 +30,7 @@
 - each test must be as explicit and self-contained as possible.
 - make the test's setup completely explicit and easy to understand without needing to look up a fixture's definition.
 - Keep simple fixtures for boilerplate that is truly generic and shared by all tests.
+- always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
 
 # Big tasks
 - bigger tasks always have specification gaps. note, which decisions you have taken to fill those gaps. be conservative and don't do anything the user didn't ask for.
