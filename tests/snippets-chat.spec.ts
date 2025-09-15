@@ -85,8 +85,8 @@ test.describe('Snippet Usage in Chat', () => {
 
   test.describe('error handling', () => {
     test.describe('shows an error when a snippet is not found', () => {
-      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Snippet not found: @fake_snippet/] });
-      test('shows an error in the UI', async () => {
+      test('shows an error in the UI', async ({ expectedConsoleErrors }) => {
+        expectedConsoleErrors.push(/\[resolveSnippets\] Snippet not found: @fake_snippet/);
         // Purpose: This test ensures that if a user tries to use a snippet that does not
         // exist (e.g., '@fake_snippet'), an error message is displayed in the UI and no
         // message is sent to the API.
@@ -100,8 +100,8 @@ test.describe('Snippet Usage in Chat', () => {
     });
 
     test.describe('shows an error when a snippet self-references', () => {
-      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_self -> @cycle_self/] });
-      test('shows an error in the UI', async () => {
+      test('shows an error in the UI', async ({ expectedConsoleErrors }) => {
+        expectedConsoleErrors.push(/\[resolveSnippets\] Cycle detected: @cycle_self -> @cycle_self/);
         // Purpose: This test verifies that the application detects and prevents infinite
         // loops caused by self-referencing snippets (e.g., '@cycle_self' containing
         // '@cycle_self'). An error should be shown and no message sent.
@@ -115,8 +115,8 @@ test.describe('Snippet Usage in Chat', () => {
     });
 
     test.describe('shows an error when a multi-step snippet cycle is detected', () => {
-      test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Cycle detected: @cycle_a -> @cycle_b -> @cycle_a/] });
-      test('shows an error in the UI', async () => {
+      test('shows an error in the UI', async ({ expectedConsoleErrors }) => {
+        expectedConsoleErrors.push(/\[resolveSnippets\] Cycle detected: @cycle_a -> @cycle_b -> @cycle_a/);
         // Purpose: This test verifies that the application can detect more complex, multi-step
         // snippet cycles (e.g., A -> B -> A). It ensures an error is displayed and the
         // message is not sent.

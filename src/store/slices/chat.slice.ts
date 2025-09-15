@@ -3,9 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { AppState, ChatSlice } from '@/store/types';
 import { Message } from '@/types/chat';
 import { requestMessageContent } from '@/api/openrouter';
-import { resolveSnippets } from '@/utils/snippetUtils';
-import { SystemPrompt } from '@/types/storage';
-import {findNeighbourSessionIds, loadSession} from "@/services/db";
+import { getReferencedSnippetNames, resolveSnippets } from '@/utils/snippetUtils';
+import { Snippet, SystemPrompt } from '@/types/storage';
+import {findNeighbourSessionIds, loadSession, loadAllSnippets} from "@/services/db";
+import { SnippetRegenerationUpdatePayload } from '@/utils/events';
 
 
 const getCurrentSystemPrompt = (systemPrompts: SystemPrompt[], name: string | null): SystemPrompt | null => {
@@ -21,22 +22,75 @@ export const createChatSlice: StateCreator<
 > = (set, get) => ({
     isStreaming: false,
     streamController: null,
-    submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate }) => {
-        const { input, apiKey, modelName, selectedPromptName, snippets } = get();
+    submitMessage: async ({ promptOverride, navigate, isRegeneration, messagesToRegenerate, snippetsOverride }: { promptOverride?: string; navigate?: (path: string, options?: { replace?: boolean }) => void; isRegeneration?: boolean; messagesToRegenerate?: Message[]; snippetsOverride?: Snippet[] }) => {
+        const { input, apiKey, modelName, selectedPromptName, systemPrompts, messages, regeneratingSnippetNames } = get();
         const rawContent = promptOverride || input;
         if (!rawContent || !apiKey) return;
 
-        let processedContent: string;
         try {
-            processedContent = resolveSnippets(rawContent, snippets);
-            console.debug(`[STORE|submitMessage] Snippet resolution complete. Original: "${rawContent}", Processed: "${processedContent}"`);
+            // --- Wait for dependent snippets to finish regenerating ---
+            const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
+            const allReferencedSnippets = [...getReferencedSnippetNames(rawContent)];
+            
+            if (messages.length === 0 && systemPrompt) {
+                allReferencedSnippets.push(...getReferencedSnippetNames(systemPrompt.prompt));
+            }
+            if (isRegeneration) {
+                const systemMessage = messagesToRegenerate?.find(m => m.role === 'system');
+                if (systemMessage) {
+                    allReferencedSnippets.push(...getReferencedSnippetNames(systemMessage.raw_content || systemMessage.content));
+                }
+            }
+            
+            const uniqueReferencedSnippetNames = [...new Set(allReferencedSnippets)];
+            const snippetsToWaitFor = uniqueReferencedSnippetNames.filter(name => regeneratingSnippetNames.includes(name));
+
+            if (snippetsToWaitFor.length > 0) {
+                await new Promise<void>((resolve, reject) => {
+                    const waitingFor = new Set(snippetsToWaitFor);
+                    // Failsafe timeout
+                    const timeout = setTimeout(() => {
+                        window.removeEventListener('snippet_regeneration_update', listener);
+                        reject(new Error(`Timed out waiting for snippets: ${[...waitingFor].join(', ')}`));
+                    }, 30000);
+
+                    const listener = (event: Event) => {
+                        const e = event as CustomEvent<SnippetRegenerationUpdatePayload>;
+                        if (waitingFor.has(e.detail.name)) {
+                            if (e.detail.status === 'failure') {
+                                clearTimeout(timeout);
+                                window.removeEventListener('snippet_regeneration_update', listener);
+                                reject(new Error(`Snippet '@${e.detail.name}' failed to regenerate: ${e.detail.error || 'Unknown error'}`));
+                                return;
+                            }
+                            waitingFor.delete(e.detail.name);
+                            if (waitingFor.size === 0) {
+                                clearTimeout(timeout);
+                                window.removeEventListener('snippet_regeneration_update', listener);
+                                console.debug(`[DEBUG|submitMessage] Finished waiting (success) for: ${snippetsToWaitFor.join(', ')}`);
+                                resolve();
+                            }
+                        }
+                    };
+                    window.addEventListener('snippet_regeneration_update', listener);
+                });
+            }
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(error);
             return;
         }
 
-        console.debug(`[STORE|submitMessage] Start. Is regeneration: ${String(isRegeneration)}`);
+        const snippets = snippetsOverride || await loadAllSnippets();
+        
+        let processedContent: string;
+        try {
+            processedContent = resolveSnippets(rawContent, snippets);
+        } catch (e) {
+            const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+            get().setError(error);
+            return;
+        }
 
         let sessionId = get().currentSessionId;
         const isNewSession = !sessionId;
@@ -48,15 +102,24 @@ export const createChatSlice: StateCreator<
         const newMessages: Message[] = [];
         const systemPrompt = getCurrentSystemPrompt(get().systemPrompts, selectedPromptName);
         if (get().messages.length === 0 && systemPrompt) {
-            newMessages.push({
-                id: uuidv4(),
-                role: 'system',
-                content: systemPrompt.prompt,
-                prompt_name: systemPrompt.name,
-                model_name: null, cost: null
-            });
+            try {
+                const resolvedContent = resolveSnippets(systemPrompt.prompt, snippets);
+                const systemMessage: Message = {
+                    id: uuidv4(),
+                    role: 'system',
+                    content: resolvedContent,
+                    raw_content: systemPrompt.prompt,
+                    prompt_name: systemPrompt.name,
+                    model_name: null, cost: null
+                };
+                newMessages.push(systemMessage);
+            } catch (e) {
+                const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+                get().setError(error);
+                return;
+            }
         }
-        
+
         if (!isRegeneration) {
             const userMessage: Message = {
                 id: uuidv4(),
@@ -73,19 +136,24 @@ export const createChatSlice: StateCreator<
         }
 
         if (newMessages.length > 0) {
-            console.debug(`[STORE|submitMessage] Adding ${String(newMessages.length)} new message(s) to state.`);
             set((state) => ({ messages: [...state.messages, ...newMessages], input: '' }));
         }
-        
+
         if (isNewSession && navigate && sessionId) {
-            console.debug(`[STORE|submitMessage] New session, navigating to /chat/${sessionId}`);
-            void navigate(`/chat/${sessionId}`, { replace: true });
+            navigate(`/chat/${sessionId}`, { replace: true });
         }
 
-        let messagesToSubmit = messagesToRegenerate || get().messages;
-        
+        let messagesToSubmit;
+        if (messagesToRegenerate) {
+            messagesToSubmit = messagesToRegenerate;
+        } else {
+            messagesToSubmit = get().messages;
+        }
+
         // If this is a regeneration, we need to replace the last user message with the newly resolved content
         if (isRegeneration) {
+            // This is a critical fix. When regenerating, we must ensure we are not including any old assistant messages.
+            messagesToSubmit = messagesToSubmit.filter(m => m.role !== 'assistant');
             const lastUserMessageIndex = messagesToSubmit.map(m => m.role).lastIndexOf('user');
             if (lastUserMessageIndex !== -1) {
                 const updatedMessages = [...messagesToSubmit];
@@ -98,13 +166,19 @@ export const createChatSlice: StateCreator<
                 messagesToSubmit = updatedMessages;
             }
         }
-        
-        console.debug(`[STORE|submitMessage] Submitting ${String(messagesToSubmit.length)} messages to API.`);
+
         set({ isStreaming: true, error: null });
 
         try {
+            const finalMessagesToSubmit = messagesToSubmit.map(m => {
+                if (m.role === 'system') {
+                    return { ...m, content: resolveSnippets(m.raw_content || m.content, snippets) };
+                }
+                return m;
+            });
+
             const assistantResponse = await requestMessageContent(
-                messagesToSubmit,
+                finalMessagesToSubmit,
                 modelName,
                 apiKey
             );
@@ -123,8 +197,7 @@ export const createChatSlice: StateCreator<
             } else {
                 set(state => ({ messages: [...state.messages, assistantMessage] }));
             }
-            
-            console.debug('[STORE|submitMessage] Non-streaming response received.');
+
             set({ isStreaming: false });
             await get().saveCurrentSession();
             const sessionId = get().currentSessionId;
@@ -144,45 +217,54 @@ export const createChatSlice: StateCreator<
         }
     },
     regenerateMessage: async (index) => {
-        console.debug(`[STORE|regenerateMessage] Called for index: ${String(index)}`);
-        const { messages, systemPrompts } = get();
+        const { messages, systemPrompts, selectedPromptName } = get();
+        const reloadedSnippets = await loadAllSnippets(); // Force reload from DB
         const messagesToRegenerate = [...messages.slice(0, index)];
 
         const systemMessageIndex = messagesToRegenerate.findIndex(m => m.role === 'system');
-        if (systemMessageIndex !== -1) {
-            const systemMessage = messagesToRegenerate[systemMessageIndex];
-            const latestPrompt = systemPrompts.find(p => p.name === systemMessage.prompt_name);
+        const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
 
-            if (latestPrompt && latestPrompt.prompt !== systemMessage.content) {
-                console.debug(`[STORE|regenerateMessage] Found updated prompt "${latestPrompt.name}". Updating content for regeneration.`);
-                messagesToRegenerate[systemMessageIndex] = { ...systemMessage, content: latestPrompt.prompt };
+        if (systemPrompt) {
+            const newSystemMessage: Message = {
+                id: systemMessageIndex !== -1 ? messagesToRegenerate[systemMessageIndex].id : uuidv4(),
+                role: 'system',
+                content: systemPrompt.prompt, // Always use the raw prompt
+                raw_content: systemPrompt.prompt,
+                prompt_name: systemPrompt.name,
+                model_name: null,
+                cost: null,
+            };
+
+            if (systemMessageIndex !== -1) {
+                messagesToRegenerate[systemMessageIndex] = newSystemMessage;
+            } else {
+                messagesToRegenerate = [newSystemMessage, ...messagesToRegenerate];
             }
         }
-        
+
         // We need to re-resolve snippets in the user message to get the latest content.
         const lastUserMessageIndex = messagesToRegenerate.map(m => m.role).lastIndexOf('user');
-        
+
         let promptOverride: string | undefined;
 
         if (lastUserMessageIndex !== -1) {
             const lastUserMessage = messagesToRegenerate[lastUserMessageIndex];
             const rawContent = lastUserMessage.raw_content ?? lastUserMessage.content;
             promptOverride = rawContent;
-            console.debug(`[STORE|regenerateMessage] Regenerating with raw content: "${rawContent}"`);
         }
-        
-        await get().submitMessage({ isRegeneration: true, messagesToRegenerate, promptOverride });
+
+        // This is a critical fix. When regenerating, we must ensure we are not including any old assistant messages.
+        await get().submitMessage({ isRegeneration: true, messagesToRegenerate, promptOverride, snippetsOverride: reloadedSnippets });
     },
     editAndResubmitMessage: async (index, newContent) => {
         const { messages } = get();
         const messagesToRegenerate = [...messages.slice(0, index + 1)];
-        
+
         // Pass the new raw content directly to submitMessage for resolution.
         await get().submitMessage({ promptOverride: newContent, isRegeneration: true, messagesToRegenerate });
     },
     cancelStream: () => {
         // Since we're no longer streaming, this could be a no-op,
         // but we'll leave it in case we re-introduce cancellable requests.
-        console.warn("[STORE|cancelStream] Stream cancellation is not supported in the current non-streaming implementation.");
     },
 });

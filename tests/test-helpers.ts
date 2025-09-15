@@ -312,6 +312,10 @@ export class ChatCompletionMocker {
     this.mocks.push(mock);
   }
 
+  getPendingMocks() {
+    return this.mocks;
+  }
+
   private async handleRequest(route: Route) {
     const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
     
@@ -401,5 +405,23 @@ export class ChatCompletionMocker {
       throw new Error(errorMessage);
     }
    }
+}
+
+/**
+ * Waits for a custom event to be dispatched on the window object.
+ */
+export async function waitForEvent(page: Page, eventName: string, timeout = 5000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const eventFound = await page.evaluate<boolean, string>((name) => {
+      return window.app_events.some((e) => e.type === name);
+    }, eventName);
+
+    if (eventFound) {
+      return;
+    }
+    await page.waitForTimeout(100); // Poll every 100ms
+  }
+  throw new Error(`Timed out waiting for event "${eventName}"`);
 }
 

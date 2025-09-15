@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState, UtilitySlice } from '@/store/types';
+import { dispatchEvent } from '@/utils/events';
 
 export const createUtilitySlice: StateCreator<
     AppState,
@@ -17,12 +18,13 @@ export const createUtilitySlice: StateCreator<
       set({ initialChatPrompt: prompt });
     },
     init: () => {
-        console.debug('[STORE|init] Starting application initialization.');
+        if (get().currentSessionId || get().isSessionLoading) {
+            return;
+        }
         Promise.all([get().loadSystemPrompts(), get().loadSnippets(), get().fetchModelList()])
             .then(() => {
-                console.debug('[STORE|init] System prompts, snippets, and model list loaded successfully.');
                 set({ isInitializing: false });
-                console.log('[STORE|init] Calling processDirtySnippets from init.');
+                dispatchEvent('app_initialized');
                 void get().processDirtySnippets();
             })
             .catch((error: unknown) => {

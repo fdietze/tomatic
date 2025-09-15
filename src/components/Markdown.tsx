@@ -19,7 +19,7 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
   const roots = useRef<Root[]>([]);
 
   // Render markdown to HTML
-  const renderedHtml = md.render(markdownText);
+  const renderedHtml = md.render(markdownText.trim());
 
   // This useEffect hook is used to inject the CopyButton React component into the
   // HTML rendered by markdown-it. This approach is a trade-off. While it involves

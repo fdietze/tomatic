@@ -3,7 +3,6 @@ import { SettingsPage } from './pom/SettingsPage';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
 
 test.describe('Generated Snippets (Error Handling)', () => {
-  test.use({ expectedConsoleErrors: [/Internal Server Error/] });
   let settingsPage: SettingsPage;
 
   test.beforeEach(async ({ context, page }) => {
@@ -27,7 +26,8 @@ test.describe('Generated Snippets (Error Handling)', () => {
     await settingsPage.goto();
   });
 
-  test('shows an error if snippet generation fails', async () => {
+  test('shows an error if snippet generation fails', async ({ expectedConsoleErrors }) => {
+    expectedConsoleErrors.push(/Internal Server Error/);
     // Purpose: This test verifies that if the API call for generating a snippet's content fails
     // (e.g., returns a 500 error), an appropriate error message is displayed to the user within
     // the snippet editor.

@@ -24,6 +24,12 @@ export class ChatPage {
     this.errorMessage = page.getByTestId('error-message');
   }
 
+   async exposeTomaticTestGetStore() {
+    await this.page.exposeFunction('tomatic_test_getStore', () => {
+        return (this.page as unknown as { tomatic_test_getStore: () => unknown }).tomatic_test_getStore();
+    });
+   }
+
   // --- Actions ---
 
   /**
@@ -49,6 +55,8 @@ export class ChatPage {
   async regenerateMessage(messageIndex: number) {
     const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
     await messageLocator.getByTestId('regenerate-button').click();
+
+
   }
 
 

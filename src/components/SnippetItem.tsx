@@ -294,7 +294,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
             </button>
           )}
           <button
-            onClick={() => { void handleSave(); }}
+            onClick={() => void handleSave()}
             data-size="compact"
             data-role="primary"
             disabled={!!nameError && editingName.trim() !== ''}

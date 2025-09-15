@@ -1,30 +1,24 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import SystemPromptBar from './SystemPromptBar';
-import type { SystemPrompt } from '@/types/storage';
+import React from 'react';
 
 interface ChatHeaderProps {
-  systemPrompts: SystemPrompt[];
-  selectedPromptName: string | null;
-  setSelectedPromptName: (name: string | null) => void;
   canGoPrev: boolean;
   canGoNext: boolean;
   onPrev: () => void;
   onNext: () => void;
+  children: React.ReactNode;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
-  systemPrompts,
-  selectedPromptName,
-  setSelectedPromptName,
   canGoPrev,
   canGoNext,
   onPrev,
   onNext,
+  children,
 }) => {
   const navigate = useNavigate();
 
-  const onNewChat = () => {
+  const handleNewChat = () => {
     void navigate('/chat/new');
   };
 
@@ -33,7 +27,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       <button data-size="compact" onClick={onPrev} disabled={!canGoPrev} data-testid="prev-session-button">
         Prev
       </button>
-      <button data-testid="next-session-button"
+      <button
+        data-testid="next-session-button"
         data-size="compact"
         onClick={onNext}
         disabled={!canGoNext}
@@ -41,14 +36,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         Next
       </button>
-      <div className="system-prompt-container">
-        <SystemPromptBar
-          systemPrompts={systemPrompts}
-          selectedPromptName={selectedPromptName}
-          onSelectPrompt={setSelectedPromptName}
-        />
-      </div>
-      <button data-role="primary" data-size="compact" onClick={onNewChat} data-testid="new-chat-button">
+      <div className="system-prompt-container">{children}</div>
+      <button data-role="primary" data-size="compact" onClick={handleNewChat} data-testid="new-chat-button">
         New Chat
       </button>
     </div>

@@ -1,5 +1,5 @@
 import { test } from './fixtures';
-import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './test-helpers';
+import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, waitForEvent } from './test-helpers';
 import { DBV1_ChatSession, DBV2_ChatSession, DBV2_Message } from '@/types/storage';
 import { ROUTES } from '@/utils/routes';
 
@@ -74,11 +74,8 @@ test.describe('Database Migrations', () => {
     // 3. Navigate to a page to trigger the app's DB initialization and migration
     await page.goto(ROUTES.chat.new);
 
-    // Wait for migration logs to appear in console
-    await page.waitForEvent('console', {
-      predicate: (msg) => msg.text().includes('[DB] Migration complete.'),
-      timeout: 5000,
-    });
+    // Wait for the custom event that signals the V2 migration is complete
+    await waitForEvent(page, 'db_migration_complete');
 
     // 4. Verify the data has been migrated in the browser context
     const migrationResult = await page.evaluate(

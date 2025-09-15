@@ -26,6 +26,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "tests", "src/types/navigator.d.ts"],
+  "include": ["src", "tests", "src/types/navigator.d.ts", "tests/types.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

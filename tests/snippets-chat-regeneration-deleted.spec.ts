@@ -9,9 +9,8 @@ test.describe('Chat Regeneration with Deleted Snippets', () => {
     let chatMocker: ChatCompletionMocker;
 
     test.describe('when a referenced snippet is deleted', () => {
-        test.use({ expectedConsoleErrors: [/\[resolveSnippets\] Snippet not found: @greet/] });
-        
-        test.beforeEach(async ({ context, page }) => {
+        test.beforeEach(async ({ context, page, expectedConsoleErrors }) => {
+            expectedConsoleErrors.push(/\[resolveSnippets\] Snippet not found: @greet/);
             await mockGlobalApis(context);
 
             // This session references a snippet named 'greet', but we will NOT seed

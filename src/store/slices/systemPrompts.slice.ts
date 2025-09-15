@@ -1,10 +1,8 @@
 import { StateCreator } from 'zustand';
 import { AppState, SystemPromptsSlice } from '@/store/types';
-import {
-    deleteSystemPrompt as dbDeleteSystemPrompt,
-    loadAllSystemPrompts,
-    saveSystemPrompt,
-} from '@/services/db';
+import * as persistence from '@/services/persistence';
+import { loadAllSystemPrompts } from '@/services/db';
+import { getReferencedSnippetNames } from '@/utils/snippetUtils';
 
 export const createSystemPromptsSlice: StateCreator<
     AppState,
@@ -27,8 +25,8 @@ export const createSystemPromptsSlice: StateCreator<
     },
     addSystemPrompt: async (prompt) => {
         try {
-            await saveSystemPrompt(prompt);
-            await get().loadSystemPrompts();
+            const freshPrompts = await persistence.addSystemPrompt(prompt);
+            set({ systemPrompts: freshPrompts });
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(`Failed to add system prompt: ${error}`);
@@ -36,11 +34,15 @@ export const createSystemPromptsSlice: StateCreator<
     },
     updateSystemPrompt: async (oldName, prompt) => {
         try {
-            if (oldName !== prompt.name) {
-                await dbDeleteSystemPrompt(oldName);
+            const freshPrompts = await persistence.updateSystemPrompt(oldName, prompt);
+            set({ systemPrompts: freshPrompts });
+
+            // When a system prompt is updated, we need to check if any snippets used in it have changed.
+            // By marking them as dirty, we ensure that any dependent generated snippets are regenerated.
+            const referencedSnippets = getReferencedSnippetNames(prompt.prompt);
+            for (const snippetName of referencedSnippets) {
+                await get()._markDependentsAsDirty(snippetName);
             }
-            await saveSystemPrompt(prompt);
-            await get().loadSystemPrompts();
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(`Failed to update system prompt: ${error}`);
@@ -48,8 +50,8 @@ export const createSystemPromptsSlice: StateCreator<
     },
     deleteSystemPrompt: async (name) => {
         try {
-            await dbDeleteSystemPrompt(name);
-            await get().loadSystemPrompts();
+            const freshPrompts = await persistence.deleteSystemPrompt(name);
+            set({ systemPrompts: freshPrompts });
         } catch (e) {
             const error = e instanceof Error ? e.message : 'An unknown error occurred.';
             get().setError(`Failed to delete system prompt: ${error}`);
