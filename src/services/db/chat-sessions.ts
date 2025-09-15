@@ -5,7 +5,9 @@ import type { ChatSession } from '@/types/chat';
 export async function saveSession(session: ChatSession): Promise<void> {
   const db = await dbPromise;
   try {
-    await db.put(SESSIONS_STORE_NAME, session);
+    const tx = db.transaction(SESSIONS_STORE_NAME, 'readwrite');
+    await tx.store.put(session);
+    await tx.done;
   } catch (error) {
     console.error('[DB] Save: Failed to save session:', error);
     throw new Error('Failed to save session.');
@@ -87,7 +89,9 @@ export async function getMostRecentSessionId(): Promise<string | null> {
 export async function deleteSession(sessionId: string): Promise<void> {
   const db = await dbPromise;
   try {
-    await db.delete(SESSIONS_STORE_NAME, sessionId);
+    const tx = db.transaction(SESSIONS_STORE_NAME, 'readwrite');
+    await tx.store.delete(sessionId);
+    await tx.done;
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete session '${sessionId}':`, error);
     throw new Error('Failed to delete session.');

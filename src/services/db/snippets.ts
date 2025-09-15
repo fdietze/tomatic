@@ -11,8 +11,13 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
     updatedAt_ms: now,
   };
   try {
-    await db.put(SNIPPETS_STORE_NAME, snippetToSave);
-  } catch {
+    console.debug(`[DB|saveSnippet] Attempting to save snippet: @${snippetToSave.name}, content: "${snippetToSave.content}"`);
+    const tx = db.transaction(SNIPPETS_STORE_NAME, 'readwrite');
+    await tx.store.put(snippetToSave);
+    await tx.done;
+    console.debug(`[DB|saveSnippet] Successfully saved snippet: @${snippetToSave.name}`);
+  } catch(e) {
+    console.error('[DB|saveSnippet] Failed to save snippet:', e);
     throw new Error('Failed to save snippet.');
   }
 }
@@ -21,6 +26,7 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
   const db = await dbPromise;
   try {
     const snippets = await db.getAll(SNIPPETS_STORE_NAME);
+    console.debug('[DB|loadAllSnippets] Loaded snippets from DB:', JSON.stringify(snippets.map(s => ({ name: s.name, content: s.content }))));
     // Validate each snippet
     const validation = z.array(snippetSchema).safeParse(snippets);
     if (validation.success) {
@@ -37,8 +43,11 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
 export async function deleteSnippet(name: string): Promise<void> {
   const db = await dbPromise;
   try {
-    await db.delete(SNIPPETS_STORE_NAME, name);
-  } catch {
+    const tx = db.transaction(SNIPPETS_STORE_NAME, 'readwrite');
+    await tx.store.delete(name);
+    await tx.done;
+  } catch(e) {
+    console.error('[DB|deleteSnippet] Failed to delete snippet:', e);
     throw new Error('Failed to delete snippet.');
   }
 }

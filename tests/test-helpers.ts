@@ -225,6 +225,7 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
 
         const storeNames = state.indexedDB.stores.map((s) => s.storeName);
         const tx = db.transaction(storeNames, 'readwrite');
+        const promises: Promise<unknown>[] = [];
 
         tx.oncomplete = () => {
           db.close();
@@ -238,10 +239,16 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
           if (storeInfo.data.length > 0) {
             const store = tx.objectStore(storeInfo.storeName);
             storeInfo.data.forEach((item) => {
-              store.put(item);
+              promises.push(new Promise((resolvePut, rejectPut) => {
+                const putRequest = store.put(item);
+                putRequest.onsuccess = () => { resolvePut(putRequest.result); };
+                putRequest.onerror = () => { rejectPut(new Error(putRequest.error?.message)); };
+              }));
             });
           }
         });
+        
+        Promise.all(promises).catch((err: unknown) => { reject(err instanceof Error ? err : new Error(String(err))); });
       };
     });
   }, injectedState);

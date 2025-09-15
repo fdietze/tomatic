@@ -98,6 +98,60 @@ test.describe('Snippet Chat with Regeneration Wait', () => {
             await chatPage.expectMessage(1, 'assistant', /Final response/);
             chatMocker.verifyComplete();
         });
+
+        test('waits for only the relevant snippet before sending', async ({ page, context }) => {
+            // Purpose: This test ensures that the waiting logic is fine-grained. If multiple snippets
+            // are regenerating, but the user's message only depends on one of them, the message
+            // should be sent as soon as that specific dependency is ready, without waiting for
+            // unrelated snippets to finish.
+            await seedIndexedDB(context, {
+                snippets: [
+                    { name: 'A', content: 'v1', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+                    { name: 'B', content: 'From A_v1', isGenerated: true, prompt: 'From @A', model: 'mock/b', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true },
+                    { name: 'Z', content: 'Independent', isGenerated: true, prompt: 'Independent', model: 'mock/z', createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: true },
+                ],
+            });
+
+            // Mock B's regeneration (fast)
+            chatMocker.mock({
+                request: { model: 'mock/b', messages: [{ role: 'user', content: 'From v1' }] },
+                response: { role: 'assistant', content: 'From A_v1_regenerated' },
+            });
+
+            // Mock Z's regeneration (slow, manually triggered)
+            chatMocker.mock({
+                request: { model: 'mock/z', messages: [{ role: 'user', content: 'Independent' }] },
+                response: { role: 'assistant', content: 'Independent_regenerated' },
+                manualTrigger: true,
+            });
+            
+            // Mock the final chat message, which depends on B but not Z
+            chatMocker.mock({
+                request: { model: 'google/gemini-2.5-pro', messages: [{ role: 'user', content: 'Message From A_v1_regenerated' }] },
+                response: { role: 'assistant', content: 'Final Chat Response.' },
+            });
+
+            await chatPage.goto();
+            await waitForEvent(page, 'snippet_regeneration_started');
+
+            // Send the message that depends on B. Because Z's regeneration is still pending,
+            // this is a race. The message should be sent as soon as B is done.
+            const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+            await chatPage.sendMessage('Message @B');
+
+            // Wait for the chat message to be sent. This should happen before Z is resolved.
+            await responsePromise;
+
+            // Assert the UI is in the correct state
+            await chatPage.expectMessage(0, 'user', /Message @B/);
+            await chatPage.expectMessage(1, 'assistant', /Final Chat Response/);
+
+            // Now, resolve Z's regeneration.
+            await chatMocker.resolveNextCompletion();
+
+            // Verify that all mocks were eventually consumed in the correct order.
+            chatMocker.verifyComplete();
+        });
     });
 
     test.describe('on failed regeneration', () => {
