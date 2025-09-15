@@ -56,7 +56,7 @@ export interface SystemPromptsSlice {
 
 export interface SnippetsSlice {
   snippets: Snippet[];
-  loadSnippets: () => Promise<void>;
+  loadSnippets: () => Promise<Snippet[] | undefined>;
   addSnippet: (snippet: Snippet) => Promise<void>;
   updateSnippet: (oldName: string, snippet: Snippet) => Promise<void>;
   deleteSnippet: (name: string) => Promise<void>;
@@ -76,6 +76,7 @@ export interface ChatSlice {
     navigate?: NavigateFunction;
     isRegeneration?: boolean;
     messagesToRegenerate?: Message[];
+    snippets?: Snippet[];
   }) => Promise<void>;
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;

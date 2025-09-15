@@ -5,6 +5,7 @@ import { AppState } from '@/store/types';
 import { useShallow } from 'zustand/react/shallow';
 import ChatHeader from '@/components/ChatHeader';
 import ChatInterface from '@/components/ChatInterface';
+import SystemPromptBar from '@/components/SystemPromptBar';
 
 const ChatPage: React.FC = () => {
   const { id: sessionIdFromUrl } = useParams<{ id: string }>();
@@ -66,14 +67,17 @@ useShallow((state: AppState) => ({
   return (
     <>
       <ChatHeader
-        systemPrompts={systemPrompts}
-        selectedPromptName={selectedPromptName}
-        setSelectedPromptName={setSelectedPromptName}
         canGoPrev={canGoPrev}
         canGoNext={canGoNext}
         onPrev={onPrev}
         onNext={onNext}
-      />
+      >
+        <SystemPromptBar
+          systemPrompts={systemPrompts}
+          selectedPromptName={selectedPromptName}
+          onSelectPrompt={setSelectedPromptName}
+        />
+      </ChatHeader>
       {error && (
         <div className="error-display" data-testid="error-message">
           <p>{error}</p>

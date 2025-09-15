@@ -59,16 +59,13 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
-    console.debug('[App|useEffect] Initialization effect is running.');
     init();
   }, [init]);
 
   if (isInitializing) {
-    console.debug('[App|render] Rendering loading spinner.');
     return <div className="loading-spinner">Loading...</div>;
   }
 
-  console.debug('[App|render] Rendering main application.');
   return (
     <Router>
       <Header />

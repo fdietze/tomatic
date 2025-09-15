@@ -4,6 +4,7 @@
 - Where appropriate, add a new unit and/or e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test. Always run all tests using the `just check` command.
 - before commiting, opening a PR or considering a task as done, `just check` must have run successfully
 - When `just check` results in a failed test, you must immediately enter the debugging protocol.
+- if you cannot satisfy the linter, it is ok to disable linting rules in the code on a per-case basis.
 
 # General
 - trust the type checker.
@@ -45,11 +46,12 @@ State that you are "Entering the debugging protocol."
 run the tests and see them failing. after each run of `just check` you must ask the following quesions:
 - what are the current hypotheses of the tests failing? explain the hypotheses with log traces.
 - where and which logging must we add to confirm or refute these hypotheses
+- add logging to trace the whole flow from start to finish
 - run the tests again
 - don't fix anything yet
 
 run this iteration 3 times. Number your iterations.
-Run specific tests instead of the whole test suite to stay focused and save time. But run `npm run lint` before.
+Run specific tests instead of the whole test suite to stay focused and save time (manually run `npm run lint` before).
 
 Then ask the following questions:
 - which decisions do we have to make to solve the problem?

@@ -34,8 +34,8 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test.describe('shows a live error when an edit introduces a snippet cycle', () => {
-    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
-    test('shows a live error in the UI', async () => {
+    test('shows a live error in the UI', async ({ expectedConsoleErrors }) => {
+      expectedConsoleErrors.push(/\[validateSnippetDependencies\] Cycle detected: @b -> @b/);
       // Purpose: This test verifies that the snippet editor provides immediate feedback when an
       // edit to a generated snippet's prompt would create a dependency cycle. It checks that
       // an error message is displayed and the regenerate/save buttons are in the correct state.
@@ -84,8 +84,8 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test.describe('shows both a cycle error and a non-existent snippet warning', () => {
-    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @b -> @b/] });
-    test('shows both errors in the UI', async () => {
+    test('shows both errors in the UI', async ({ expectedConsoleErrors }) => {
+      expectedConsoleErrors.push(/\[validateSnippetDependencies\] Cycle detected: @b -> @b/);
       // Purpose: This test ensures the UI can display multiple validation messages simultaneously,
       // showing both a cycle error and a non-existent snippet warning when an edit introduces
       // both issues.
@@ -102,8 +102,8 @@ test.describe('Snippet Editor Validation', () => {
   });
 
   test.describe('shows a cycle error for mixed-type snippet cycles', () => {
-    test.use({ expectedConsoleErrors: [/\[validateSnippetDependencies\] Cycle detected: @d -> @b -> @d/] });
-    test('shows the cycle error in the UI', async () => {
+    test('shows the cycle error in the UI', async ({ expectedConsoleErrors }) => {
+      expectedConsoleErrors.push(/\[validateSnippetDependencies\] Cycle detected: @d -> @b -> @d/);
       // Purpose: This test verifies that cycle detection works correctly across different snippet
       // types (e.g., a standard snippet referencing a generated snippet, which in turn
       // references the standard one).
