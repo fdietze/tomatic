@@ -5,7 +5,9 @@ import { systemPromptSchema } from './schemas';
 export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
   const db = await dbPromise;
   try {
-    await db.put(SYSTEM_PROMPTS_STORE_NAME, prompt);
+    const tx = db.transaction(SYSTEM_PROMPTS_STORE_NAME, 'readwrite');
+    await tx.store.put(prompt);
+    await tx.done;
   } catch (error) {
     console.error('[DB] Save: Failed to save system prompt:', error);
     throw new Error('Failed to save system prompt.');
@@ -33,7 +35,9 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
 export async function deleteSystemPrompt(promptName: string): Promise<void> {
   const db = await dbPromise;
   try {
-    await db.delete(SYSTEM_PROMPTS_STORE_NAME, promptName);
+    const tx = db.transaction(SYSTEM_PROMPTS_STORE_NAME, 'readwrite');
+    await tx.store.delete(promptName);
+    await tx.done;
   } catch (error) {
     console.error(`[DB] Delete: Failed to delete system prompt '${promptName}':`, error);
     throw new Error('Failed to delete system prompt.');

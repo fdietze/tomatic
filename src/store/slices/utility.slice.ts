@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState, UtilitySlice } from '@/store/types';
-import { dispatchEvent } from '@/utils/events';
+import { dispatchEvent, waitForSnippets } from '@/utils/events';
+import { getReferencedSnippetNames } from '@/utils/snippetUtils';
 
 export const createUtilitySlice: StateCreator<
     AppState,
@@ -32,5 +33,25 @@ export const createUtilitySlice: StateCreator<
                 get().setError('Initialization failed. Some features may not be available.');
                 set({ isInitializing: false });
             });
+    },
+    waitForDependentSnippets: async (text) => {
+        const referencedNames = Array.from(getReferencedSnippetNames(text));
+        if (referencedNames.length === 0) {
+            return;
+        }
+
+        const regeneratingNames = get().regeneratingSnippetNames;
+        console.debug(`[DEBUG] waitForDependentSnippets: Checking for dependencies. Referenced: [${referencedNames.join(', ')}]. Currently regenerating: [${regeneratingNames.join(', ')}]`);
+        const namesToWaitFor = referencedNames.filter(name => regeneratingNames.includes(name));
+
+        if (namesToWaitFor.length > 0) {
+            try {
+                await waitForSnippets(namesToWaitFor);
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while waiting for snippets.';
+                get().setError(errorMessage);
+                throw new Error(errorMessage);
+            }
+        }
     },
 });

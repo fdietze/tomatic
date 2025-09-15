@@ -24,6 +24,7 @@ export interface UtilitySlice {
     setError: (error: string | null) => void;
     setInitialChatPrompt: (prompt: string | null) => void;
     init: () => void;
+    waitForDependentSnippets: (text: string) => Promise<void>;
 }
 
 export interface ModelsSlice {
@@ -76,7 +77,7 @@ export interface ChatSlice {
     navigate?: NavigateFunction;
     isRegeneration?: boolean;
     messagesToRegenerate?: Message[];
-    snippets?: Snippet[];
+    snippetsOverride?: Snippet[];
   }) => Promise<void>;
   regenerateMessage: (index: number) => Promise<void>;
   editAndResubmitMessage: (index: number, newContent: string) => Promise<void>;
