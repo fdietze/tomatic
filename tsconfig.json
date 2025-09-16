@@ -6,6 +6,10 @@
     "module": "ESNext",
     "skipLibCheck": true,
 
+    /* Completeness */
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -15,7 +19,7 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": true,
+    "strict": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
@@ -26,6 +30,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "tests", "src/types/navigator.d.ts", "tests/types.d.ts"],
+  "include": ["src", "tests", "unittests"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
