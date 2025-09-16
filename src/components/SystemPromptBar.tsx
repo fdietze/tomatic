@@ -15,7 +15,7 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
   const selectedPrompt = systemPrompts.find((p) => p.name === selectedPromptName);
   const unselectedPrompts = systemPrompts.filter((p) => p.name !== selectedPromptName);
 
-  const handleSelectPrompt = (name: string) => {
+  const handleSelectPrompt = (name: string): void => {
     if (selectedPromptName === name) {
       onSelectPrompt(null); // Deselect if already selected
     } else {

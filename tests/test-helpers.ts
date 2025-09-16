@@ -308,7 +308,7 @@ export class ChatCompletionMocker {
   }
 
   async setup() {
-    await this.page.route('https://openrouter.ai/api/v1/chat/completions', this.handleRequest.bind(this));
+    await this.page.route('https://openrouter.ai/api/v1/chat/completions', (route) => this.handleRequest(route));
   }
 
   /**

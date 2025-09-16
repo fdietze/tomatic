@@ -1,66 +1,76 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useAppStore } from '@/store';
-import { AppState } from '@/store/types';
-import { useShallow } from 'zustand/react/shallow';
+import { useSelector } from '@xstate/react';
 import ChatHeader from '@/components/ChatHeader';
 import ChatInterface from '@/components/ChatInterface';
 import SystemPromptBar from '@/components/SystemPromptBar';
+import { useGlobalState } from '@/context/GlobalStateContext';
+import { SystemPrompt } from '@/types/storage';
 
 const ChatPage: React.FC = () => {
   const { id: sessionIdFromUrl } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const {
-    loadSession,
-    systemPrompts,
-    selectedPromptName,
-    setSelectedPromptName,
-    prevSessionId,
-    nextSessionId,
-    error,
-    setError,
-  } = useAppStore(
-useShallow((state: AppState) => ({
-      loadSession: state.loadSession,
-      systemPrompts: state.systemPrompts,
-      selectedPromptName: state.selectedPromptName,
-      setSelectedPromptName: state.setSelectedPromptName,
-      prevSessionId: state.prevSessionId,
-      nextSessionId: state.nextSessionId,
-      error: state.error,
-      setError: state.setError,
-    }))
-  );
+  const { settingsActor, sessionActor, promptsActor } = useGlobalState();
+
+  // --- Granular Selectors ---
+  const selectedPromptName = useSelector(settingsActor, (state) => state.context.selectedPromptName);
+  const isInitializing = useSelector(settingsActor, (state) => state.context.isInitializing);
+  const error = useSelector(settingsActor, (state) => state.context.error);
+  const prevSessionId = useSelector(sessionActor, (state) => state.context.prevSessionId);
+  const nextSessionId = useSelector(sessionActor, (state) => state.context.nextSessionId);
+  const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
+  const promptsLoaded = useSelector(promptsActor, (state) => state.context.promptsLoaded);
+
+  const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
+    return systemPrompts.find(p => p.name === selectedPromptName);
+  }, [systemPrompts, selectedPromptName]);
+
 
   // Effect to load session when URL parameter changes
   useEffect(() => {
-    const idToLoad = sessionIdFromUrl || 'new';
-    void loadSession(idToLoad);
-
-    if (idToLoad === 'new') {
-        const initialPrompt = searchParams.get('q');
-        if (initialPrompt) {
-            useAppStore.getState().setInitialChatPrompt(initialPrompt);
-            setSearchParams({}); // Clear the query param after consuming it
-        }
+    // Wait for both settings and prompts to be loaded before proceeding
+    if (isInitializing || !promptsLoaded) {
+      return;
     }
-  }, [sessionIdFromUrl, loadSession, searchParams, setSearchParams]);
 
-  const canGoPrev = !!prevSessionId; // "Prev" button goes to older sessions
-  const canGoNext = !!nextSessionId; // "Next" button goes to newer sessions
+    const idToLoad = sessionIdFromUrl || 'new';
+    if (idToLoad === 'new') {
+      sessionActor.send({
+        type: 'START_NEW_SESSION',
+      });
+      const initialPrompt = searchParams.get('q');
+      if (initialPrompt) {
+        settingsActor.send({ type: 'SET_INITIAL_CHAT_PROMPT', prompt: initialPrompt });
+        setSearchParams({}); // Clear the query param after consuming it
+      }
+    } else {
+      sessionActor.send({ type: 'LOAD_SESSION', sessionId: idToLoad });
+    }
+  }, [sessionIdFromUrl, sessionActor, settingsActor, searchParams, setSearchParams, isInitializing, promptsLoaded]);
 
-  const onPrev = () => {
+  const canGoPrev = !!prevSessionId;
+  const canGoNext = !!nextSessionId;
+
+  const onPrev = (): void => {
     if (prevSessionId) {
       void navigate(`/chat/${prevSessionId}`);
     }
   };
 
-  const onNext = () => {
+  const onNext = (): void => {
     if (nextSessionId) {
       void navigate(`/chat/${nextSessionId}`);
     }
+  };
+
+  const handleSelectPrompt = (name: string | null): void => {
+    settingsActor.send({ type: 'SET_SELECTED_PROMPT_NAME', name });
+  };
+
+  const handleErrorClear = (): void => {
+    settingsActor.send({ type: 'SET_ERROR', error: null });
   };
 
 
@@ -75,18 +85,18 @@ useShallow((state: AppState) => ({
         <SystemPromptBar
           systemPrompts={systemPrompts}
           selectedPromptName={selectedPromptName}
-          onSelectPrompt={setSelectedPromptName}
+          onSelectPrompt={handleSelectPrompt}
         />
       </ChatHeader>
       {error && (
         <div className="error-display" data-testid="error-message">
           <p>{error}</p>
-          <button onClick={() => { setError(null); }} className="close-button">
+          <button onClick={handleErrorClear} className="close-button">
             &times;
           </button>
         </div>
       )}
-      <ChatInterface />
+      <ChatInterface systemPrompt={activeSystemPrompt} />
     </>
   );
 };

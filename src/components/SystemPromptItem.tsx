@@ -20,9 +20,10 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-  console.log(
-    `[DEBUG] SystemPromptItem render. Name: "${prompt.name}", isEditing initially: ${String(isInitiallyEditing)}`
-  );
+  // This component doesn't need to be connected to the context,
+  // as it receives all necessary data and callbacks as props.
+  // The parent (SettingsPage) is responsible for providing them.
+
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(prompt.name);
   const [editingPrompt, setEditingPrompt] = useState(prompt.prompt);
@@ -35,7 +36,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
     }
   }, [isEditing]);
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     const trimmedName = editingName.trim();
     if (nameError || trimmedName === '') {
         if (trimmedName === '') setNameError('Name cannot be empty.');
@@ -46,7 +47,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
     setNameError(null);
   };
 
-  const handleCancelEditing = () => {
+  const handleCancelEditing = (): void => {
     if (onCancel) {
       onCancel();
     } else {
@@ -58,7 +59,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   };
 
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newName = e.target.value;
     setEditingName(newName);
 

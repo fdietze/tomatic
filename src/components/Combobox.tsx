@@ -61,7 +61,7 @@ const Combobox: React.FC<ComboboxProps> = ({
     });
   }, [searchQuery, items]);
 
-  const handleSelectItem = (item: ComboboxItem) => {
+  const handleSelectItem = (item: ComboboxItem): void => {
     onSelect(item.id);
     setSearchQuery(item.id);
     setShowSuggestions(false);
@@ -69,7 +69,7 @@ const Combobox: React.FC<ComboboxProps> = ({
     inputRef.current?.focus();
   };
   
-  const scrollHighlightedItemIntoView = () => {
+  const scrollHighlightedItemIntoView = (): void => {
     const listEl = suggestionsListRef.current;
     const highlightedEl = listEl?.querySelector<HTMLLIElement>('.combobox-item-highlighted');
 
@@ -86,7 +86,7 @@ const Combobox: React.FC<ComboboxProps> = ({
   };
 
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (!showSuggestions && !['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
         return;
     }
@@ -130,14 +130,14 @@ const Combobox: React.FC<ComboboxProps> = ({
     }
   };
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newValue = e.target.value;
     setSearchQuery(newValue);
     setShowSuggestions(true);
     setHighlightedIndex(null);
   };
 
-  const handleFocus = () => {
+  const handleFocus = (): void => {
     setShowSuggestions(true);
   };
 

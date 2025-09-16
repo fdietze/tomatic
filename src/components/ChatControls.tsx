@@ -1,12 +1,11 @@
 import React from 'react';
 import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
+import { useGlobalState } from '@/context/GlobalStateContext';
 
 interface ChatControlsProps {
   input: string;
   setInput: (value: string) => void;
   isStreaming: boolean;
-  onSubmit: (promptOverride?: string) => void;
-  onCancel: () => void;
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   apiKey: string;
@@ -16,25 +15,28 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   input,
   setInput,
   isStreaming,
-  onSubmit,
-  onCancel,
   isMobile,
   inputRef,
   apiKey,
 }) => {
-  
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isStreaming) {
-      onSubmit();
+  const { sessionActor } = useGlobalState();
+
+  const handleSubmit = (): void => {
+    if (!isStreaming && input.trim().length > 0) {
+      sessionActor.send({ type: 'SUBMIT', prompt: input });
     }
   };
 
-  const handleKeyDown = useTextAreaEnterHandler(isMobile, () => {
-    if (!isStreaming) {
-      onSubmit();
-    }
-  });
+  const handleCancel = (): void => {
+    sessionActor.send({ type: 'CANCEL' });
+  };
+
+  const handleFormSubmit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    handleSubmit();
+  };
+
+  const handleKeyDown = useTextAreaEnterHandler(isMobile, handleSubmit);
 
   return (
     <div className="chat-controls">
@@ -54,7 +56,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
               type="button"
               data-role="destructive"
               style={{ flexShrink: 0 }}
-              onClick={onCancel}
+              onClick={handleCancel}
             >
               <span className="spinner" />
               Cancel

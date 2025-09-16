@@ -18,7 +18,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  const handleNewChat = () => {
+  const handleNewChat = (): void => {
     void navigate('/chat/new');
   };
 

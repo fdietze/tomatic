@@ -11,9 +11,16 @@ export const testWithConsoleErrors = base.extend<ConsoleErrorOptions>({
 
 	page: async ({ page, expectedConsoleErrors }, use) => {
 		const unhandledErrors: string[] = [];
+
+        page.on('pageerror', (err) => {
+            unhandledErrors.push(err.message);
+        });
+        
 		page.on('console', (msg) => {
-			if (msg.type().toUpperCase() === 'ERROR') {
-				const msgText = msg.text();
+            const msgType = msg.type().toUpperCase();
+            const msgText = msg.text();
+
+			if (msgType === 'ERROR') {
 				const isExpected =
 					Array.isArray(expectedConsoleErrors) &&
 					expectedConsoleErrors.some((pattern) => {
@@ -46,11 +53,11 @@ export const test = mergeTests(testWithConsoleErrors, testWithLogging, networkSe
 			window.app_events = events;
 			
 			const originalDispatchEvent = window.dispatchEvent;
-			window.dispatchEvent = function (event: Event): boolean {
+			window.dispatchEvent = function (this: Window, event: Event): boolean {
 				if (event instanceof CustomEvent) {
 					events.push({ type: event.type, detail: event.detail });
 				}
-				return originalDispatchEvent.apply(this, [event]);
+				return originalDispatchEvent.apply(this, [event]) as boolean;
 			};
 		});
 		await use(context);

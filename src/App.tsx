@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,18 +9,23 @@ import {
 } from 'react-router-dom';
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
-import { useAppStore } from '@/store';
-import { useShallow } from 'zustand/react/shallow';
-import { AppState } from './store/types';
+import { useSelector } from '@xstate/react';
 import { ROUTES } from '@/utils/routes';
+import { GlobalStateContext } from '@/context/GlobalStateContext';
+import { SessionSnapshot } from './machines/sessionMachine';
+import { SnippetsSnapshot } from './machines/snippetsMachine';
+import { SettingsSnapshot } from './machines/settingsMachine';
+import { ModelsSnapshot } from './machines/modelsMachine';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const currentSessionId = useAppStore((state) => state.currentSessionId);
-  const isRegenerating = useAppStore((state) => state.isRegenerating);
+  const { sessionActor, snippetsActor } = useContext(GlobalStateContext);
 
-  const onChat = () => {
+  const currentSessionId = useSelector(sessionActor, (state: SessionSnapshot) => state.context.currentSessionId);
+  const isRegenerating = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.isRegenerating);
+
+  const onChat = (): void => {
     if (currentSessionId) {
       void navigate(ROUTES.chat.session(currentSessionId));
     } else {
@@ -28,7 +33,7 @@ const Header: React.FC = () => {
     }
   };
 
-  const onSettings = () => {
+  const onSettings = (): void => {
     void navigate(ROUTES.settings);
   };
 
@@ -49,37 +54,50 @@ const Header: React.FC = () => {
   );
 };
 
+const AppContent: React.FC = () => {
+    return (
+        <Router>
+            <Header />
+            <main>
+                <Routes>
+                    <Route path="/" element={<Navigate to={ROUTES.chat.new} replace />} />
+                    <Route path="/chat" element={<Navigate to={ROUTES.chat.new} replace />} />
+                    <Route path={ROUTES.chat.byId} element={<ChatPage />} />
+                    <Route path={ROUTES.settings} element={<SettingsPage />} />
+                    <Route path="*" element={<h1>Not Found</h1>} />
+                </Routes>
+            </main>
+        </Router>
+    )
+}
 
-const App: React.FC = () => {
-  const { isInitializing, init } = useAppStore(
-    useShallow((state: AppState) => ({
-      isInitializing: state.isInitializing,
-      init: state.init,
-    }))
-  );
+
+export const App: React.FC = () => {
+  const { settingsActor, modelsActor } = useContext(GlobalStateContext);
+  const { isInitializing: settingsInitializing, apiKey } = useSelector(settingsActor, (state: SettingsSnapshot) => ({
+    isInitializing: state.context.isInitializing,
+    apiKey: state.context.apiKey,
+  }));
+  const { modelsLoading, cachedModels } = useSelector(modelsActor, (state: ModelsSnapshot) => ({
+    modelsLoading: state.context.modelsLoading,
+    cachedModels: state.context.cachedModels,
+  }));
 
   useEffect(() => {
-    init();
-  }, [init]);
+    // Once settings are loaded, check if we need to fetch models.
+    if (!settingsInitializing && apiKey && cachedModels.length === 0) {
+      modelsActor.send({ type: 'FETCH' });
+    }
+  }, [settingsInitializing, apiKey, cachedModels.length, modelsActor]);
+
+  // The app is initializing if settings are loading OR if we have an API key but are still waiting for the first model fetch to complete.
+  const isInitializing = settingsInitializing || (apiKey && modelsLoading && cachedModels.length === 0);
 
   if (isInitializing) {
     return <div className="loading-spinner">Loading...</div>;
   }
 
   return (
-    <Router>
-      <Header />
-      <main>
-        <Routes>
-          <Route path="/" element={<Navigate to={ROUTES.chat.new} replace />} />
-          <Route path="/chat" element={<Navigate to={ROUTES.chat.new} replace />} />
-          <Route path={ROUTES.chat.byId} element={<ChatPage />} />
-          <Route path={ROUTES.settings} element={<SettingsPage />} />
-          <Route path="*" element={<h1>Not Found</h1>} />
-        </Routes>
-      </main>
-    </Router>
+      <AppContent />
   );
 };
-
-export default App;

@@ -9,6 +9,9 @@ interface CostProps {
 }
 
 const Cost: React.FC<CostProps> = ({ value }) => {
+  if (isNaN(value)) {
+    return <span style={{ color: 'var(--base03)' }}>$?.??????</span>;
+  }
   const costStr = value.toFixed(6);
 
   if (value < 0.01) {
@@ -16,8 +19,8 @@ const Cost: React.FC<CostProps> = ({ value }) => {
   }
 
   const parts = costStr.split('.');
-  const dollarsAndCents = parts[0] + '.' + parts[1].substring(0, 2);
-  const fractionsOfCents = parts[1].substring(2);
+  const dollarsAndCents = (parts[0] || '0') + '.' + (parts[1] || '00').substring(0, 2);
+  const fractionsOfCents = (parts[1] || '00').substring(2);
 
   return (
     <span>
@@ -50,7 +53,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const isSystemMessage = message.role === 'system';
   const [collapsed, setCollapsed] = useState(isSystemMessage);
 
-  const handleResubmit = () => {
+  const handleResubmit = (): void => {
     onEditAndResubmit(messageIndex, editInput);
     setIsEditing(false);
   };
@@ -74,13 +77,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     return displayString;
   }, [message, isSystemMessage, collapsed]);
 
-  const toggleCollapsed = () => {
+  const toggleCollapsed = (): void => {
     if (isSystemMessage) {
       setCollapsed((c) => !c);
     }
   };
 
-  const renderButtons = () => {
+  const renderButtons = (): React.JSX.Element | null => {
     if (message.role === 'assistant') {
       return (
         <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }} data-testid="regenerate-button">

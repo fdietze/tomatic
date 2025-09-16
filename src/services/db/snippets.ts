@@ -32,7 +32,6 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
     if (validation.success) {
       return validation.data;
     } else {
-      console.log('[DB|loadAllSnippets] Zod validation failed for snippets:', JSON.stringify(validation.error, null, 2));
       return [];
     }
   } catch {

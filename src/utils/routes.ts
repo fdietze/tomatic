@@ -1,7 +1,7 @@
 export const ROUTES = {
   chat: {
     new: '/chat/new',
-    session: (sessionId: string) => `/chat/${sessionId}`,
+    session: (sessionId: string): string => `/chat/${sessionId}`,
     byId: '/chat/:id',
   },
   settings: '/settings',
