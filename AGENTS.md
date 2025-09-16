@@ -43,20 +43,17 @@
 # Debugging Protocol
 Follow this process by creating a plan for it:
 State that you are "Entering the debugging protocol."
-run the tests and see them failing. after each run of `just check` you must ask the following quesions:
+run the tests (fix linting if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
 - what are the current hypotheses of the tests failing? explain the hypotheses with log traces.
 - where and which logging must we add to confirm or refute these hypotheses
 - add logging to trace the whole flow from start to finish
 - run the tests again
 - don't fix anything yet
-
 run this iteration 3 times. Number your iterations.
-Run specific tests instead of the whole test suite to stay focused and save time (manually run `npm run lint` before).
 
-Then ask the following questions:
+Then answer the following questions:
 - which decisions do we have to make to solve the problem?
 - what are the options, tradeoffs and recommendations?
 - what is the detailed implementation plan?
 
-then implement the fix and run the checks again.
-If the tests are still failing, start from the Debugging Protocol from the beginning.
+Finally, report your findings and stop.

@@ -56,7 +56,7 @@ const parsePriceToPerMillion = (priceStr: string): number | null => {
 
 // --- API Client Configuration ---
 
-const getOpenAIClient = (apiKey: string) => {
+const getOpenAIClient = (apiKey: string): OpenAI => {
   if (!apiKey) {
     throw new Error('OpenRouter API key is missing.');
   }
@@ -134,7 +134,7 @@ export async function requestMessageContent(
             stream: false,
         });
 
-        const newContent = response.choices[0]?.message?.content || '';
+        const newContent = response.choices[0]?.message.content || '';
         return newContent;
 
     } catch (e) {

@@ -35,14 +35,14 @@ export function waitForSnippets(names: string[], timeout_ms = 120000): Promise<v
         const waitingFor = new Set(names);
         const timeouts = new Map<string, NodeJS.Timeout>();
 
-        const cleanup = () => {
+        const cleanup = (): void => {
             window.removeEventListener('snippet_regeneration_update', listener);
             for (const timeoutId of timeouts.values()) {
                 clearTimeout(timeoutId);
             }
         };
 
-        const listener = (event: Event) => {
+        const listener = (event: Event): void => {
             const detail = (event as CustomEvent<SnippetRegenerationUpdatePayload>).detail;
             if (!waitingFor.has(detail.name)) {
                 return;

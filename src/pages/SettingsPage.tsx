@@ -1,85 +1,63 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAppStore } from '@/store';
-import { AppState } from '@/store/types';
+import { useSelector } from '@xstate/react';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import SnippetItem from '@/components/SnippetItem';
 import type { Snippet, SystemPrompt } from '@/types/storage';
-import { useShallow } from 'zustand/react/shallow';
 import { topologicalSort } from '@/utils/snippetUtils';
+import { useGlobalState } from '@/context/GlobalStateContext';
 
 const SettingsPage: React.FC = () => {
-  const {
-    apiKey: storeApiKey,
-    setApiKey,
-    systemPrompts,
-    snippets,
-    autoScrollEnabled,
-    toggleAutoScroll,
-    addSystemPrompt,
-    updateSystemPrompt,
-    deleteSystemPrompt,
-    addSnippet,
-    updateSnippet,
-    deleteSnippet,
-  } = useAppStore(
-useShallow((state: AppState) => ({
-      apiKey: state.apiKey,
-      setApiKey: state.setApiKey,
-      systemPrompts: state.systemPrompts,
-      snippets: state.snippets,
-      autoScrollEnabled: state.autoScrollEnabled,
-      toggleAutoScroll: state.toggleAutoScroll,
-      addSystemPrompt: state.addSystemPrompt,
-      updateSystemPrompt: state.updateSystemPrompt,
-      deleteSystemPrompt: state.deleteSystemPrompt,
-      addSnippet: state.addSnippet,
-      updateSnippet: state.updateSnippet,
-      deleteSnippet: state.deleteSnippet,
-    }))
-  );
+    const { settingsActor, promptsActor, snippetsActor } = useGlobalState();
 
-  const [localApiKey, setLocalApiKey] = useState(storeApiKey);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
-  const [isCreatingNewPrompt, setIsCreatingNewPrompt] = useState(false);
-  const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
+    const apiKey = useSelector(settingsActor, (state) => state.context.apiKey);
+    const autoScrollEnabled = useSelector(settingsActor, (state) => state.context.autoScrollEnabled);
+    const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
+    const snippets = useSelector(snippetsActor, (state) => state.context.snippets);
+
+    const [localApiKey, setLocalApiKey] = useState(apiKey);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+    const [isCreatingNewPrompt, setIsCreatingNewPrompt] = useState(false);
+    const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
 
   useEffect(() => {
-    setLocalApiKey(storeApiKey);
-  }, [storeApiKey]);
+    setLocalApiKey(apiKey);
+  }, [apiKey]);
 
-  const handleSaveApiKey = () => {
-    setApiKey(localApiKey);
+  const handleSaveApiKey = (): void => {
+    settingsActor.send({ type: 'SET_API_KEY', key: localApiKey });
     setSaveStatus('saved');
     setTimeout(() => { setSaveStatus('idle'); }, 2000);
   };
 
   // --- Prompt Handlers ---
-  const handleNewPrompt = () => { setIsCreatingNewPrompt(true); };
-  const handleCancelNewPrompt = () => { setIsCreatingNewPrompt(false); };
-  const handleCreatePrompt = async (newPrompt: SystemPrompt) => {
-    await addSystemPrompt(newPrompt);
+  const handleNewPrompt = (): void => { setIsCreatingNewPrompt(true); };
+  const handleCancelNewPrompt = (): void => { setIsCreatingNewPrompt(false); };
+  const handleCreatePrompt = (newPrompt: SystemPrompt): void => {
+    promptsActor.send({ type: 'ADD', prompt: newPrompt });
     setIsCreatingNewPrompt(false);
   };
-  const handleUpdatePrompt = async (oldName: string, updatedPrompt: SystemPrompt) => {
-    await updateSystemPrompt(oldName, updatedPrompt);
+  const handleUpdatePrompt = (oldName: string, updatedPrompt: SystemPrompt): void => {
+    promptsActor.send({ type: 'UPDATE', oldName, prompt: updatedPrompt });
   };
-  const handleRemovePrompt = async (name: string) => {
-    await deleteSystemPrompt(name);
+  const handleRemovePrompt = (name: string): void => {
+    promptsActor.send({ type: 'DELETE', name });
   };
 
   // --- Snippet Handlers ---
-  const handleNewSnippet = () => { setIsCreatingNewSnippet(true); };
-  const handleCancelNewSnippet = () => { setIsCreatingNewSnippet(false); };
-  const handleCreateSnippet = (newSnippet: Snippet) => {
-    return addSnippet(newSnippet).then(() => {
-        setIsCreatingNewSnippet(false);
-    });
+  const handleNewSnippet = (): void => { setIsCreatingNewSnippet(true); };
+  const handleCancelNewSnippet = (): void => { setIsCreatingNewSnippet(false); };
+  const handleCreateSnippet = (newSnippet: Snippet): Promise<void> => {
+    snippetsActor.send({ type: 'ADD', snippet: newSnippet });
+    setIsCreatingNewSnippet(false);
+    return Promise.resolve(); // Keep signature for SnippetItem
   };
-  const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet) => {
-    return updateSnippet(oldName, updatedSnippet);
+  const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet): Promise<void> => {
+    snippetsActor.send({ type: 'UPDATE', oldName, snippet: updatedSnippet });
+    return Promise.resolve();
   };
-  const handleRemoveSnippet = (name: string) => {
-    return deleteSnippet(name);
+  const handleRemoveSnippet = (name: string): Promise<void> => {
+    snippetsActor.send({ type: 'DELETE', name });
+    return Promise.resolve();
   };
 
   const sortedSnippets = useMemo(() => {
@@ -119,7 +97,7 @@ useShallow((state: AppState) => ({
               type="checkbox"
               id="auto-scroll-checkbox"
               checked={autoScrollEnabled}
-              onChange={() => { toggleAutoScroll(); }}
+              onChange={() => { settingsActor.send({ type: 'TOGGLE_AUTO_SCROLL' }); }}
             />
             <span className="checkbox-custom"></span>
             Auto-scroll to bottom
@@ -144,7 +122,7 @@ useShallow((state: AppState) => ({
               prompt={{ name: '', prompt: '' }}
               isInitiallyEditing={true}
               allPrompts={systemPrompts}
-              onUpdate={(prompt) => { void handleCreatePrompt(prompt); }}
+              onUpdate={(prompt) => { handleCreatePrompt(prompt); }}
               onRemove={handleCancelNewPrompt}
               onCancel={handleCancelNewPrompt}
             />
@@ -155,8 +133,8 @@ useShallow((state: AppState) => ({
               prompt={prompt}
               isInitiallyEditing={false}
               allPrompts={systemPrompts}
-              onUpdate={(updatedPrompt) => { void handleUpdatePrompt(prompt.name, updatedPrompt); }}
-              onRemove={() => { void handleRemovePrompt(prompt.name); }}
+              onUpdate={(updatedPrompt) => { handleUpdatePrompt(prompt.name, updatedPrompt); }}
+              onRemove={() => { handleRemovePrompt(prompt.name); }}
             />
           ))}
         </div>

@@ -32,12 +32,12 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
   // with all its features and styling, inside the markdown-it rendered output.
   useEffect(() => {
     // Clean up previously created React roots to prevent memory leaks
-    roots.current.forEach(root => { root.unmount(); });
+    roots.current.forEach((root: Root) => { root.unmount(); });
     roots.current = [];
 
     if (contentRef.current) {
       // Find all code blocks rendered by markdown-it
-      const codeBlocks = contentRef.current.querySelectorAll('pre');
+      const codeBlocks: NodeListOf<HTMLElement> = contentRef.current.querySelectorAll('pre');
 
       codeBlocks.forEach(codeBlock => {
         const codeElement = codeBlock.querySelector('code');
@@ -55,7 +55,7 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
         codeBlock.appendChild(buttonContainer);
 
         // Create a new React root in the container and render the CopyButton
-        const root = createRoot(buttonContainer);
+        const root = createRoot(buttonContainer as HTMLElement);
         root.render(<CopyButton textToCopy={codeText} />);
 
         // Keep track of the created roots so they can be unmounted on cleanup
@@ -65,8 +65,8 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
 
     // Cleanup function to unmount all created roots when the component
     // unmounts or when the markdown content changes.
-    return () => {
-      roots.current.forEach(root => { root.unmount(); });
+    return (): void => {
+      roots.current.forEach((root: Root) => { root.unmount(); });
     };
   }, [renderedHtml]); // Rerun effect if markdown content changes
 

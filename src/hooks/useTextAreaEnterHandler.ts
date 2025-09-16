@@ -3,8 +3,8 @@ import React from 'react';
 export function useTextAreaEnterHandler(
   isMobile: boolean,
   onSubmit: () => void
-) {
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+): (event: React.KeyboardEvent<HTMLTextAreaElement>) => void {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key !== 'Enter') {
       return;
     }

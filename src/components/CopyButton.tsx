@@ -13,11 +13,11 @@ const CopyButton: React.FC<CopyButtonProps> = ({ textToCopy }) => {
   const [buttonText, setButtonText] = useState(COPY_LABEL);
   const timeoutRef = useRef<number | null>(null);
 
-  const resetText = () => {
+  const resetText = (): void => {
     setButtonText(COPY_LABEL);
   };
 
-  const handleCopy = async () => {
+  const handleCopy = async (): Promise<void> => {
     if (!textToCopy) return;
 
     if (timeoutRef.current) {
@@ -36,7 +36,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ textToCopy }) => {
   };
 
   useEffect(() => {
-    return () => {
+    return (): void => {
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }

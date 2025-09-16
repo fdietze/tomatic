@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { SystemPrompt } from '@/types/storage';
 import { dbPromise, SYSTEM_PROMPTS_STORE_NAME } from '../persistence';
 import { systemPromptSchema } from './schemas';
+
 export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
   const db = await dbPromise;
   try {
@@ -18,7 +19,6 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
   const db = await dbPromise;
   try {
     const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
-    // Validate each prompt
     const validation = z.array(systemPromptSchema).safeParse(prompts);
     if (validation.success) {
       return validation.data;

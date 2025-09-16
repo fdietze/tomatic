@@ -1,4 +1,4 @@
-import { openDB, type DBSchema } from 'idb';
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { ChatSession, Message } from '@/types/chat';
 import type { Snippet, SystemPrompt } from '@/types/storage';
 import { loadAllSnippets, saveSnippet, deleteSnippet as dbDeleteSnippet } from '@/services/db/snippets';
@@ -46,11 +46,10 @@ interface TomaticDB extends DBSchema {
 
 // --- Database Interaction Functions ---
 
-function openTomaticDB() {
+function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 	return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
 		upgrade(db, oldVersion, _newVersion, tx) {
 			if (oldVersion < 2) {
-				console.log('[DB] Upgrading database from version 1 to 2...');
 				// Create sessions store
 				if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
 					const store = db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
@@ -94,7 +93,7 @@ function openTomaticDB() {
 					});
 			}
 			if (oldVersion < 3) {
-				console.log('[DB] Upgrading database from version 2 to 3...');
+				// Create snippets store
 				if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
 					db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
 				}

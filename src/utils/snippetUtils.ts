@@ -58,6 +58,7 @@ export function validateSnippetDependencies(
 
   for (const match of matches) {
     const snippetName = match[1]; // Group 1 is the name
+    if (!snippetName) continue;
 
     if (path.includes(snippetName)) {
       const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
