@@ -1,0 +1,27 @@
+{
+    "plugins": [
+        "react",
+        "react-hooks",
+        "typescript",
+        "unicorn",
+        "jest"
+    ],
+    "rules": {
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "warn"
+    },
+    "overrides": [
+        {
+            "files": ["*.test.ts", "*.spec.ts", "*.test.tsx", "*.spec.tsx", "tests/**/*.ts", "tests/**/*.tsx"],
+            "plugins": [
+                "typescript",
+                "unicorn",
+                "jest"
+            ],
+            "rules": {
+                "react-hooks/rules-of-hooks": "off",
+                "react-hooks/exhaustive-deps": "off"
+            }
+        }
+    ]
+}
