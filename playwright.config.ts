@@ -14,7 +14,17 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            // Use with caution!
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gl-drawing-for-tests',
+          ],
+        },
+      },
     },
   ],
   timeout: 10 * 1000,
