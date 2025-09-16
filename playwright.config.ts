@@ -18,12 +18,13 @@ export default defineConfig({
     },
   ],
   timeout: 10 * 1000,
+  expect: { timeout: 2_000 },
   webServer: {
     command: 'VITE_IS_TESTING=true npm run dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     stdout: 'ignore',
-    stderr: 'ignore',
+    stderr: 'pipe',
     timeout: 10 * 1000,
   },
 });
