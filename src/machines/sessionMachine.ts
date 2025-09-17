@@ -1,13 +1,12 @@
-import { setup, assign, SnapshotFrom, ActorRefFrom, stop, Spawner, AnyActorLogic, sendTo, fromPromise } from 'xstate';
+import { setup, assign, SnapshotFrom, ActorRefFrom, stop, sendTo, fromPromise, assertEvent } from 'xstate';
 import { Message } from '@/types/chat';
 import * as db from '@/services/db';
 import { NavigateFunction } from 'react-router-dom';
-import { chatSubmissionMachine } from '@/machines/chatSubmissionMachine';
-import { settingsMachine } from './settingsMachine';
-import { promptsMachine } from './promptsMachine';
-import { snippetsMachine } from './snippetsMachine';
-// DO NOT re-add resolveSnippets import, it's the source of the bug
-// import { resolveSnippets } from '@/utils/snippetUtils';
+import { chatSubmissionMachine, ChatSubmissionInput } from '@/machines/chatSubmissionMachine';
+import { settingsMachine, SettingsContext } from './settingsMachine';
+import { promptsMachine, PromptsContext } from './promptsMachine';
+import { snippetsMachine, SnippetsContext } from './snippetsMachine';
+import { ChatSession } from '@/types/chat';
 
 type ScrollEffect = { type: 'scrollToBottom' } | { type: 'scrollToLastUserMessage' } | null;
 
@@ -30,12 +29,32 @@ export type SessionMachineInput = {
     snippetsActor: ActorRefFrom<typeof snippetsMachine>;
 };
 
+// Events now carry the full settings context they need
 export type SessionEvent =
   | { type: 'LOAD_SESSION'; sessionId: string }
-  | { type: 'START_NEW_SESSION'; systemPrompt?: { name: string; prompt: string } }
-  | { type: 'SUBMIT'; prompt: string }
-  | { type: 'REGENERATE'; messageIndex: number }
-  | { type: 'EDIT_MESSAGE'; messageIndex: number; newContent: string }
+  | { type: 'START_NEW_SESSION' }
+  | { 
+      type: 'SUBMIT'; 
+      prompt: string;
+      settings: SettingsContext;
+      systemPrompts: PromptsContext['systemPrompts'];
+      snippets: SnippetsContext['snippets'];
+    }
+  | { 
+      type: 'REGENERATE'; 
+      messageIndex: number;
+      settings: SettingsContext;
+      systemPrompts: PromptsContext['systemPrompts'];
+      snippets: SnippetsContext['snippets'];
+    }
+  | { 
+      type: 'EDIT_MESSAGE'; 
+      messageIndex: number; 
+      newContent: string;
+      settings: SettingsContext;
+      systemPrompts: PromptsContext['systemPrompts'];
+      snippets: SnippetsContext['snippets'];
+    }
   | { type: 'CANCEL' }
   | { type: 'SUBMISSION_ERROR'; error: string }
   | { type: 'SAVE_CURRENT_SESSION' }
@@ -43,128 +62,12 @@ export type SessionEvent =
   | { type: 'ADD_MESSAGE'; message: Message; autoScrollEnabled: boolean }
   | { type: 'UPDATE_MESSAGES'; messages: Message[]; autoScrollEnabled: boolean }
   | { type: 'SCROLL_EFFECT_CONSUMED' }
-  | { type: 'xstate.done.actor.loadSession'; output: { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null } };
+  | { type: 'xstate.done.actor.loadSession'; output: { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null } }
+  | { type: 'xstate.error.actor.loadSession', error: unknown };
 
-type LoadSessionDoneEvent = Extract<SessionEvent, { type: 'xstate.done.actor.loadSession' }>;
-
-const spawnAndInitializeSubmissionActor = assign({
-    submissionActor: ({ spawn, event, self, context }: {
-        spawn: Spawner<AnyActorLogic>;
-        event: SessionEvent;
-        self: ActorRefFrom<typeof sessionMachine>;
-        context: SessionContext;
-    }) => {
-        const submitEvent = event as Extract<SessionEvent, { type: 'SUBMIT' }>;
-        const { settingsActor, promptsActor, snippetsActor } = context;
-        const { apiKey, modelName, selectedPromptName, autoScrollEnabled } = settingsActor.getSnapshot().context;
-        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
-        const snippets = snippetsActor.getSnapshot().context.snippets;
-        
-
-        const actor = spawn(chatSubmissionMachine, {
-            systemId: 'chatSubmissionActor',
-            input: {
-                messages: context.messages,
-                apiKey,
-                modelName,
-                systemPrompts,
-                snippets,
-                selectedPromptName,
-                onSuccess: (result) => {
-                    self.send({ type: 'UPDATE_MESSAGES', messages: result.messages, autoScrollEnabled });
-                },
-                onError: (error) => {
-                    self.send({ type: 'SUBMISSION_ERROR', error });
-                }
-            }
-        });
-        
-        actor.send({ type: 'SUBMIT', prompt: submitEvent.prompt });
-
-        return actor;
-    }
-});
-
-const spawnAndInitializeSubmissionActorForRegenerate = assign({
-    submissionActor: ({ spawn, event, self, context }: {
-        spawn: Spawner<AnyActorLogic>;
-        event: SessionEvent;
-        self: ActorRefFrom<typeof sessionMachine>;
-        context: SessionContext;
-    }) => {
-        const regenerateEvent = event as Extract<SessionEvent, { type: 'REGENERATE' }>;
-        const { settingsActor, promptsActor, snippetsActor } = context;
-        const { apiKey, modelName, selectedPromptName, autoScrollEnabled } = settingsActor.getSnapshot().context;
-        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
-        const snippets = snippetsActor.getSnapshot().context.snippets;
-
-        const messagesToSubmit = context.messages.slice(0, regenerateEvent.messageIndex);
-        const lastUserMessage = messagesToSubmit.filter(m => m.role === 'user').pop();
-        if (!lastUserMessage) return context.submissionActor;
-
-        const actor = spawn(chatSubmissionMachine, {
-            systemId: 'chatSubmissionActor',
-            input: {
-                messages: messagesToSubmit,
-                apiKey,
-                modelName,
-                systemPrompts,
-                snippets,
-                selectedPromptName,
-                onSuccess: (result) => {
-                    self.send({ type: 'UPDATE_MESSAGES', messages: result.messages, autoScrollEnabled });
-                },
-                onError: (error) => {
-                    self.send({ type: 'SUBMISSION_ERROR', error });
-                }
-            }
-        });
-        
-        actor.send({ type: 'REGENERATE' });
-
-        return actor;
-    }
-});
-
-const spawnAndInitializeSubmissionActorForEdit = assign({
-    submissionActor: ({ spawn, event, self, context }: {
-        spawn: Spawner<AnyActorLogic>;
-        event: SessionEvent;
-        self: ActorRefFrom<typeof sessionMachine>;
-        context: SessionContext;
-    }) => {
-        const editEvent = event as Extract<SessionEvent, { type: 'EDIT_MESSAGE' }>;
-        const { settingsActor, promptsActor, snippetsActor } = context;
-        const { apiKey, modelName, selectedPromptName, autoScrollEnabled } = settingsActor.getSnapshot().context;
-        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
-        const snippets = snippetsActor.getSnapshot().context.snippets;
-
-        const messagesToSubmit = context.messages.slice(0, editEvent.messageIndex);
-        
-
-        const actor = spawn(chatSubmissionMachine, {
-            systemId: 'chatSubmissionActor',
-            input: {
-                messages: messagesToSubmit,
-                apiKey,
-                modelName,
-                systemPrompts,
-                snippets,
-                selectedPromptName,
-                onSuccess: (result) => {
-                    self.send({ type: 'UPDATE_MESSAGES', messages: result.messages, autoScrollEnabled });
-                },
-                onError: (error) => {
-                    self.send({ type: 'SUBMISSION_ERROR', error });
-                }
-            }
-        });
-        
-        actor.send({ type: 'SUBMIT', prompt: editEvent.newContent });
-
-        return actor;
-    }
-});
+type LoadSessionInput = { sessionId: string };
+type LoadSessionOutput = { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null };
+type SaveSessionInput = { currentSessionId: string | null, messages: Message[] };
 
 export const sessionMachine = setup({
     types: {
@@ -173,25 +76,63 @@ export const sessionMachine = setup({
         input: {} as SessionMachineInput,
     },
     actors: {
-        loadSession: fromPromise(async ({ input }: { input: { sessionId: string } }) => {
+        loadSession: fromPromise<LoadSessionOutput, LoadSessionInput>(async ({ input }) => {
             const session = await db.loadSession(input.sessionId);
             if (!session) throw new Error("Session not found");
             const { prevId, nextId } = await db.findNeighbourSessionIds(session);
-            return { ...session, prevId, nextId, sessionId: input.sessionId };
+            return { messages: session.messages, prevId, nextId, sessionId: input.sessionId };
         }),
-        saveSession: fromPromise(async ({ context }: { context: SessionContext }) => {
-            if (context.currentSessionId) {
-                await db.saveSession({ id: context.currentSessionId, messages: context.messages });
+        saveSession: fromPromise<void, SaveSessionInput>(async ({ input }) => {
+            if (input.currentSessionId) {
+                const sessionToSave: Partial<ChatSession> = {
+                    session_id: input.currentSessionId,
+                    messages: input.messages,
+                };
+                await db.saveSession(sessionToSave as ChatSession);
             }
         }),
     },
     actions: {
-        assignLoadedSession: assign({
-            messages: ({ event }: { event: LoadSessionDoneEvent }) => event.output.messages,
-            currentSessionId: ({ event }: { event: LoadSessionDoneEvent }) => event.output.sessionId,
-            prevSessionId: ({ event }: { event: LoadSessionDoneEvent }) => event.output.prevId,
-            nextSessionId: ({ event }: { event: LoadSessionDoneEvent }) => event.output.nextId,
-            scrollEffect: { type: 'scrollToBottom' },
+        spawnSubmissionActor: assign({
+            submissionActor: ({ spawn, context, event, self }) => {
+                console.log('[DEBUG] sessionMachine: received event:', JSON.stringify(event));
+                if (event.type !== 'SUBMIT' && event.type !== 'REGENERATE' && event.type !== 'EDIT_MESSAGE') {
+                    return context.submissionActor;
+                }
+        
+                let messagesToSubmit: Message[];
+                let submissionEvent: { type: 'SUBMIT'; prompt: string } | { type: 'REGENERATE' };
+
+                if (event.type === 'SUBMIT') {
+                    messagesToSubmit = context.messages;
+                    submissionEvent = { type: 'SUBMIT', prompt: event.prompt };
+                } else if (event.type === 'REGENERATE') {
+                    messagesToSubmit = context.messages.slice(0, event.messageIndex);
+                    submissionEvent = { type: 'REGENERATE' };
+                } else { // EDIT_MESSAGE
+                    messagesToSubmit = context.messages.slice(0, event.messageIndex);
+                    submissionEvent = { type: 'SUBMIT', prompt: event.newContent };
+                }
+        
+                const actorInput: ChatSubmissionInput = {
+                    messages: messagesToSubmit,
+                    // Pass everything from the event
+                    systemPrompts: event.systemPrompts,
+                    snippets: event.snippets,
+                    apiKey: event.settings.apiKey,
+                    modelName: event.settings.modelName,
+                    autoScrollEnabled: event.settings.autoScrollEnabled,
+                    selectedPromptName: event.settings.selectedPromptName,
+                    // Callbacks to send events back to self
+                    onSuccess: (result) => self.send({ type: 'UPDATE_MESSAGES', ...result }),
+                    onError: (error) => self.send({ type: 'SUBMISSION_ERROR', error }),
+                };
+                console.log('[DEBUG] sessionMachine: Spawning submission actor with input:', JSON.stringify(actorInput, (key, value) => key === 'onSuccess' || key === 'onError' ? 'function' : value, 2));
+        
+                const actor = spawn(chatSubmissionMachine, { input: actorInput });
+                actor.send(submissionEvent);
+                return actor;
+            }
         }),
     }
 }).createMachine({
@@ -205,20 +146,24 @@ export const sessionMachine = setup({
     error: null,
     submissionActor: null,
     scrollEffect: null,
-    ...input
+    settingsActor: input.settingsActor,
+    promptsActor: input.promptsActor,
+    snippetsActor: input.snippetsActor,
   }),
   on: {
+    SETTINGS_UPDATED: {
+        actions: [
+            assign({ currentSettings: ({ event }) => event.settings }),
+        ],
+    },
     '*': {
-      actions: () => {
-      }
+      actions: () => {}
     }
   },
   states: {
     idle: {
         on: {
-            LOAD_SESSION: {
-                target: 'loading',
-            },
+            LOAD_SESSION: 'loading',
             START_NEW_SESSION: {
                 actions: assign({
                     messages: [],
@@ -231,98 +176,91 @@ export const sessionMachine = setup({
             SUBMIT: {
                 target: 'processingSubmission',
                 actions: [
-                    sendTo(
-                        ({ context }) => context.settingsActor,
-                        { type: 'SET_INPUT', text: '' }
-                    ),
-                    spawnAndInitializeSubmissionActor
+                    sendTo(({ context }) => context.settingsActor, { type: 'SET_INPUT', text: '' }),
+                    'spawnSubmissionActor'
                 ],
             },
             REGENERATE: {
                 target: 'processingSubmission',
-                actions: spawnAndInitializeSubmissionActorForRegenerate
+                actions: 'spawnSubmissionActor',
             },
             EDIT_MESSAGE: {
                 target: 'processingSubmission',
-                actions: spawnAndInitializeSubmissionActorForEdit
+                actions: 'spawnSubmissionActor',
             },
         }
     },
     processingSubmission: {
         on: {
-        CANCEL: {
-            actions: ({ context }) => {
-                context.submissionActor?.send({ type: 'CANCEL' });
-            }
-        },
-        UPDATE_MESSAGES: {
-          target: 'idle',
-          actions: [
-            // eslint-disable-next-line @typescript-eslint/no-deprecated
-            stop<SessionContext>(({ context }) => context.submissionActor),
-            assign({
-            messages: ({ event }) => event.messages,
-            scrollEffect: ({ event }) => {
-                const { autoScrollEnabled, messages } = event as { autoScrollEnabled: boolean, messages: Message[] };
-                if (autoScrollEnabled) {
-                    return { type: 'scrollToBottom' };
+            CANCEL: {
+                actions: ({ context }) => {
+                    context.submissionActor?.send({ type: 'CANCEL' });
                 }
-                if (messages.length > 0) {
-                    const lastMessage = messages[messages.length - 1];
-                    if (lastMessage && lastMessage.role === 'user') {
-                        return { type: 'scrollToLastUserMessage' };
-                    }
-                }
-                return null;
             },
-            submissionActor: null
-        }),
-        ],
-        },
-        SUBMISSION_ERROR: {
-            target: 'idle',
-            actions: [
-                // eslint-disable-next-line @typescript-eslint/no-deprecated
-                stop<SessionContext>(({ context }) => context.submissionActor),
-                assign({
-                    error: ({ event }) => event.error,
-                    submissionActor: null,
-                })
-            ]
-        },
-      }
+            UPDATE_MESSAGES: {
+                target: 'idle',
+                actions: [
+                    stop(({ context }) => context.submissionActor!),
+                    assign({
+                        messages: ({ event }) => event.messages,
+                        scrollEffect: ({ event }) => {
+                            if (event.autoScrollEnabled) return { type: 'scrollToBottom' };
+                            const lastMessage = event.messages[event.messages.length - 1];
+                            if (lastMessage?.role === 'user') return { type: 'scrollToLastUserMessage' };
+                            return null;
+                        },
+                        submissionActor: null
+                    }),
+                ],
+            },
+            SUBMISSION_ERROR: {
+                target: 'idle',
+                actions: [
+                    stop(({ context }) => context.submissionActor!),
+                    assign({
+                        error: ({ event }) => event.error,
+                        submissionActor: null,
+                    })
+                ]
+            },
+        }
     },
     loading: {
       invoke: {
         id: 'loadSession',
         src: 'loadSession',
-        input: ({ event }) => ({ sessionId: (event as { type: 'LOAD_SESSION', sessionId: string }).sessionId }),
+        input: ({ event }) => {
+            assertEvent(event, 'LOAD_SESSION');
+            return { sessionId: event.sessionId };
+        },
         onDone: {
           target: 'idle',
-          actions: [
-            'assignLoadedSession',
-        ],
+          actions: assign({
+                messages: ({ event }) => {
+                    assertEvent(event, 'xstate.done.actor.loadSession');
+                    return event.output.messages;
+                },
+                currentSessionId: ({ event }) => {
+                    assertEvent(event, 'xstate.done.actor.loadSession');
+                    return event.output.sessionId;
+                },
+                prevSessionId: ({ event }) => {
+                    assertEvent(event, 'xstate.done.actor.loadSession');
+                    return event.output.prevId;
+                },
+                nextSessionId: ({ event }) => {
+                    assertEvent(event, 'xstate.done.actor.loadSession');
+                    return event.output.nextId;
+                },
+                scrollEffect: { type: 'scrollToBottom' },
+            }),
         },
         onError: {
           target: 'idle',
-          actions: [
-              assign({ error: 'Failed to load session' }),
-              ({ event }): void => { console.error('[DEBUG] sessionMachine: loadSession invocation failed (onError).', event.error); }
-          ],
+          actions: assign({ error: 'Failed to load session' }),
         },
       },
     },
-    saving: {
-        invoke: {
-            id: 'saveSession',
-            src: 'saveSession',
-            onDone: 'idle',
-            onError: {
-                target: 'idle',
-                actions: assign({ error: 'Failed to save session' }),
-            }
-        }
-    }
   },
 });
 

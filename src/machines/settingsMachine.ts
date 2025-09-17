@@ -1,4 +1,4 @@
-import { setup, assign, SnapshotFrom, fromPromise, DoneActorEvent } from 'xstate';
+import { setup, assign, SnapshotFrom, fromPromise, assertEvent } from 'xstate';
 import { loadSettings, saveSettings } from '@/services/persistence/settings';
 
 // The context should hold all the state from the SettingsSlice and UtilitySlice
@@ -23,12 +23,21 @@ export type SettingsEvent =
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_INITIAL_CHAT_PROMPT'; prompt: string | null }
   | { type: 'INIT' }
-  | { type: 'xstate.done.actor.loadSettings', output: Partial<SettingsContext> };
+  | { type: 'xstate.done.actor.loadSettings', output: Partial<SettingsContext> }
+  | { type: 'xstate.error.actor.loadSettings', error: unknown };
 
 export const settingsMachine = setup({
-  types: {
-    context: {} as SettingsContext,
-    events: {} as SettingsEvent,
+  types: {} as {
+    context: SettingsContext,
+    events: SettingsEvent,
+  },
+  actors: {
+    loadSettings: fromPromise<Partial<SettingsContext>, void>(() => Promise.resolve(loadSettings())),
+  },
+  actions: {
+    saveSettings: ({ context }) => {
+      saveSettings(context);
+    },
   },
 }).createMachine({
   id: 'settings',
@@ -45,36 +54,29 @@ export const settingsMachine = setup({
   },
   states: {
     loading: {
-        entry: () => { console.log('[DEBUG] settingsMachine: entered loading state.'); },
-        invoke: {
-            id: 'loadSettings',
-            src: fromPromise<Partial<SettingsContext>>(() => loadSettings()),
-            onDone: {
-                target: 'idle',
-                actions: assign(({ context, event }: { context: SettingsContext, event: DoneActorEvent<Partial<SettingsContext>> }) => {
-                    const loaded = event.output;
-                    console.log('[DEBUG] settingsMachine: loadSettings.onDone, assigning context:', loaded);
-                    const newContext: SettingsContext = {
-                        ...context,
-                        ...loaded,
-                        isInitializing: false,
-                        error: null,
-                    };
-                    console.log('[DEBUG] settingsMachine: final context after assignment:', newContext);
-                    return newContext;
-                })
-            },
-            onError: {
-                target: 'failure',
-                actions: [
-                    assign({
-                        isInitializing: false,
-                        error: 'Failed to load settings',
-                    }),
-                    ({ event }): void => { console.error('[DEBUG] settingsMachine: loadSettings.onError', (event as { error: Error }).error); },
-                ]
-            }
+      invoke: {
+        id: 'loadSettings',
+        src: 'loadSettings',
+        onDone: {
+          target: 'idle',
+          actions: assign(( { event }) => {
+            assertEvent(event, 'xstate.done.actor.loadSettings');
+            const loaded = event.output;
+            return {
+                ...loaded,
+                isInitializing: false,
+                error: null,
+            };
+          })
+        },
+        onError: {
+          target: 'failure',
+          actions: assign({
+            isInitializing: false,
+            error: 'Failed to load settings',
+          }),
         }
+      }
     },
     failure: {
         type: 'final'
@@ -85,14 +87,13 @@ export const settingsMachine = setup({
     SET_API_KEY: {
       actions: [
         assign({ apiKey: ({ event }) => event.key }),
-        ({ context }): void => { saveSettings(context); },
-        (): void => { console.log('[DEBUG] settingsMachine: API key set.'); },
+        'saveSettings',
       ],
     },
     SET_MODEL_NAME: {
       actions: [
         assign({ modelName: ({ event }) => event.name }),
-        ({ context }): void => { saveSettings(context); },
+        'saveSettings',
       ]
     },
     SET_INPUT: {
@@ -101,13 +102,13 @@ export const settingsMachine = setup({
     SET_SELECTED_PROMPT_NAME: {
       actions: [
         assign({ selectedPromptName: ({ event }) => event.name }),
-        ({ context }): void => { saveSettings(context); },
+        'saveSettings',
       ]
     },
     TOGGLE_AUTO_SCROLL: {
       actions: [
         assign({ autoScrollEnabled: ({ context }) => !context.autoScrollEnabled }),
-        ({ context }): void => { saveSettings(context); },
+        'saveSettings',
       ]
     },
     SET_ERROR: {

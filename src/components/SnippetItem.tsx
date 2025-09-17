@@ -8,6 +8,7 @@ import Markdown from './Markdown';
 import { GlobalStateContext } from '@/context/GlobalStateContext';
 import { ModelsSnapshot } from '@/machines/modelsMachine';
 import { SnippetsSnapshot } from '@/machines/snippetsMachine';
+import { SettingsSnapshot } from '@/machines/settingsMachine';
 
 interface SnippetItemProps {
   snippet: Snippet;
@@ -28,11 +29,10 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-    const { modelsActor, snippetsActor } = useContext(GlobalStateContext);
-    const { cachedModels, modelName: defaultModelName } = useSelector(modelsActor, (state: ModelsSnapshot) => ({
-        cachedModels: state.context.cachedModels,
-        modelName: 'openai/gpt-4o', // This should probably come from settingsActor
-    }));
+    const { modelsActor, snippetsActor, settingsActor } = useContext(GlobalStateContext);
+    const cachedModels = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.cachedModels);
+    const defaultModelName = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.modelName);
+    
     const { regeneratingSnippetNames } = useSelector(snippetsActor, (state: SnippetsSnapshot) => ({
         regeneratingSnippetNames: state.context.regeneratingSnippetNames,
     }));
@@ -156,7 +156,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const handleCancelEditing = (): void => {
-    if (onCancel) {
+    if (isInitiallyEditing && onCancel) {
       onCancel();
     } else {
       setEditingName(snippet.name);
@@ -204,6 +204,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
                 items={modelItems}
                 selectedId={editingModel}
                 onSelect={setEditingModel}
+                placeholder="Inherit from chat settings"
               />
               <textarea
                 value={editingPrompt}

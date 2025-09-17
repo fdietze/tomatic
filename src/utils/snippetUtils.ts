@@ -23,7 +23,9 @@ export function resolveSnippets(
 
     const snippet = allSnippets.find((s) => s.name === snippetName);
     if (!snippet) {
-      throw new Error(`Snippet '@${snippetName}' not found.`);
+      const error = new Error(`Snippet '@${snippetName}' not found.`);
+      console.error('[DEBUG] resolveSnippets:', error);
+      throw error;
     }
 
     // Add the current snippet to the visited set for this resolution path

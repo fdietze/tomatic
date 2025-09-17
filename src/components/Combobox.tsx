@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
+import CopyButton from './CopyButton';
 
 export interface ComboboxItem {
   id: string;
   display_text: string;
   display_html?: string;
-  // We can add the full model info if needed for richer filtering
-  model_info: DisplayModelInfo;
+  model_info?: DisplayModelInfo;
 }
 
 interface ComboboxProps {
@@ -41,19 +41,29 @@ const Combobox: React.FC<ComboboxProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsListRef = useRef<HTMLUListElement>(null);
 
-  // Effect to update internal search_query when external selected_id changes
   useEffect(() => {
     setSearchQuery(selectedId);
   }, [selectedId]);
 
-  // Close suggestions when clicking outside
+  useEffect(() => {
+    if (items.length > 0 && inputRef.current === document.activeElement) {
+      setShowSuggestions(true);
+    }
+  }, [items]);
+
   useOnClickOutside(comboboxWrapperRef as React.RefObject<HTMLElement>, () => {
-    setShowSuggestions(false);
-    setHighlightedIndex(null);
+    // Only act if the suggestions are currently shown
+    if (showSuggestions) {
+      setShowSuggestions(false);
+      setHighlightedIndex(null);
+      // Restore the search query to the last known selected ID
+      setSearchQuery(selectedId);
+    }
   });
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
+    if (!query) return items;
     const searchTerms = query.split(/\s+/);
     return items.filter((item) => {
       const itemText = `${item.id} ${item.display_text}`.toLowerCase();
@@ -66,7 +76,6 @@ const Combobox: React.FC<ComboboxProps> = ({
     setSearchQuery(item.id);
     setShowSuggestions(false);
     setHighlightedIndex(null);
-    inputRef.current?.focus();
   };
   
   const scrollHighlightedItemIntoView = (): void => {
@@ -84,7 +93,6 @@ const Combobox: React.FC<ComboboxProps> = ({
         }
     }
   };
-
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (!showSuggestions && !['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
@@ -109,23 +117,29 @@ const Combobox: React.FC<ComboboxProps> = ({
         e.preventDefault();
         if (highlightedIndex !== null && filteredItems[highlightedIndex]) {
           handleSelectItem(filteredItems[highlightedIndex]);
-        } else if (filteredItems.length === 1) {
+        } else if (filteredItems.length === 1 && filteredItems[0]) {
             handleSelectItem(filteredItems[0]);
         } else {
-            // If the query exactly matches an item, select it
             const exactMatch = items.find(item => item.id === searchQuery);
             if (exactMatch) {
                 handleSelectItem(exactMatch);
+            } else {
+                // If no match and user presses enter, cancel the search and restore
+                setSearchQuery(selectedId);
+                setShowSuggestions(false);
+                setHighlightedIndex(null);
             }
         }
         break;
       case 'Escape':
         setShowSuggestions(false);
         setHighlightedIndex(null);
+        setSearchQuery(selectedId);
         break;
       case 'Tab':
         setShowSuggestions(false);
         setHighlightedIndex(null);
+        setSearchQuery(selectedId);
         break;
     }
   };
@@ -139,6 +153,8 @@ const Combobox: React.FC<ComboboxProps> = ({
 
   const handleFocus = (): void => {
     setShowSuggestions(true);
+    // Clear the input to allow the user to easily type a new search
+    setSearchQuery('');
   };
 
   return (
@@ -159,13 +175,19 @@ const Combobox: React.FC<ComboboxProps> = ({
           aria-autocomplete="list"
           aria-expanded={showSuggestions}
         />
+         <CopyButton textToCopy={selectedId} />
+         {onReload && (
+            <button onClick={onReload} className={`combobox-reload ${loading ? 'reloading' : ''}`} disabled={loading} data-testid="reload-models-button">
+                <i className="codicon codicon-refresh"></i>
+            </button>
+        )}
       </div>
       
       {loading && <div className="combobox-loading-indicator">Loading...</div>}
       
       {!loading && errorMessage && <div className="combobox-error-message">{errorMessage}</div>}
 
-      {!loading && !errorMessage && showSuggestions && (
+      {!loading && !errorMessage && showSuggestions && items.length > 0 && (
         <div className="combobox-suggestions-container">
           {filteredItems.length > 0 ? (
             <ul className="combobox-suggestions" ref={suggestionsListRef} role="listbox">
@@ -189,14 +211,6 @@ const Combobox: React.FC<ComboboxProps> = ({
             </ul>
           ) : (
             <div className="combobox-no-results">No results found</div>
-          )}
-          {onReload && (
-             <div className="combobox-footer">
-                <button className="combobox-reload-button" onClick={onReload} disabled={loading} title="Reload model list">
-                    {/* SVG for reload icon */}
-                    Reload
-                </button>
-            </div>
           )}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { setup, assign, SnapshotFrom, fromPromise, DoneActorEvent } from 'xstate';
+import { setup, assign, SnapshotFrom, fromPromise, assertEvent } from 'xstate';
 import { DisplayModelInfo } from '@/types/storage';
 import { listAvailableModels } from '@/api/openrouter';
 
@@ -10,12 +10,16 @@ export interface ModelsContext {
 
 export type ModelsEvent =
   | { type: 'FETCH' }
-  | { type: 'xstate.done.actor.fetchModels', output: DisplayModelInfo[] };
+  | { type: 'xstate.done.actor.fetchModels', output: DisplayModelInfo[] }
+  | { type: 'xstate.error.actor.fetchModels', error: unknown };
 
 export const modelsMachine = setup({
-    types: {
-        context: {} as ModelsContext,
-        events: {} as ModelsEvent,
+    types: {} as {
+        context: ModelsContext,
+        events: ModelsEvent,
+    },
+    actors: {
+        fetchModels: fromPromise(listAvailableModels),
     },
 }).createMachine({
   id: 'models',
@@ -35,22 +39,24 @@ export const modelsMachine = setup({
       entry: assign({ modelsLoading: true, modelsError: null }),
       invoke: {
         id: 'fetchModels',
-        src: fromPromise(listAvailableModels),
+        src: 'fetchModels',
         onDone: {
           target: 'idle',
-          actions: 
-            assign({
-              cachedModels: ({ event }: { event: DoneActorEvent<DisplayModelInfo[]> }) => event.output,
-              modelsLoading: false,
-            }),
+          actions: assign({
+            cachedModels: ({ event }): DisplayModelInfo[] => {
+              assertEvent(event, 'xstate.done.actor.fetchModels');
+              console.log('[DEBUG] modelsMachine: fetchModels.onDone, received models:', event.output);
+              return event.output;
+            },
+            modelsLoading: false,
+          }),
         },
         onError: {
           target: 'idle',
-          actions: 
-            assign({
-              modelsError: 'Failed to fetch models',
-              modelsLoading: false,
-            }),
+          actions: assign({
+            modelsError: 'Failed to fetch models',
+            modelsLoading: false,
+          }),
         },
       },
     },

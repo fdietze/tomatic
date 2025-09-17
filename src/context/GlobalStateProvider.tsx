@@ -13,7 +13,12 @@ import { GlobalStateContext, GlobalStateContextType } from './GlobalStateContext
 
 const settingsActor = createActor(settingsMachine).start();
 const promptsActor = createActor(promptsMachine).start();
-const snippetsActor = createActor(snippetsMachine).start();
+const snippetsActor = createActor(snippetsMachine, {
+    input: {
+        settingsActor,
+        promptsActor,
+    }
+}).start();
 const modelsActor = createActor(modelsMachine).start();
 
 // Create the provider component

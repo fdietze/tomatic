@@ -61,7 +61,6 @@ const getOpenAIClient = (apiKey: string): OpenAI => {
     throw new Error('OpenRouter API key is missing.');
   }
   const maxRetries = window.__IS_TESTING__ ? 0 : 2;
-  console.log('New OpenAI client with maxRetries:', maxRetries);
   return new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: apiKey,

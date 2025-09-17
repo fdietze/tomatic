@@ -1,8 +1,10 @@
 import { beforeEach, afterEach, vi } from 'vitest';
 import type { TestContext } from 'vitest';
+import { MockInstance } from 'vitest';
+import '@testing-library/jest-dom';
 
-let consoleLogSpy: (...args: any[]) => void;
-let consoleErrorSpy: (...args: any[]) => void;
+let consoleLogSpy: MockInstance;
+let consoleErrorSpy: MockInstance;
 const logBuffer: any[][] = [];
 
 beforeEach(() => {
@@ -19,7 +21,7 @@ afterEach((context: TestContext) => {
   consoleLogSpy.mockRestore();
   consoleErrorSpy.mockRestore();
 
-  if (context.result?.state === 'fail') {
+  if (context.task.result?.state === 'fail') {
     logBuffer.forEach(args => console.log(...args));
   }
   

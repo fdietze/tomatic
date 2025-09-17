@@ -5,10 +5,22 @@ import { Message } from '@/types/chat';
 import { requestMessageContent } from '@/api/openrouter';
 import { resolveSnippets } from '@/utils/snippetUtils';
 import { Snippet, SystemPrompt } from '@/types/storage';
+import { v4 as uuidv4 } from 'uuid';
 
 export type StreamChatResponseOutput = {
     finalMessages: Message[];
     assistantResponse: string;
+};
+
+export type StreamChatResponseInput = {
+    messages: Message[];
+    modelName: string;
+    apiKey: string;
+    snippets: Snippet[];
+    systemPrompts: SystemPrompt[];
+    selectedPromptName: string | null;
+    prompt: string;
+    isRegeneration?: boolean;
 };
 
 const getCurrentSystemPrompt = (systemPrompts: SystemPrompt[], name: string | null): SystemPrompt | null => {
@@ -26,16 +38,7 @@ export const streamChatResponse = async ({
     selectedPromptName,
     prompt,
     isRegeneration,
-}: {
-    messages: Message[];
-    modelName: string;
-    apiKey: string;
-    snippets: Snippet[];
-    systemPrompts: SystemPrompt[];
-    selectedPromptName: string | null;
-    prompt: string;
-    isRegeneration?: boolean;
-}): Promise<StreamChatResponseOutput> => {
+}: StreamChatResponseInput): Promise<StreamChatResponseOutput> => {
 
     const processedContent = resolveSnippets(prompt, snippets);
 
@@ -77,18 +80,20 @@ export const streamChatResponse = async ({
             if (lastUserMessageIndex !== -1) {
                 const updatedMessages = [...messagesToSubmit];
                 const originalMessage = updatedMessages[lastUserMessageIndex];
-                updatedMessages[lastUserMessageIndex] = {
-                    ...originalMessage,
-                    content: processedContent,
-                    raw_content: prompt,
-                };
+                if (originalMessage) {
+                    updatedMessages[lastUserMessageIndex] = {
+                        ...originalMessage,
+                        content: processedContent,
+                        raw_content: prompt,
+                    };
+                }
                 messagesToSubmit = updatedMessages;
             }
         }
         finalMessagesToSubmit = messagesToSubmit;
     } else {
         messagesToSubmit.push({
-            id: 'user-message', // A temporary ID
+            id: uuidv4(), // A temporary ID
             role: 'user',
             content: processedContent,
             raw_content: prompt,

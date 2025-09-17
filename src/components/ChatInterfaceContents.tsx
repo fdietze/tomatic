@@ -7,6 +7,11 @@ import ChatControls from './ChatControls';
 import Combobox, { ComboboxItem } from './Combobox';
 import { isMobile as checkIsMobile } from '@/utils/isMobile';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { ModelsSnapshot } from '@/machines/modelsMachine';
+import { PromptsSnapshot } from '@/machines/promptsMachine';
+import { SnippetsSnapshot } from '@/machines/snippetsMachine';
+import { SessionSnapshot } from '@/machines/sessionMachine';
+import { SettingsSnapshot } from '@/machines/settingsMachine';
 
 interface ChatInterfaceContentsProps {
     systemPrompt?: SystemPrompt;
@@ -21,21 +26,25 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({ systemPro
     }, []);
 
     const navigate = useNavigate();
-    const { settingsActor, sessionActor, modelsActor } = useGlobalState();
+    const { settingsActor, sessionActor, modelsActor, promptsActor, snippetsActor } = useGlobalState();
 
     // --- Granular Selectors ---
-    const messages = useSelector(sessionActor, (state) => state.context.messages);
-    const scrollEffect = useSelector(sessionActor, (state) => state.context.scrollEffect);
-    const isStreaming = useSelector(sessionActor, (state) => state.matches('processingSubmission'));
+    const messages = useSelector(sessionActor, (state: SessionSnapshot) => state.context.messages);
+    const scrollEffect = useSelector(sessionActor, (state: SessionSnapshot) => state.context.scrollEffect);
+    const isStreaming = useSelector(sessionActor, (state: SessionSnapshot) => state.matches('processingSubmission'));
     
-    const input = useSelector(settingsActor, (state) => state.context.input);
-    const apiKey = useSelector(settingsActor, (state) => state.context.apiKey);
-    const modelName = useSelector(settingsActor, (state) => state.context.modelName);
-    const error = useSelector(settingsActor, (state) => state.context.error);
+    const input = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.input);
+    const apiKey = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.apiKey);
+    const modelName = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.modelName);
+    useSelector(settingsActor, (state: SettingsSnapshot) => state.context.autoScrollEnabled);
+    const error = useSelector(sessionActor, (state: SessionSnapshot) => state.context.error);
 
-    const cachedModels = useSelector(modelsActor, (state) => state.context.cachedModels);
-    const modelsLoading = useSelector(modelsActor, (state) => state.context.modelsLoading);
-    const modelsError = useSelector(modelsActor, (state) => state.context.modelsError);
+    const cachedModels = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.cachedModels);
+    const modelsLoading = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.modelsLoading);
+    const modelsError = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.modelsError);
+    
+    useSelector(promptsActor, (state: PromptsSnapshot) => state.context.systemPrompts);
+    useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.snippets);
     
     const displayMessages = useMemo(() => {
         if (systemPrompt && messages.length === 0) {
@@ -50,12 +59,11 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({ systemPro
         return messages;
     }, [messages, systemPrompt]);
     
-    // This logic is now centralized in App.tsx
-    // useEffect(() => {
-    //     if (apiKey && cachedModels.length === 0) {
-    //         modelsActor.send({ type: 'FETCH' });
-    //     }
-    // }, [apiKey, cachedModels.length, modelsActor]);
+    useEffect(() => {
+        if (apiKey && cachedModels.length === 0) {
+            modelsActor.send({ type: 'FETCH' });
+        }
+    }, [apiKey, cachedModels.length, modelsActor]);
 
     useEffect(() => {
         if (!scrollEffect || !historyRef.current) return;
@@ -78,10 +86,13 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({ systemPro
     useEffect(() => {
         const { initialChatPrompt } = settingsActor.getSnapshot().context;
         if (initialChatPrompt && messages.length === 0 && !isStreaming) {
-            sessionActor.send({ type: 'SUBMIT', prompt: initialChatPrompt });
+            const settings = settingsActor.getSnapshot().context;
+            const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
+            const snippets = snippetsActor.getSnapshot().context.snippets;
+            sessionActor.send({ type: 'SUBMIT', prompt: initialChatPrompt, settings, systemPrompts, snippets });
             settingsActor.send({ type: 'SET_INITIAL_CHAT_PROMPT', prompt: null });
         }
-    }, [messages.length, isStreaming, settingsActor, sessionActor]);
+    }, [messages.length, isStreaming, settingsActor, sessionActor, promptsActor, snippetsActor]);
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -99,18 +110,37 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({ systemPro
     ), [cachedModels]);
 
     const handleRegenerate = (index: number): void => {
+        const settings = settingsActor.getSnapshot().context;
+        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
+        const snippets = snippetsActor.getSnapshot().context.snippets;
         sessionActor.send({
             type: 'REGENERATE',
             messageIndex: index,
+            settings,
+            systemPrompts,
+            snippets,
         });
     };
 
     const handleEditAndResubmit = (index: number, newContent: string): void => {
+        const settings = settingsActor.getSnapshot().context;
+        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
+        const snippets = snippetsActor.getSnapshot().context.snippets;
         sessionActor.send({
             type: 'EDIT_MESSAGE',
             messageIndex: index,
             newContent,
+            settings,
+            systemPrompts,
+            snippets,
         });
+    };
+
+    const handleSubmit = (prompt: string): void => {
+        const settings = settingsActor.getSnapshot().context;
+        const systemPrompts = promptsActor.getSnapshot().context.systemPrompts;
+        const snippets = snippetsActor.getSnapshot().context.snippets;
+        sessionActor.send({ type: 'SUBMIT', prompt, settings, systemPrompts, snippets });
     };
 
     const handleSetInput = (value: string): void => {
@@ -149,6 +179,7 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({ systemPro
             <ChatControls
                 input={input}
                 setInput={handleSetInput}
+                onSubmit={handleSubmit}
                 isStreaming={isStreaming}
                 isMobile={isMobile}
                 inputRef={inputRef}
