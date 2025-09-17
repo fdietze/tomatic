@@ -139,7 +139,7 @@ test.describe('Database Migrations', () => {
     });
 
     // Check message content integrity
-    expect(migratedSession.messages[0].content).toBe('Hello');
-    expect(migratedSession.messages[1].content).toBe('Hi from V1');
+    expect(migratedSession.messages[0]?.content).toBe('Hello');
+    expect(migratedSession.messages[1]?.content).toBe('Hi from V1');
   });
 });

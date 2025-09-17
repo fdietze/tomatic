@@ -5,6 +5,7 @@ interface AppEvents {
     'snippet_regeneration_started': CustomEvent<void>;
     'snippet_regeneration_completed': CustomEvent<void>;
     'snippet_regeneration_update': SnippetRegenerationUpdateEvent;
+    'db_migration_complete': CustomEvent<{ from: number; to: number }>;
 }
 
 export interface SnippetRegenerationUpdatePayload {

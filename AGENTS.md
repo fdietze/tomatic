@@ -25,6 +25,7 @@
 - if a variable or field name contains a quantity with a unit, like seconds, meters, etc. include that as a suffix in the name.
 - make illegal states irrepresentable
 - parse, don't validate
+- aid type inference by adding more explicit types
 
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 

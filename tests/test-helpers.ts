@@ -344,6 +344,10 @@ export class ChatCompletionMocker {
     // Remove the matched mock from the queue
     const nextMock = this.mocks.splice(mockIndex, 1)[0];
 
+    if (!nextMock) {
+        throw new Error(`[ChatCompletionMocker] Mock not found after splice, this should not happen.`);
+    }
+
     if (nextMock.manualTrigger) {
         const triggerPromise = new Promise<void>(resolve => {
             this.pendingTriggers.push(resolve);

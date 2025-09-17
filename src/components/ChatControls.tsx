@@ -5,6 +5,7 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 interface ChatControlsProps {
   input: string;
   setInput: (value: string) => void;
+  onSubmit: (prompt: string) => void;
   isStreaming: boolean;
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -14,6 +15,7 @@ interface ChatControlsProps {
 const ChatControls: React.FC<ChatControlsProps> = ({
   input,
   setInput,
+  onSubmit,
   isStreaming,
   isMobile,
   inputRef,
@@ -21,9 +23,9 @@ const ChatControls: React.FC<ChatControlsProps> = ({
 }) => {
   const { sessionActor } = useGlobalState();
 
-  const handleSubmit = (): void => {
-    if (!isStreaming && input.trim().length > 0) {
-      sessionActor.send({ type: 'SUBMIT', prompt: input });
+  const handleSend = (): void => {
+    if (input.trim() && !isStreaming) {
+      onSubmit(input.trim());
     }
   };
 
@@ -33,10 +35,10 @@ const ChatControls: React.FC<ChatControlsProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    handleSubmit();
+    handleSend();
   };
 
-  const handleKeyDown = useTextAreaEnterHandler(isMobile, handleSubmit);
+  const handleKeyDown = useTextAreaEnterHandler(isMobile, handleSend);
 
   return (
     <div className="chat-controls">

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,13 +9,12 @@ import {
 } from 'react-router-dom';
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
-import { useSelector } from '@xstate/react';
+import { useSelector,  } from '@xstate/react';
 import { ROUTES } from '@/utils/routes';
 import { GlobalStateContext } from '@/context/GlobalStateContext';
 import { SessionSnapshot } from './machines/sessionMachine';
 import { SnippetsSnapshot } from './machines/snippetsMachine';
 import { SettingsSnapshot } from './machines/settingsMachine';
-import { ModelsSnapshot } from './machines/modelsMachine';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ const Header: React.FC = () => {
   const { sessionActor, snippetsActor } = useContext(GlobalStateContext);
 
   const currentSessionId = useSelector(sessionActor, (state: SessionSnapshot) => state.context.currentSessionId);
-  const isRegenerating = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.isRegenerating);
+  const isRegenerating = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.regeneratingSnippetNames.length > 0);
 
   const onChat = (): void => {
     if (currentSessionId) {
@@ -73,25 +72,8 @@ const AppContent: React.FC = () => {
 
 
 export const App: React.FC = () => {
-  const { settingsActor, modelsActor } = useContext(GlobalStateContext);
-  const { isInitializing: settingsInitializing, apiKey } = useSelector(settingsActor, (state: SettingsSnapshot) => ({
-    isInitializing: state.context.isInitializing,
-    apiKey: state.context.apiKey,
-  }));
-  const { modelsLoading, cachedModels } = useSelector(modelsActor, (state: ModelsSnapshot) => ({
-    modelsLoading: state.context.modelsLoading,
-    cachedModels: state.context.cachedModels,
-  }));
-
-  useEffect(() => {
-    // Once settings are loaded, check if we need to fetch models.
-    if (!settingsInitializing && apiKey && cachedModels.length === 0) {
-      modelsActor.send({ type: 'FETCH' });
-    }
-  }, [settingsInitializing, apiKey, cachedModels.length, modelsActor]);
-
-  // The app is initializing if settings are loading OR if we have an API key but are still waiting for the first model fetch to complete.
-  const isInitializing = settingsInitializing || (apiKey && modelsLoading && cachedModels.length === 0);
+  const { settingsActor } = useContext(GlobalStateContext);
+  const isInitializing = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.isInitializing);
 
   if (isInitializing) {
     return <div className="loading-spinner">Loading...</div>;

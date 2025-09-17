@@ -48,7 +48,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   };
 
   const handleCancelEditing = (): void => {
-    if (onCancel) {
+    if (isInitiallyEditing && onCancel) {
       onCancel();
     } else {
       setEditingName(prompt.name);

@@ -1,4 +1,4 @@
-import { setup, assign, SnapshotFrom, fromPromise } from 'xstate';
+import { setup, assign, SnapshotFrom, fromPromise, assertEvent } from 'xstate';
 import { SystemPrompt } from '@/types/storage';
 import { 
     loadAllSystemPrompts,
@@ -17,13 +17,20 @@ export type PromptsEvent =
   | { type: 'ADD'; prompt: SystemPrompt }
   | { type: 'UPDATE'; oldName: string; prompt: SystemPrompt }
   | { type: 'DELETE'; name: string }
-  | { type: 'xstate.done.actor.loadPrompts', output: SystemPrompt[] };
+  | { type: 'xstate.done.actor.loadPrompts', output: SystemPrompt[] }
+  | { type: 'xstate.error.actor.loadPrompts', error: unknown }
+  | { type: 'xstate.done.actor.addPrompt' }
+  | { type: 'xstate.error.actor.addPrompt', error: unknown }
+  | { type: 'xstate.done.actor.updatePrompt' }
+  | { type: 'xstate.error.actor.updatePrompt', error: unknown }
+  | { type: 'xstate.done.actor.deletePrompt' }
+  | { type: 'xstate.error.actor.deletePrompt', error: unknown };
 
 
 export const promptsMachine = setup({
-    types: {
-        context: {} as PromptsContext,
-        events: {} as PromptsEvent,
+    types: {} as {
+        context: PromptsContext,
+        events: PromptsEvent,
     },
     actors: {
         loadSystemPrompts: fromPromise(loadAllSystemPrompts),
@@ -58,7 +65,7 @@ export const promptsMachine = setup({
         onDone: {
           target: 'idle',
           actions: assign({
-            systemPrompts: ({ event }: { event: { output: SystemPrompt[] }}) => event.output,
+            systemPrompts: ({ event }) => event.output,
             promptsLoaded: true,
           }),
         },
@@ -66,7 +73,10 @@ export const promptsMachine = setup({
           target: 'failure',
           actions: [
             assign({ error: 'Failed to load system prompts' }),
-            ({ event }): void => { console.error('[DEBUG] promptsMachine loadPrompts onError', event.error); }
+            ({ event }): void => { 
+                assertEvent(event, 'xstate.error.actor.loadPrompts');
+                console.error('[DEBUG] promptsMachine loadPrompts onError', event.error); 
+            }
             ],
         },
       },
@@ -100,7 +110,10 @@ export const promptsMachine = setup({
         invoke: {
             id: 'addPrompt',
             src: 'addPrompt',
-            input: ({ event }) => (event as { type: 'ADD', prompt: SystemPrompt }).prompt,
+            input: ({ event }) => {
+                assertEvent(event, 'ADD');
+                return event.prompt;
+            },
             onDone: 'idle',
             onError: {
                 target: 'loading', // On error, refetch to revert optimistic update
@@ -113,7 +126,8 @@ export const promptsMachine = setup({
             id: 'updatePrompt',
             src: 'updatePrompt',
             input: ({ event }) => {
-                const updateEvent = event as { type: 'UPDATE', oldName: string, prompt: SystemPrompt };
+                assertEvent(event, 'UPDATE');
+                const updateEvent = event;
                 return { oldName: updateEvent.oldName, prompt: updateEvent.prompt };
             },
             onDone: 'idle',
@@ -127,7 +141,10 @@ export const promptsMachine = setup({
         invoke: {
             id: 'deletePrompt',
             src: 'deletePrompt',
-            input: ({ event }) => (event as { type: 'DELETE', name: string }).name,
+            input: ({ event }) => {
+                assertEvent(event, 'DELETE');
+                return event.name;
+            },
             onDone: 'idle',
             onError: {
                 target: 'loading', // On error, refetch to revert optimistic update
