@@ -1,3 +1,6 @@
+# User requests
+- for every user request, decide if we can develop it in a test-driven way. which tests would be appropriate? vitest unit tests and/or playwright e2e tests?
+
 # Validating Changes
 
 - automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation milestones. Always plan at which points you will execute `just check`.
@@ -26,6 +29,7 @@
 - make illegal states irrepresentable
 - parse, don't validate
 - aid type inference by adding more explicit types
+- When debugging XState machines with `always` transitions that depend on context updated by events, ensure the state is re-entered (e.g., via a self-transition) to force re-evaluation of the `always` transition.
 
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 
@@ -45,16 +49,12 @@
 Follow this process by creating a plan for it:
 State that you are "Entering the debugging protocol."
 run the tests (fix linting if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
-- what are the current hypotheses of the tests failing? explain the hypotheses with log traces.
+- what are the current hypotheses of the tests failing? Explain the hypotheses with log traces.
+- are we able to catch those problems with more future-proof unit tests?
 - where and which logging must we add to confirm or refute these hypotheses
 - add logging to trace the whole flow from start to finish
+- which logs should we remove to reduce noise?
 - run the tests again
 - don't fix anything yet
 run this iteration 3 times. Number your iterations.
-
-Then answer the following questions:
-- which decisions do we have to make to solve the problem?
-- what are the options, tradeoffs and recommendations?
-- what is the detailed implementation plan?
-
 Finally, report your findings and stop.

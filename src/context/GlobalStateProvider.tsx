@@ -1,51 +1,58 @@
-import React, { useMemo, useEffect } from 'react';
-import { createActor } from 'xstate';
+import React, { useMemo } from 'react';
+import { useActorRef, useSelector } from '@xstate/react';
+import { InspectionEvent } from 'xstate';
 
-// Import all the machines
-import { settingsMachine } from '@/machines/settingsMachine';
-import { sessionMachine } from '@/machines/sessionMachine';
-import { promptsMachine } from '@/machines/promptsMachine';
-import { snippetsMachine } from '@/machines/snippetsMachine';
-import { modelsMachine } from '@/machines/modelsMachine';
+// Import the root machine
+import { rootMachine } from '@/machines/rootMachine';
 
 // Import the context and type from the new file
 import { GlobalStateContext, GlobalStateContextType } from './GlobalStateContext';
 
-const settingsActor = createActor(settingsMachine).start();
-const promptsActor = createActor(promptsMachine).start();
-const snippetsActor = createActor(snippetsMachine, {
-    input: {
-        settingsActor,
-        promptsActor,
+const inspector = (inspEvent: InspectionEvent) => {
+    // Less noisy logging
+    if (inspEvent.type === '@xstate.snapshot' && 'snapshot' in inspEvent && inspEvent.snapshot && 'context' in inspEvent.snapshot) {
+        const simplifiedContext = { ...(inspEvent.snapshot.context as Record<string, unknown>) };
+        // Avoid logging huge things
+        if (simplifiedContext.snippets && Array.isArray(simplifiedContext.snippets)) simplifiedContext.snippets = `[${simplifiedContext.snippets.length} snippets]`;
+        if (simplifiedContext.messages && Array.isArray(simplifiedContext.messages)) simplifiedContext.messages = `[${simplifiedContext.messages.length} messages]`;
+        if (simplifiedContext.systemPrompts && Array.isArray(simplifiedContext.systemPrompts)) simplifiedContext.systemPrompts = `[${simplifiedContext.systemPrompts.length} prompts]`;
+        if (simplifiedContext.cachedModels && Array.isArray(simplifiedContext.cachedModels)) simplifiedContext.cachedModels = `[${simplifiedContext.cachedModels.length} models]`;
+        
+        const actorId = 'id' in inspEvent.actorRef ? String(inspEvent.actorRef.id) : 'unknown';
+        const snapshotValue = 'value' in inspEvent.snapshot ? inspEvent.snapshot.value : 'unknown';
+
+        console.log(`[XSTATE] SNAPSHOT for ${actorId}: value: ${JSON.stringify(snapshotValue)}, context: ${JSON.stringify(simplifiedContext)}`);
+    } else if (inspEvent.type === '@xstate.event') {
+        const sourceId = inspEvent.sourceRef && 'id' in inspEvent.sourceRef ? String(inspEvent.sourceRef.id) : 'external';
+        const actorId = 'id' in inspEvent.actorRef ? String(inspEvent.actorRef.id) : 'unknown';
+        console.log(`[XSTATE] EVENT for ${actorId} from ${sourceId}:`, inspEvent.event);
     }
-}).start();
-const modelsActor = createActor(modelsMachine).start();
+};
 
 // Create the provider component
 export const GlobalStateProvider = ({ children }: { children: React.ReactNode }): React.JSX.Element => {
-  const sessionActor = useMemo(() => {
-    return createActor(sessionMachine, {
-      systemId: 'sessionActor',
-      input: {
-        settingsActor,
-        promptsActor,
-        snippetsActor
-      }
-    }).start();
-  }, []);
+  const rootActor = useActorRef(rootMachine, { inspect: inspector });
+  
+  const isReady = useSelector(rootActor, (state) => state.matches('running'));
+  const { settingsActor, promptsActor, snippetsActor, modelsActor, sessionActor } = useSelector(rootActor, (state) => state.context);
 
-  useEffect(() => {
-    promptsActor.send({ type: 'LOAD' });
-    snippetsActor.send({ type: 'LOAD' });
-  }, []);
+  const actorContextValue = useMemo((): GlobalStateContextType | null => {
+    if (!isReady || !settingsActor || !promptsActor || !snippetsActor || !modelsActor || !sessionActor) {
+      return null;
+    }
+    return {
+      rootActor,
+      settingsActor,
+      sessionActor,
+      promptsActor,
+      snippetsActor,
+      modelsActor,
+    };
+  }, [isReady, rootActor, settingsActor, sessionActor, promptsActor, snippetsActor, modelsActor]);
 
-  const actorContextValue = useMemo((): GlobalStateContextType => ({
-    settingsActor,
-    sessionActor,
-    promptsActor,
-    snippetsActor,
-    modelsActor,
-  }), [sessionActor]);
+  if (!actorContextValue) {
+    return <></>; // Or a loading spinner
+  }
 
   return (
     <GlobalStateContext.Provider value={actorContextValue}>

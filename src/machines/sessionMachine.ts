@@ -1,14 +1,16 @@
-import { setup, assign, SnapshotFrom, ActorRefFrom, stop, sendTo, fromPromise, assertEvent } from 'xstate';
+import { setup, assign, SnapshotFrom, ActorRefFrom, stop, sendTo, fromPromise, assertEvent, enqueueActions } from 'xstate';
 import { Message } from '@/types/chat';
 import * as db from '@/services/db';
 import { NavigateFunction } from 'react-router-dom';
 import { chatSubmissionMachine, ChatSubmissionInput } from '@/machines/chatSubmissionMachine';
-import { settingsMachine, SettingsContext } from './settingsMachine';
-import { promptsMachine, PromptsContext } from './promptsMachine';
-import { snippetsMachine, SnippetsContext } from './snippetsMachine';
+import { settingsMachine, SettingsContext, SettingsSnapshot } from './settingsMachine';
+import { promptsMachine, PromptsSnapshot } from './promptsMachine';
+import { snippetsMachine, SnippetsSnapshot } from './snippetsMachine';
 import { ChatSession } from '@/types/chat';
 
 type ScrollEffect = { type: 'scrollToBottom' } | { type: 'scrollToLastUserMessage' } | null;
+
+export type { ChatSubmissionInput };
 
 export interface SessionContext {
   messages: Message[];
@@ -21,6 +23,13 @@ export interface SessionContext {
   settingsActor: ActorRefFrom<typeof settingsMachine>;
   promptsActor: ActorRefFrom<typeof promptsMachine>;
   snippetsActor: ActorRefFrom<typeof snippetsMachine>;
+  currentSettings: SettingsContext;
+  currentPrompts: PromptsSnapshot['context'];
+  currentSnippets: SnippetsSnapshot['context'];
+  settingsReady: boolean;
+  promptsReady: boolean;
+  snippetsReady: boolean;
+  pendingEvents: SessionEvent[];
 }
 
 export type SessionMachineInput = {
@@ -34,26 +43,17 @@ export type SessionEvent =
   | { type: 'LOAD_SESSION'; sessionId: string }
   | { type: 'START_NEW_SESSION' }
   | { 
-      type: 'SUBMIT'; 
-      prompt: string;
-      settings: SettingsContext;
-      systemPrompts: PromptsContext['systemPrompts'];
-      snippets: SnippetsContext['snippets'];
+      type: 'SUBMIT_USER_MESSAGE'; 
+      message: string;
     }
   | { 
       type: 'REGENERATE'; 
       messageIndex: number;
-      settings: SettingsContext;
-      systemPrompts: PromptsContext['systemPrompts'];
-      snippets: SnippetsContext['snippets'];
     }
   | { 
       type: 'EDIT_MESSAGE'; 
       messageIndex: number; 
       newContent: string;
-      settings: SettingsContext;
-      systemPrompts: PromptsContext['systemPrompts'];
-      snippets: SnippetsContext['snippets'];
     }
   | { type: 'CANCEL' }
   | { type: 'SUBMISSION_ERROR'; error: string }
@@ -62,11 +62,15 @@ export type SessionEvent =
   | { type: 'ADD_MESSAGE'; message: Message; autoScrollEnabled: boolean }
   | { type: 'UPDATE_MESSAGES'; messages: Message[]; autoScrollEnabled: boolean }
   | { type: 'SCROLL_EFFECT_CONSUMED' }
+  | { type: 'SETTINGS_UPDATED', settings: SettingsSnapshot }
+  | { type: 'PROMPTS_UPDATED', prompts: PromptsSnapshot }
+  | { type: 'SNIPPETS_UPDATED', snippets: SnippetsSnapshot }
   | { type: 'xstate.done.actor.loadSession'; output: { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null } }
-  | { type: 'xstate.error.actor.loadSession', error: unknown };
+  | { type: 'xstate.error.actor.loadSession', error: unknown }
+  | { type: 'CHECK_READY' };
 
 type LoadSessionInput = { sessionId: string };
-type LoadSessionOutput = { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null };
+export type LoadSessionOutput = { messages: Message[], sessionId: string, prevId: string | null, nextId: string | null };
 type SaveSessionInput = { currentSessionId: string | null, messages: Message[] };
 
 export const sessionMachine = setup({
@@ -92,76 +96,197 @@ export const sessionMachine = setup({
             }
         }),
     },
+    guards: {
+      dependenciesReady: ({ context }) => context.settingsReady && context.promptsReady && context.snippetsReady,
+    },
     actions: {
-        spawnSubmissionActor: assign({
+        spawnSubmitActor: assign({
             submissionActor: ({ spawn, context, event, self }) => {
-                console.log('[DEBUG] sessionMachine: received event:', JSON.stringify(event));
-                if (event.type !== 'SUBMIT' && event.type !== 'REGENERATE' && event.type !== 'EDIT_MESSAGE') {
-                    return context.submissionActor;
-                }
-        
-                let messagesToSubmit: Message[];
-                let submissionEvent: { type: 'SUBMIT'; prompt: string } | { type: 'REGENERATE' };
-
-                if (event.type === 'SUBMIT') {
-                    messagesToSubmit = context.messages;
-                    submissionEvent = { type: 'SUBMIT', prompt: event.prompt };
-                } else if (event.type === 'REGENERATE') {
-                    messagesToSubmit = context.messages.slice(0, event.messageIndex);
-                    submissionEvent = { type: 'REGENERATE' };
-                } else { // EDIT_MESSAGE
-                    messagesToSubmit = context.messages.slice(0, event.messageIndex);
-                    submissionEvent = { type: 'SUBMIT', prompt: event.newContent };
-                }
-        
+                assertEvent(event, 'SUBMIT_USER_MESSAGE');
+                
                 const actorInput: ChatSubmissionInput = {
-                    messages: messagesToSubmit,
-                    // Pass everything from the event
-                    systemPrompts: event.systemPrompts,
-                    snippets: event.snippets,
-                    apiKey: event.settings.apiKey,
-                    modelName: event.settings.modelName,
-                    autoScrollEnabled: event.settings.autoScrollEnabled,
-                    selectedPromptName: event.settings.selectedPromptName,
-                    // Callbacks to send events back to self
+                    messages: context.messages,
+                    apiKey: context.currentSettings.apiKey,
+                    modelName: context.currentSettings.modelName,
+                    systemPrompts: context.currentPrompts.systemPrompts,
+                    snippets: context.currentSnippets.snippets,
+                    selectedPromptName: context.currentSettings.selectedPromptName,
+                    autoScrollEnabled: context.currentSettings.autoScrollEnabled,
                     onSuccess: (result) => self.send({ type: 'UPDATE_MESSAGES', ...result }),
                     onError: (error) => self.send({ type: 'SUBMISSION_ERROR', error }),
                 };
-                console.log('[DEBUG] sessionMachine: Spawning submission actor with input:', JSON.stringify(actorInput, (key, value) => key === 'onSuccess' || key === 'onError' ? 'function' : value, 2));
-        
                 const actor = spawn(chatSubmissionMachine, { input: actorInput });
-                actor.send(submissionEvent);
+                actor.send({ type: 'SUBMIT', prompt: event.message });
                 return actor;
             }
         }),
+        spawnRegenerateActor: assign({
+            submissionActor: ({ spawn, context, event, self }) => {
+                assertEvent(event, 'REGENERATE');
+                const messagesForResubmission = context.messages.slice(0, event.messageIndex);
+
+                const actorInput: ChatSubmissionInput = {
+                    messages: messagesForResubmission,
+                    apiKey: context.currentSettings.apiKey,
+                    modelName: context.currentSettings.modelName,
+                    systemPrompts: context.currentPrompts.systemPrompts,
+                    snippets: context.currentSnippets.snippets,
+                    selectedPromptName: context.currentSettings.selectedPromptName,
+                    autoScrollEnabled: context.currentSettings.autoScrollEnabled,
+                    onSuccess: (result) => self.send({ type: 'UPDATE_MESSAGES', ...result }),
+                    onError: (error) => self.send({ type: 'SUBMISSION_ERROR', error }),
+                };
+
+                const actor = spawn(chatSubmissionMachine, { input: actorInput });
+                actor.send({ type: 'REGENERATE' });
+                return actor;
+            }
+        }),
+        spawnEditActor: assign({
+            submissionActor: ({ spawn, context, event, self }) => {
+                assertEvent(event, 'EDIT_MESSAGE');
+                const messagesForResubmission = context.messages.slice(0, event.messageIndex);
+                
+                const actorInput: ChatSubmissionInput = {
+                    messages: messagesForResubmission,
+                    apiKey: context.currentSettings.apiKey,
+                    modelName: context.currentSettings.modelName,
+                    systemPrompts: context.currentPrompts.systemPrompts,
+                    snippets: context.currentSnippets.snippets,
+                    selectedPromptName: context.currentSettings.selectedPromptName,
+                    autoScrollEnabled: context.currentSettings.autoScrollEnabled,
+                    onSuccess: (result) => self.send({ type: 'UPDATE_MESSAGES', ...result }),
+                    onError: (error) => self.send({ type: 'SUBMISSION_ERROR', error }),
+                };
+
+                const actor = spawn(chatSubmissionMachine, { input: actorInput });
+                actor.send({ type: 'SUBMIT', prompt: event.newContent });
+                return actor;
+            }
+        }),
+        processPendingEvents: enqueueActions(({ context, enqueue }) => {
+            context.pendingEvents.forEach(evt => {
+                assertEvent(evt, ['SUBMIT_USER_MESSAGE', 'REGENERATE', 'EDIT_MESSAGE']);
+                enqueue.raise(evt);
+            });
+            enqueue.assign({ pendingEvents: [] });
+        }),
+        signalReadyForTests: () => {
+            if (window.__IS_TESTING__) {
+                window.sessionReady = true;
+            }
+        },
     }
 }).createMachine({
   id: 'session',
-  initial: 'idle',
-  context: ({ input }) => ({
-    messages: [],
-    currentSessionId: null,
-    prevSessionId: null,
-    nextSessionId: null,
-    error: null,
-    submissionActor: null,
-    scrollEffect: null,
-    settingsActor: input.settingsActor,
-    promptsActor: input.promptsActor,
-    snippetsActor: input.snippetsActor,
-  }),
+  initial: 'waitingForDependencies',
+  context: ({ input }) => {
+    return {
+        messages: [],
+        currentSessionId: null,
+        prevSessionId: null,
+        nextSessionId: null,
+        error: null,
+        submissionActor: null,
+        scrollEffect: null,
+        settingsActor: input.settingsActor,
+        promptsActor: input.promptsActor,
+        snippetsActor: input.snippetsActor,
+        currentSettings: {
+            apiKey: '',
+            modelName: '',
+            autoScrollEnabled: true,
+            initialChatPrompt: null,
+            input: '',
+            isInitializing: true,
+            selectedPromptName: null,
+            error: null,
+        },
+        currentPrompts: {
+            systemPrompts: [],
+            error: null,
+            promptsLoaded: false,
+        },
+        currentSnippets: {
+            snippets: [],
+            error: null,
+            promptsActor: input.promptsActor,
+            settingsActor: input.settingsActor,
+            regeneratingSnippetNames: [],
+            _currentUpdate: null,
+            currentSettings: {
+                apiKey: '',
+                modelName: '',
+                autoScrollEnabled: true,
+                initialChatPrompt: null,
+                input: '',
+                isInitializing: true,
+                selectedPromptName: null,
+                error: null,
+            },
+            currentPrompts: {
+                systemPrompts: [],
+                error: null,
+                promptsLoaded: false,
+            },
+        },
+        settingsReady: false,
+        promptsReady: false,
+        snippetsReady: false,
+        pendingEvents: [],
+    };
+  },
   on: {
     SETTINGS_UPDATED: {
         actions: [
-            assign({ currentSettings: ({ event }) => event.settings }),
+            assign({ currentSettings: ({ event }) => event.settings.context, settingsReady: true }),
+            sendTo(({ self }) => self, { type: 'CHECK_READY' }),
         ],
     },
-    '*': {
-      actions: () => {}
-    }
+    PROMPTS_UPDATED: {
+        actions: [
+            assign({ currentPrompts: ({ event }) => event.prompts.context, promptsReady: true }),
+            sendTo(({ self }) => self, { type: 'CHECK_READY' }),
+        ],
+    },
+    SNIPPETS_UPDATED: {
+        actions: [
+            assign({ currentSnippets: ({ event }) => event.snippets.context, snippetsReady: true }),
+            sendTo(({ self }) => self, { type: 'CHECK_READY' }),
+        ],
+    },
   },
   states: {
+    waitingForDependencies: {
+        after: {
+          10000: {
+            target: 'timeout',
+            actions: assign({ error: 'Dependencies timeout' })
+          }
+        },
+        always: {
+            target: 'idle',
+            guard: ({ context }) => 
+                context.settingsReady && 
+                context.promptsReady && 
+                context.snippetsReady,
+        },
+        on: {
+          '*': {
+            actions: assign({
+              pendingEvents: ({ context, event }) => {
+                if (event.type === 'SUBMIT_USER_MESSAGE' || event.type === 'REGENERATE' || event.type === 'EDIT_MESSAGE') {
+                  return [...context.pendingEvents, event];
+                }
+                return context.pendingEvents; // Ignore others
+              }
+            })
+          },
+          CHECK_READY: { /* no-op, just to trigger always re-evaluation */ },
+        }
+    },
     idle: {
+        entry: ['processPendingEvents', 'signalReadyForTests'],
         on: {
             LOAD_SESSION: 'loading',
             START_NEW_SESSION: {
@@ -173,29 +298,43 @@ export const sessionMachine = setup({
                     error: null
                 })
             },
-            SUBMIT: {
+            SUBMIT_USER_MESSAGE: {
                 target: 'processingSubmission',
+                guard: 'dependenciesReady',
                 actions: [
-                    sendTo(({ context }) => context.settingsActor, { type: 'SET_INPUT', text: '' }),
-                    'spawnSubmissionActor'
+                    'spawnSubmitActor',
+                    sendTo(({ context }) => context.settingsActor, ({ event }) => ({ type: 'SET_INPUT', text: event.message })),
                 ],
             },
             REGENERATE: {
                 target: 'processingSubmission',
-                actions: 'spawnSubmissionActor',
+                guard: 'dependenciesReady',
+                actions: 'spawnRegenerateActor',
             },
             EDIT_MESSAGE: {
                 target: 'processingSubmission',
-                actions: 'spawnSubmissionActor',
+                guard: 'dependenciesReady',
+                actions: 'spawnEditActor',
             },
         }
     },
     processingSubmission: {
+        entry: () => {
+        },
+        exit: () => {
+        },
         on: {
             CANCEL: {
-                actions: ({ context }) => {
-                    context.submissionActor?.send({ type: 'CANCEL' });
-                }
+                target: 'idle',
+                actions: [
+                    stop(({ context }) => context.submissionActor!),
+                    assign({
+                        submissionActor: null,
+                    }),
+                    ({ context }) => {
+                        context.submissionActor?.send({ type: 'CANCEL' });
+                    }
+                ]
             },
             UPDATE_MESSAGES: {
                 target: 'idle',
@@ -261,6 +400,7 @@ export const sessionMachine = setup({
         },
       },
     },
+    timeout: { type: 'final' },
   },
 });
 

@@ -39,20 +39,20 @@ export const chatSubmissionMachine = setup({
         input: {} as ChatSubmissionInput,
     },
     actors: {
-        streamResponse: fromPromise<StreamChatResponseOutput, StreamResponseInput>(
-            async ({ input }) => {
-                const { event, input: machineInput } = input;
-                const isRegeneration = event.type === 'REGENERATE';
-                const prompt = event.type === 'SUBMIT' ? event.prompt : '';
-                
-                const serviceInput: StreamChatResponseInput = {
-                    ...machineInput,
-                    prompt,
-                    isRegeneration,
-                };
-
-                return await streamChatResponse(serviceInput);
-            }
+        streamResponse: fromPromise(
+          async ({ input: promiseInput }: { input: StreamResponseInput }) => {
+            const { event, input: machineInput } = promiseInput;
+            const isRegeneration = event.type === 'REGENERATE';
+            const prompt = event.type === 'SUBMIT' ? event.prompt : '';
+    
+            const serviceInput: StreamChatResponseInput = {
+              ...machineInput,
+              prompt,
+              isRegeneration,
+            };
+    
+            return await streamChatResponse(serviceInput);
+          }
         ),
     },
     actions: {
@@ -82,6 +82,7 @@ export const chatSubmissionMachine = setup({
             assertEvent(event, 'xstate.error.actor.streamResponse');
             const error = event.error;
             const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[DEBUG] chatSubmissionMachine: sendError action triggered.', { error: event.error });
             context.input.onError(errorMessage);
         }
     }
@@ -113,7 +114,7 @@ export const chatSubmissionMachine = setup({
             };
         },
         onDone: {
-          target: 'finalizing',
+          target: 'idle',
           actions: 'sendSuccess',
         },
         onError: {
@@ -130,9 +131,6 @@ export const chatSubmissionMachine = setup({
           ],
         },
       }
-    },
-    finalizing: {
-        always: 'idle'
     },
     failure: {
       on: {

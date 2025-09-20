@@ -327,12 +327,21 @@ export class ChatCompletionMocker {
     const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
     
     // Find a matching mock without removing it yet
-    const mockIndex = this.mocks.findIndex(m => 
-        m.request.model === requestBody.model &&
-        JSON.stringify(m.request.messages) === JSON.stringify(requestBody.messages)
-    );
+    const mockIndex = this.mocks.findIndex(m => {
+        if (m.request.model !== requestBody.model) return false;
+        if (m.request.messages.length !== requestBody.messages.length) return false;
+
+        return m.request.messages.every((mockMsg, i) => {
+            const reqMsg = requestBody.messages[i];
+            if (!reqMsg) return false;
+            // Only compare role and content for robust matching
+            return mockMsg.role === reqMsg.role && mockMsg.content === reqMsg.content;
+        });
+    });
 
     if (mockIndex === -1) {
+      console.error(`[ChatCompletionMocker] Unexpected API call. No mock found for request:`, JSON.stringify(requestBody, null, 2));
+      console.error(`[ChatCompletionMocker] Available mocks:`, JSON.stringify(this.mocks, null, 2));
       const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions. No matching mock found.\nRECEIVED:\n${JSON.stringify(
         requestBody,
         null,

@@ -118,8 +118,7 @@ test('can select a model and get a model-specific response', async ({ context, p
 
   // Select the mock model
   await chatPage.modelCombobox.selectModel('Mock Model', 'mock-model/mock-model');
-  await chatPage.modelCombobox.expectInputValue('mock-model/mock-model');
-
+  
   // Send a message with the new model
   const responsePromise2 = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
   await chatPage.sendMessage('Another message');

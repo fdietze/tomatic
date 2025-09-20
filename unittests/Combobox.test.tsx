@@ -13,15 +13,19 @@ describe('Combobox', () => {
   test('renders with initial selected item', () => {
     render(<Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />);
     const input = screen.getByTestId('model-combobox-input') as HTMLInputElement;
-    expect(input.value).toBe('item1');
+    expect(input.value).toBe('First Item');
   });
 
-  test('shows suggestions on focus', () => {
+  test('opens suggestions on focus', () => {
     render(<Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />);
     const input = screen.getByTestId('model-combobox-input');
+    
+    // Suggestions should not be visible initially
+    expect(screen.queryByText('First Item')).not.toBeInTheDocument();
+
     fireEvent.focus(input);
+    // On focus, the input is cleared, and all items should become visible.
     expect(screen.getByText('First Item')).toBeInTheDocument();
-    // On focus, the input is cleared, so all items should be visible now.
     expect(screen.getByText('Second Item')).toBeInTheDocument();
   });
 
@@ -91,28 +95,29 @@ describe('Combobox', () => {
     const handleSelect = vi.fn();
     render(<Combobox items={mockItems} selectedId="" onSelect={handleSelect} />);
     const input = screen.getByTestId('model-combobox-input');
-    // The suggestions are not shown yet
-    expect(screen.queryByText('First Item')).not.toBeInTheDocument();
-
+    // With the fix, suggestions are shown immediately if items are present
+    fireEvent.focus(input);
+    
     fireEvent.change(input, { target: { value: 'item2' } });
-    // Suggestions are now visible
+    // Suggestions are now visible and filtered
     expect(screen.getByText('Second Item')).toBeInTheDocument();
 
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(handleSelect).toHaveBeenCalledWith('item2');
   });
 
-  test('closes suggestions on Escape key and restores value', () => {
+  test('closes suggestions on Escape key and restores value', async () => {
     render(<Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />);
     const input = screen.getByTestId('model-combobox-input') as HTMLInputElement;
-    fireEvent.focus(input);
-    expect(input.value).toBe(''); // Cleared on focus
-    expect(screen.getByText('First Item')).toBeInTheDocument();
-    fireEvent.change(input, { target: { value: 'some query' } });
 
+    // Open and type
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'some query' } });
+    
+    // Escape
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByText('First Item')).not.toBeInTheDocument();
-    expect(input.value).toBe('item1'); // Value restored
+    expect(input.value).toBe('First Item'); // Value restored
   });
 
   test('reloads items when reload button is clicked', () => {
@@ -144,26 +149,41 @@ describe('Combobox', () => {
   test('clears input on focus to start a new search', () => {
     render(<Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />);
     const input = screen.getByTestId('model-combobox-input') as HTMLInputElement;
-    expect(input.value).toBe('item1');
+    expect(input.value).toBe('First Item');
     fireEvent.focus(input);
     expect(input.value).toBe('');
-    expect(screen.getByText('First Item')).toBeInTheDocument(); // Suggestions appear
   });
 
   test('restores original value on click outside if nothing is selected', () => {
-    render(
-      <div>
-        <Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />
-        <div data-testid="outside-element" />
-      </div>
-    );
+    render(<Combobox items={mockItems} selectedId="item1" onSelect={() => {}} />);
     const input = screen.getByTestId('model-combobox-input') as HTMLInputElement;
+    
+    // Type something
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'some other query' } });
     expect(input.value).toBe('some other query');
 
+    // Click away
+    render(<div data-testid="outside-element"></div>, { container: document.body });
+
     fireEvent.mouseDown(screen.getByTestId('outside-element')); // Simulate click outside
-    expect(input.value).toBe('item1');
+    expect(input.value).toBe('First Item');
     expect(screen.queryByText('First Item')).not.toBeInTheDocument(); // Suggestions closed
+  });
+
+  test('updates suggestions when items prop changes asynchronously', () => {
+    const { rerender } = render(<Combobox items={[]} selectedId="" onSelect={() => {}} loading />);
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('First Item')).not.toBeInTheDocument();
+
+    rerender(<Combobox items={mockItems} selectedId="" onSelect={() => {}} loading={false} />);
+
+    // To see the suggestions, the user must interact with the combobox first
+    const input = screen.getByTestId('model-combobox-input');
+    fireEvent.focus(input);
+
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.getByText('First Item')).toBeInTheDocument();
+    expect(screen.getByText('Second Item')).toBeInTheDocument();
   });
 });

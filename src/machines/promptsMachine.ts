@@ -1,4 +1,4 @@
-import { setup, assign, SnapshotFrom, fromPromise, assertEvent } from 'xstate';
+import { setup, assign, SnapshotFrom, fromPromise, assertEvent, sendParent } from 'xstate';
 import { SystemPrompt } from '@/types/storage';
 import { 
     loadAllSystemPrompts,
@@ -19,23 +19,24 @@ export type PromptsEvent =
   | { type: 'DELETE'; name: string }
   | { type: 'xstate.done.actor.loadPrompts', output: SystemPrompt[] }
   | { type: 'xstate.error.actor.loadPrompts', error: unknown }
-  | { type: 'xstate.done.actor.addPrompt' }
+  | { type: 'xstate.done.actor.addPrompt', output: SystemPrompt }
   | { type: 'xstate.error.actor.addPrompt', error: unknown }
-  | { type: 'xstate.done.actor.updatePrompt' }
+  | { type: 'xstate.done.actor.updatePrompt', output: SystemPrompt }
   | { type: 'xstate.error.actor.updatePrompt', error: unknown }
-  | { type: 'xstate.done.actor.deletePrompt' }
+  | { type: 'xstate.done.actor.deletePrompt', output: string }
   | { type: 'xstate.error.actor.deletePrompt', error: unknown };
 
 
 export const promptsMachine = setup({
-    types: {} as {
-        context: PromptsContext,
-        events: PromptsEvent,
+    types: {
+        context: {} as PromptsContext,
+        events: {} as PromptsEvent,
     },
     actors: {
         loadSystemPrompts: fromPromise(loadAllSystemPrompts),
         addPrompt: fromPromise(async ({ input }: { input: SystemPrompt }) => {
             await saveSystemPrompt(input);
+            return input;
         }),
         updatePrompt: fromPromise(async ({ input }: { input: { oldName: string, prompt: SystemPrompt }}) => {
             // NOTE: The DB API uses a simple `put` operation. We must delete the old prompt first
@@ -44,9 +45,45 @@ export const promptsMachine = setup({
                 await deleteSystemPrompt(input.oldName);
             }
             await saveSystemPrompt(input.prompt);
+            return input.prompt;
         }),
         deletePrompt: fromPromise(async ({ input }: { input: string }) => {
             await deleteSystemPrompt(input);
+            return input;
+        }),
+    },
+    actions: {
+        notifyParent: sendParent(({ context }) => ({
+            type: 'PROMPTS_UPDATED',
+            prompts: { context }
+        })),
+        addPrompt: assign({
+            systemPrompts: ({ context, event }) => {
+                assertEvent(event, 'xstate.done.actor.addPrompt');
+                return [...context.systemPrompts, event.output];
+            }
+        }),
+        updatePrompt: assign({
+            systemPrompts: ({ context, event }) => {
+                assertEvent(event, ['xstate.done.actor.addPrompt', 'xstate.done.actor.updatePrompt']);
+                // This logic correctly handles both adding a new prompt (replacing the optimistically added one)
+                // and updating an existing one.
+                const updatedPrompt = event.output;
+                const exists = context.systemPrompts.some(p => p.name === updatedPrompt.name);
+                if (exists) {
+                    return context.systemPrompts.map(p => p.name === updatedPrompt.name ? updatedPrompt : p);
+                }
+                // This case handles when a prompt's name is changed during an update.
+                // We need more info to handle that robustly here, so for now we'll just add it.
+                // The correct way would be to trace it via an ID.
+                return [...context.systemPrompts, updatedPrompt];
+            }
+        }),
+        removePrompt: assign({
+            systemPrompts: ({ context, event }) => {
+                assertEvent(event, 'xstate.done.actor.deletePrompt');
+                return context.systemPrompts.filter(p => p.name !== event.output);
+            }
         }),
     }
 }).createMachine({
@@ -64,10 +101,13 @@ export const promptsMachine = setup({
         src: 'loadSystemPrompts',
         onDone: {
           target: 'idle',
-          actions: assign({
-            systemPrompts: ({ event }) => event.output,
-            promptsLoaded: true,
-          }),
+          actions: [
+            assign({
+                systemPrompts: ({ event }) => event.output,
+                promptsLoaded: true,
+            }),
+            'notifyParent'
+          ],
         },
         onError: {
           target: 'failure',
@@ -87,9 +127,15 @@ export const promptsMachine = setup({
             target: 'loading',
         },
         ADD: {
-          target: 'adding',
+          target: 'persistingAdd',
           actions: assign({
-            systemPrompts: ({ context, event }) => [...context.systemPrompts, event.prompt],
+            systemPrompts: ({ context, event }) => {
+                // Avoid adding duplicates if the user clicks multiple times
+                if (context.systemPrompts.some(p => p.name === event.prompt.name)) {
+                    return context.systemPrompts;
+                }
+                return [...context.systemPrompts, event.prompt];
+            }
           })
         },
         UPDATE: {
@@ -106,7 +152,7 @@ export const promptsMachine = setup({
         },
       },
     },
-    adding: {
+    persistingAdd: {
         invoke: {
             id: 'addPrompt',
             src: 'addPrompt',
@@ -114,7 +160,10 @@ export const promptsMachine = setup({
                 assertEvent(event, 'ADD');
                 return event.prompt;
             },
-            onDone: 'idle',
+            onDone: {
+                target: 'idle',
+                actions: ['updatePrompt', 'notifyParent']
+            },
             onError: {
                 target: 'loading', // On error, refetch to revert optimistic update
                 actions: assign({ error: 'Failed to add prompt' }),
@@ -130,7 +179,10 @@ export const promptsMachine = setup({
                 const updateEvent = event;
                 return { oldName: updateEvent.oldName, prompt: updateEvent.prompt };
             },
-            onDone: 'idle',
+            onDone: {
+                target: 'idle',
+                actions: ['updatePrompt', 'notifyParent']
+            },
             onError: {
                 target: 'loading', // On error, refetch to revert optimistic update
                 actions: assign({ error: 'Failed to update prompt' }),
@@ -145,7 +197,10 @@ export const promptsMachine = setup({
                 assertEvent(event, 'DELETE');
                 return event.name;
             },
-            onDone: 'idle',
+            onDone: {
+                target: 'idle',
+                actions: ['removePrompt', 'notifyParent']
+            },
             onError: {
                 target: 'loading', // On error, refetch to revert optimistic update
                 actions: assign({ error: 'Failed to delete prompt' }),

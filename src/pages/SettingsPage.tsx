@@ -5,6 +5,7 @@ import SnippetItem from '@/components/SnippetItem';
 import type { Snippet, SystemPrompt } from '@/types/storage';
 import { topologicalSort } from '@/utils/snippetUtils';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { SnippetsSnapshot } from '@/machines/snippetsMachine';
 
 const SettingsPage: React.FC = () => {
     const { settingsActor, promptsActor, snippetsActor } = useGlobalState();
@@ -12,7 +13,7 @@ const SettingsPage: React.FC = () => {
     const apiKey = useSelector(settingsActor, (state) => state.context.apiKey);
     const autoScrollEnabled = useSelector(settingsActor, (state) => state.context.autoScrollEnabled);
     const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
-    const snippets = useSelector(snippetsActor, (state) => state.context.snippets);
+    const snippets = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.snippets);
 
     const [localApiKey, setLocalApiKey] = useState(apiKey);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
@@ -52,7 +53,11 @@ const SettingsPage: React.FC = () => {
     return Promise.resolve(); // Keep signature for SnippetItem
   };
   const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet): Promise<void> => {
-    snippetsActor.send({ type: 'UPDATE', oldName, snippet: updatedSnippet });
+    snippetsActor.send({ 
+        type: 'UPDATE', 
+        oldName, 
+        snippet: updatedSnippet,
+    });
     return Promise.resolve();
   };
   const handleRemoveSnippet = (name: string): Promise<void> => {
@@ -157,7 +162,7 @@ const SettingsPage: React.FC = () => {
               snippet={{ name: '', content: '', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }}
               isInitiallyEditing={true}
               allSnippets={snippets}
-              onUpdate={handleCreateSnippet}
+              onUpdate={(_oldName, updatedSnippet) => handleCreateSnippet(updatedSnippet)}
               onRemove={() => {
                 handleCancelNewSnippet();
                 return Promise.resolve();
@@ -171,7 +176,7 @@ const SettingsPage: React.FC = () => {
               snippet={snippet}
               isInitiallyEditing={false}
               allSnippets={snippets}
-              onUpdate={(updatedSnippet) => handleUpdateSnippet(snippet.name, updatedSnippet)}
+              onUpdate={(_oldName, updatedSnippet) => handleUpdateSnippet(snippet.name, updatedSnippet)}
               onRemove={() => handleRemoveSnippet(snippet.name)}
             />
           ))}

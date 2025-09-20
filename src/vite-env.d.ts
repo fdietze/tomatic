@@ -15,3 +15,7 @@ declare namespace JSX {
     'error-box': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
   }
 }
+
+interface Window {
+  sessionReady?: boolean;
+}

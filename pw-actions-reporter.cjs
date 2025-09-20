@@ -28,8 +28,8 @@
  * failures quickly.
  */
 
-const fs = require('fs').promises;
-const path = require('path');
+// const fs = require('fs').promises;
+// const path = require('path');
 
 /** @implements {import('@playwright/test/reporter').Reporter} */
 class PwActionsReporter {

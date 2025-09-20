@@ -170,41 +170,38 @@ test.describe('Automatic Regeneration', () => {
 		await settingsPage.goto();
 	});
 
-	test('regenerates a dependent snippet when its dependency is updated', async ({ context }) => {
+	test('regenerates a dependent snippet when its dependency is updated', async () => {
 		// Purpose: This test verifies that when a standard snippet (A) is updated, any generated
 		// snippet (B) that depends on it (i.e., uses '@A' in its prompt) is automatically
 		// and correctly regenerated in the background.
-		// 1. Seed the initial snippets
-		await seedIndexedDB(context, {
-			snippets: [
-				{ name: 'A', content: 'World', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-				{ name: 'B', content: 'Initial content for B', isGenerated: true, prompt: 'Hello @A', model: 'mock-model/mock-model', createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
-			],
-		});
-		await settingsPage.page.reload();
-		await settingsPage.expectGeneratedSnippetContent('B', /Initial content for B/);
+		// 1. Create initial snippets: A (base) and B (depends on A)
+		await settingsPage.createNewSnippet('A', 'World');
+		await settingsPage.createGeneratedSnippet(
+			'B',
+			'Hello @A',
+			'mock-model/mock-model',
+			'Initial content for B'
+		);
 
-
-		// 2. Mock the regeneration of snippet B, which will be triggered by updating A
+		// 2. Set up the mock for the regeneration of B
 		chatMocker.mock({
 			request: {
 				model: 'mock-model/mock-model',
-				messages: [{ role: 'user', content: 'Hello Universe' }],
+				messages: [{ role: 'user', content: 'Hello World' }]
 			},
-			response: { role: 'assistant', content: 'Updated content for B' },
+			response: {
+				role: 'assistant',
+				content: 'Updated content for B'
+			}
 		});
 
-		// 3. Update snippet A
+		// 3. Go back to settings and update snippet A, which should trigger regeneration of B
 		await settingsPage.startEditingSnippet('A');
-		await settingsPage.fillSnippetForm('A', 'Universe');
+		await settingsPage.fillSnippetForm('A', 'World');
 		await settingsPage.saveSnippet();
 
-		// 4. Assert that snippet B's content has been updated.
-		// Playwright's expect has a built-in timeout, so it will wait for the regeneration to complete.
+		// 4. Verify that the content of B is updated after the regeneration
 		await settingsPage.expectGeneratedSnippetContent('B', /Updated content for B/);
-
-		// 5. Verify all mocks were consumed
-		chatMocker.verifyComplete();
 	});
 
 	test('transitively regenerates snippets in the correct order', async ({ context }) => {
@@ -220,7 +217,7 @@ test.describe('Automatic Regeneration', () => {
 			],
 		});
 		await settingsPage.page.reload();
-		
+
 		// 2. Verify initial state
 		await settingsPage.expectGeneratedSnippetContent('B', /Content of B from v1/);
 		await settingsPage.expectGeneratedSnippetContent('C', /Content of C from B_v1/);

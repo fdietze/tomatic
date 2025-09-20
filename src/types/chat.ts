@@ -13,6 +13,7 @@ export interface Message {
   raw_content?: string;
   model_name?: string | null;
   cost?: MessageCost | null;
+  error?: string | null;
 }
 
 export interface ChatSession {
