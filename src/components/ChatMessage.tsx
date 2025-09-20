@@ -154,6 +154,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {(message.cost.prompt_tokens && message.cost.completion_tokens) && <span> ({message.cost.prompt_tokens + message.cost.completion_tokens} tokens)</span>}
         </div>
       )}
+      {message.error && (
+        <div className="error-message" data-testid="error-message">
+            <p>{message.error}</p>
+        </div>
+      )}
     </div>
   );
 };

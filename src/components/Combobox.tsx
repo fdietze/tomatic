@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
 import CopyButton from './CopyButton';
@@ -33,49 +33,48 @@ const Combobox: React.FC<ComboboxProps> = ({
   errorMessage = null,
   label,
 }) => {
-  const [searchQuery, setSearchQuery] = useState(selectedId);
+  const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  const [isPristine, setIsPristine] = useState(true);
 
   const comboboxWrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsListRef = useRef<HTMLUListElement>(null);
 
-  useEffect(() => {
-    setSearchQuery(selectedId);
-  }, [selectedId]);
+  const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId]);
 
-  useEffect(() => {
-    if (items.length > 0 && inputRef.current === document.activeElement) {
-      setShowSuggestions(true);
-    }
-  }, [items]);
+  console.log('[DEBUG] Combobox render. Props:', { loading, errorMessage, itemCount: items.length, selectedId });
+
+  console.log('[DEBUG] Combobox state:', { showSuggestions, inputValue, isPristine, highlightedIndex });
 
   useOnClickOutside(comboboxWrapperRef as React.RefObject<HTMLElement>, () => {
     // Only act if the suggestions are currently shown
     if (showSuggestions) {
       setShowSuggestions(false);
       setHighlightedIndex(null);
-      // Restore the search query to the last known selected ID
-      setSearchQuery(selectedId);
+      // On click outside, revert to pristine state, showing the selected item
+      setInputValue('');
+      setIsPristine(true);
     }
   });
 
   const filteredItems = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return items;
+    const query = inputValue.toLowerCase().trim();
+    if (isPristine || !query) return items;
     const searchTerms = query.split(/\s+/);
     return items.filter((item) => {
       const itemText = `${item.id} ${item.display_text}`.toLowerCase();
       return searchTerms.every((term) => itemText.includes(term));
     });
-  }, [searchQuery, items]);
+  }, [inputValue, items, isPristine]);
 
   const handleSelectItem = (item: ComboboxItem): void => {
     onSelect(item.id);
-    setSearchQuery(item.id);
     setShowSuggestions(false);
     setHighlightedIndex(null);
+    setInputValue('');
+    setIsPristine(true);
   };
   
   const scrollHighlightedItemIntoView = (): void => {
@@ -120,42 +119,51 @@ const Combobox: React.FC<ComboboxProps> = ({
         } else if (filteredItems.length === 1 && filteredItems[0]) {
             handleSelectItem(filteredItems[0]);
         } else {
-            const exactMatch = items.find(item => item.id === searchQuery);
+            const exactMatch = items.find(item => item.id === inputValue);
             if (exactMatch) {
                 handleSelectItem(exactMatch);
             } else {
                 // If no match and user presses enter, cancel the search and restore
-                setSearchQuery(selectedId);
                 setShowSuggestions(false);
                 setHighlightedIndex(null);
+                setInputValue('');
+                setIsPristine(true);
             }
         }
         break;
       case 'Escape':
         setShowSuggestions(false);
         setHighlightedIndex(null);
-        setSearchQuery(selectedId);
+        setInputValue('');
+        setIsPristine(true);
         break;
       case 'Tab':
         setShowSuggestions(false);
         setHighlightedIndex(null);
-        setSearchQuery(selectedId);
+        setInputValue('');
+        setIsPristine(true);
         break;
     }
   };
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newValue = e.target.value;
-    setSearchQuery(newValue);
+    setInputValue(newValue);
+    console.log('[DEBUG] Combobox input changed, showing suggestions. New value:', newValue);
     setShowSuggestions(true);
     setHighlightedIndex(null);
+    setIsPristine(false);
   };
 
   const handleFocus = (): void => {
+    console.log('[DEBUG] Combobox focused, showing suggestions.');
     setShowSuggestions(true);
     // Clear the input to allow the user to easily type a new search
-    setSearchQuery('');
+    setInputValue('');
+    setIsPristine(false);
   };
+
+  const displayValue = isPristine ? (selectedItem?.display_text || selectedId) : inputValue;
 
   return (
     <div className="combobox-wrapper" ref={comboboxWrapperRef}>
@@ -165,7 +173,7 @@ const Combobox: React.FC<ComboboxProps> = ({
           data-testid="model-combobox-input"
           ref={inputRef}
           type="text"
-          value={searchQuery}
+          value={displayValue}
           onChange={handleInput}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}

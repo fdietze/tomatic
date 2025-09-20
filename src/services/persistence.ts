@@ -49,7 +49,9 @@ interface TomaticDB extends DBSchema {
 function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 	return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
 		upgrade(db, oldVersion, _newVersion, tx) {
+			console.log(`[DEBUG] Entering upgrade handler. oldVersion: ${oldVersion}, newVersion: ${_newVersion}`);
 			if (oldVersion < 2) {
+				console.log("[DEBUG] Upgrading from <2: Creating sessions and prompts stores.");
 				// Create sessions store
 				if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
 					const store = db.createObjectStore(SESSIONS_STORE_NAME, { keyPath: SESSION_ID_KEY_PATH });
@@ -68,6 +70,7 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 					.then(function migrate(cursor) {
 						if (!cursor) {
 							dispatchEvent('db_migration_complete', { from: 1, to: 2 });
+							console.log("[DEBUG] Migration from 1 to 2 completed.");
 							return;
 						}
 
@@ -93,6 +96,7 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 					});
 			}
 			if (oldVersion < 3) {
+				console.log("[DEBUG] Upgrading from <3: Creating snippets store.");
 				// Create snippets store
 				if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
 					db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
@@ -105,6 +109,7 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 					.then(function migrateSnippets(cursor) {
 						if (!cursor) {
 							dispatchEvent('db_migration_complete', { from: 2, to: 3 });
+							console.log("[DEBUG] Migration from 2 to 3 completed.");
 							return;
 						}
 
@@ -123,6 +128,7 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
 						void cursor.continue().then(migrateSnippets);
 					});
 			}
+			console.log("[DEBUG] Exiting upgrade handler.");
 		},
 	});
 }

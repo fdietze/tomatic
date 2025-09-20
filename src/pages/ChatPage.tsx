@@ -12,43 +12,30 @@ const ChatPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { settingsActor, sessionActor, promptsActor } = useGlobalState();
+  const { rootActor, settingsActor, sessionActor, promptsActor } = useGlobalState();
 
   // --- Granular Selectors ---
   const selectedPromptName = useSelector(settingsActor, (state) => state.context.selectedPromptName);
-  const isInitializing = useSelector(settingsActor, (state) => state.context.isInitializing);
   const error = useSelector(settingsActor, (state) => state.context.error);
   const prevSessionId = useSelector(sessionActor, (state) => state.context.prevSessionId);
   const nextSessionId = useSelector(sessionActor, (state) => state.context.nextSessionId);
   const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
-  const promptsLoaded = useSelector(promptsActor, (state) => state.context.promptsLoaded);
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
     return systemPrompts.find(p => p.name === selectedPromptName);
   }, [systemPrompts, selectedPromptName]);
 
 
-  // Effect to load session when URL parameter changes
+  // Effect to notify the root machine of URL changes
   useEffect(() => {
-    // Wait for both settings and prompts to be loaded before proceeding
-    if (isInitializing || !promptsLoaded) {
-      return;
-    }
+    rootActor.send({
+      type: 'URL_CHANGED',
+      sessionId: sessionIdFromUrl || null,
+      queryParams: searchParams,
+      setSearchParams: setSearchParams
+    });
+  }, [sessionIdFromUrl, searchParams, setSearchParams, rootActor]);
 
-    const idToLoad = sessionIdFromUrl || 'new';
-    if (idToLoad === 'new') {
-      sessionActor.send({
-        type: 'START_NEW_SESSION',
-      });
-      const initialPrompt = searchParams.get('q');
-      if (initialPrompt) {
-        settingsActor.send({ type: 'SET_INITIAL_CHAT_PROMPT', prompt: initialPrompt });
-        setSearchParams({}); // Clear the query param after consuming it
-      }
-    } else {
-      sessionActor.send({ type: 'LOAD_SESSION', sessionId: idToLoad });
-    }
-  }, [sessionIdFromUrl, sessionActor, settingsActor, searchParams, setSearchParams, isInitializing, promptsLoaded]);
 
   const canGoPrev = !!prevSessionId;
   const canGoNext = !!nextSessionId;

@@ -29,6 +29,7 @@ export class SettingsPage {
    */
   async goto() {
      await this.page.goto(ROUTES.settings);
+     await this.page.waitForFunction(() => window.sessionReady === true, {}, { timeout: 5000 });
   }
 
   /**

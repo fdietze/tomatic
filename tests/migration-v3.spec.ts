@@ -3,6 +3,12 @@ import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage } from './
 import { DBV2_ChatSession, DBV2_SystemPrompt } from '@/types/storage';
 import { ROUTES } from '@/utils/routes';
 
+declare global {
+  interface Window {
+    migrationPromise: Promise<boolean>;
+  }
+}
+
 test.describe('Database Migrations V3', () => {
   test.beforeEach(async ({ context }) => {
     await mockGlobalApis(context);
@@ -73,14 +79,25 @@ test.describe('Database Migrations V3', () => {
       });
     }, { session: V2_SESSION, prompt: V2_PROMPT });
 
-    const consolePromise = page.waitForEvent('console', {
-      predicate: (msg) => msg.text().includes('[DB] Upgrading database from version 2 to 3...'),
-      timeout: 5000,
+    // const consolePromise = page.waitForEvent('console', {
+    //   predicate: (msg) => msg.text().includes('[DB] Upgrading database from version 2 to 3...'),
+    //   timeout: 5000,
+    // });
+
+    await context.addInitScript(() => {
+      window.migrationPromise = new Promise(resolve => {
+        window.addEventListener('db_migration_complete', (event) => {
+          const customEvent = event as CustomEvent;
+          if (customEvent.detail.from === 2 && customEvent.detail.to === 3) {
+            resolve(true);
+          }
+        }, { once: true });
+      });
     });
 
     await page.goto(ROUTES.chat.new);
 
-    await consolePromise;
+    const migrationCompleted = await page.evaluate(() => window.migrationPromise as Promise<boolean>);
 
     const migrationResult = await page.evaluate(
       async (): Promise<{

@@ -35,6 +35,7 @@ describe('CopyButton', () => {
             fireEvent.click(button);
         });
 
+        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(MOCK_TEXT);
         expect(button).toHaveTextContent('copied');
     });
@@ -108,6 +109,7 @@ describe('CopyButton', () => {
             fireEvent.click(button);
         });
 
+        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
         expect(button).toHaveTextContent('copy');
     });

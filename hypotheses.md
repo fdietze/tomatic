@@ -1,33 +1,47 @@
-# Hypotheses and Learnings (2025-09-17)
+# Project Tomatic: Architectural Analysis & Refactoring Report (2025-09-18)
 
-## 1. Confirmed Root Causes of 27 Test Failures
+## 1. Executive Summary
 
-Through a systematic, three-iteration debugging protocol, the 27 test failures have been traced to four distinct, fundamental architectural flaws in the XState and React implementation. The application suffers from state synchronization issues, missing logic for complex asynchronous processes, incorrect UI updates, and flawed error handling.
+A systematic debugging process has identified two failing unit tests that reveal a core architectural issue: the lack of a robust, event-driven mechanism for inter-actor state synchronization. The identified symptoms are a **race condition in a test for `sessionMachine`** and an **improper use of `always` transitions in `snippetsMachine`**.
 
-### 1.1. Stale State in Actor Communication (Race Condition)
+The root cause is a deviation from idiomatic XState v5 patterns. The system relies on implicit state management rather than explicit, event-based communication. This leads to brittle orchestration logic and race conditions. This report outlines a plan to refactor towards a reactive, push-based architecture where actors subscribe to state changes, eliminating the need for polling (`getSnapshot()`) and making the system more robust and maintainable.
 
-*   **Problem:** Actors are communicating by "pulling" state from other actors using `actor.getSnapshot()`. XState does not guarantee that a snapshot will be updated within the same synchronous execution block that an event is processed. An incoming event can therefore be handled using a stale copy of another actor's state.
-*   **Symptom:** The `system-prompt-interaction.spec.ts` test fails because a regenerated API call is sent with the old model (`google/gemini-2.5-pro` instead of `openai/gpt-4o`). Debug logs confirmed that the `sessionMachine` received an event with the *correct* new settings, but when spawning the `chatSubmissionMachine`, it read stale data for `systemPrompts` and `snippets` from its actor references (`promptsActor.getSnapshot()`).
-*   **Architectural Flaw:** This "pull" or "query" model for inter-actor state is the primary source of race conditions. A robust actor system must use a "push" model, where all necessary data for an action is passed *within* the event itself. This makes the action self-contained and eliminates the possibility of reading stale state from another machine's context.
+## 2. Identified Issues & Root Causes
 
-### 1.2. Flawed Orchestration for Snippet Regeneration
+### 2.1. Issue #1: Improper `always` Transition (`snippetsMachine.test.ts`)
 
-*   **Problem:** The `snippetsMachine` correctly identifies dependent snippets and spawns `snippetRegenerationMachine` actors. However, its logic for processing the results is flawed. It waits for *all* actors to complete before transitioning to `idle` (`guard: ({ context }) => context.regenerationActors.length === 1`), preventing incremental UI updates. Even after the update, the UI fails to reflect the new snippet content.
-*   **Symptom:** All tests related to automatic snippet regeneration fail. For example, `snippets-generated.spec.ts` shows that a dependent snippet's content is never updated in the UI, even though debug logs confirm the regeneration actor completed successfully with the new content and the machine's context was updated.
-*   **Architectural Flaw:** The orchestration logic is incomplete and not reactive. It needs to process results as they arrive, immediately update its state, and correctly signal to the UI that a change has occurred. The current guard logic is a key part of the problem.
+*   **Symptom:** The test `spawns regeneration actors for all transitive dependents...` fails because it expects the machine to be in the `regenerating` state, but finds it in the `idle` state.
+*   **Root Cause Analysis:** The `regenerating` state uses an `always` transition that checks `context.regeneratingSnippetNames.length === 0`. In a test environment, the mock child actors complete almost instantly. Their completion events trigger context updates, causing the `always` guard to immediately become true and transition the machine to `idle` before the test assertion can run.
+*   **Architectural Flaw:** This is a classic anti-pattern. Orchestrating an unknown number of asynchronous child actors with a context-based `always` guard is inherently racy. The machine's state transitions should be driven by explicit completion events from the child actors, not by synchronously inspecting a context variable.
 
-### 1.3. UI Component State Bug in Combobox
+### 2.2. Issue #2: Test-Induced Race Condition (`sessionMachine.test.ts`)
 
-*   **Problem:** The `Combobox` component, used for model selection, fails to display model items when they are loaded asynchronously. Debug logs from the `modelsMachine` confirm that the list of models is fetched successfully. The bug is internal to the `Combobox` component's state management, which doesn't correctly react when its `items` prop changes from an empty array to a populated one after the API call finishes.
-*   **Symptom:** Multiple tests across the suite that need to select a model fail with a timeout, waiting for a `model-combobox-item` that is never rendered in the DOM.
-*   **Architectural Flaw:** A bug in the React component's effect/state handling prevents it from correctly reacting to asynchronous changes in its props.
+*   **Symptom:** The test `should spawn a submission actor with the latest settings...` fails because it asserts that `submissionActor` is not null, but finds `null`.
+*   **Root Cause Analysis:** The test correctly triggers the spawning of a `submissionActor`. However, the mock actor completes instantly, sends its result back to the `sessionMachine`, and is immediately cleaned up. The test's `vi.waitFor` asserts the state *after* this entire lifecycle is complete, leading to a false negative.
+*   **Architectural Flaw:** While the immediate fix is to make the test check the intermediate state, this failure highlights a deeper issue. The test was originally written to guard against the `sessionMachine` using stale state from its dependencies (like `settingsMachine`). The previous solution involved polling with `getSnapshot()`, which is not idiomatic. The correct architecture should ensure the `sessionMachine` *always* has the latest state *pushed* to it, making such a test less complex.
 
-### 1.4. Improper Error Handling
+## 3. Architectural Recommendations (Idiomatic XState v5)
 
-*   **Problem:** When an error is thrown during snippet resolution (e.g., snippet not found), the `chatSubmissionMachine` catches the `Error` object and places it directly into its context's `error` field. The UI then attempts to render this object.
-*   **Symptom:** React logs the warning `Objects are not valid as a React child (found: [object Error])`, and tests like `snippets-system-prompts.spec.ts` fail because the expected error message is not displayed.
-*   **Architectural Flaw:** Violation of React principles. State intended for rendering must be a primitive (like a string) or a valid React element. The error handling logic must serialize the error (e.g., by storing `error.message`) before putting it into the state.
+### 3.1. Adopt a Reactive, Push-Based State Synchronization Model
 
-## 2. Path Forward: A Type-Safe, Event-Driven Architecture
+The core of the refactoring is to move from a "pull" model (actors polling for state with `getSnapshot()`) to a "push" model (actors being notified of state changes).
 
-The initial refactoring attempt failed due to cascading type-safety issues. The debugging protocol has now confirmed that the architectural issues go beyond simple bugs and require a shift in the fundamental communication patterns between actors. The next phase will focus on designing and implementing a robust, event-driven, and fully type-safe XState architecture.
+*   **Problem:** Actors like `sessionMachine` need up-to-date state from `settingsMachine`, `promptsMachine`, etc., to perform their logic (e.g., making an API call with the correct model name). Polling for this state is inefficient and not in the spirit of the actor model.
+*   **Recommendation (Event-Driven Synchronization):**
+    1.  A top-level `rootMachine` will orchestrate all major actors.
+    2.  When a dependency actor (e.g., `settingsMachine`) updates its state, it will send a notification event to the `rootMachine` (e.g., `{ type: 'SETTINGS_UPDATED', settings: ... }`).
+    3.  The `rootMachine` will then forward this event to all other actors that need this information (e.g., `sessionMachine`, `snippetsMachine`).
+    4.  Consumer actors (`sessionMachine`, `snippetsMachine`) will have handlers (`on: { SETTINGS_UPDATED: ... }`) to receive the new state and update their own context.
+*   **Benefits:** This creates a fully reactive system. Actors are always in sync. There is no need for `getSnapshot()`, and the logic becomes clearer and less prone to race conditions.
+
+### 3.2. Orchestrate Child Actors via Explicit Events
+
+*   **Problem:** The `snippetsMachine` needs to wait for an unknown number of child actors to complete.
+*   **Recommendation (Actor Lifecycle Management):**
+    1.  The `snippetsMachine` will store the `ActorRef` of each spawned regeneration actor in its context (e.g., `context.regeneratingActors`).
+    2.  The `always` transition will be removed.
+    3.  The machine will transition out of the `regenerating` state only after it has received a completion/failure event from every actor it spawned. An action will remove the completed actor's `ActorRef` from the context, and a guarded transition will check if the `regeneratingActors` array is now empty.
+
+## 4. Next Steps: Refactoring Plan
+
+The next steps will be to implement this robust, event-driven architecture. This involves creating a new unit test to prove the `snippetsMachine` orchestration logic, refactoring the `snippetsMachine` itself, and then wiring up the inter-actor communication through the `rootMachine`. The flawed test in `sessionMachine` will also be fixed.

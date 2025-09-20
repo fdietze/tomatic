@@ -2,18 +2,71 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { vi } from 'vitest';
 import SnippetItem from '../src/components/SnippetItem';
-import { Snippet } from '../src/types/storage';
+import { Snippet, SystemPrompt, DisplayModelInfo } from '../src/types/storage';
 import { GlobalStateContext } from '../src/context/GlobalStateContext';
-import { createActor } from 'xstate';
+import { createActor, fromPromise } from 'xstate';
+import { snippetRegenerationMachineSetup } from '../src/machines/snippetRegenerationMachine';
+
+// Import the real machines and their types
+import { rootMachine } from '../src/machines/rootMachine';
+import { modelsMachine } from '../src/machines/modelsMachine';
+import { snippetsMachine } from '../src/machines/snippetsMachine';
+import { settingsMachine } from '../src/machines/settingsMachine';
+import { promptsMachine } from '../src/machines/promptsMachine';
+import { sessionMachine } from '../src/machines/sessionMachine';
+
+
+// --- Create Test Versions of Machines ---
+
+const testModelsMachine = modelsMachine.provide({
+    actors: {
+        fetchModels: fromPromise(async () => {
+            const mockModels: DisplayModelInfo[] = [];
+            return mockModels;
+        }),
+    }
+});
+
+const testSnippetsMachine = snippetsMachine.provide({
+    actions: {
+        notifyParent: () => {},
+    },
+    actors: {
+        loadSnippets: fromPromise(async () => {
+            const mockSnippets: Snippet[] = [];
+            return mockSnippets;
+        }),
+        updateSnippet: fromPromise(async ({ input }) => input.snippet),
+    }
+});
+
+const testSettingsMachine = settingsMachine.provide({
+    actors: {
+        loadSettings: fromPromise(async () => ({})),
+        saveSettings: fromPromise(async ({ input }) => input),
+    }
+});
+
+const testPromptsMachine = promptsMachine.provide({
+    actors: {
+        loadSystemPrompts: fromPromise(async () => {
+            const mockPrompts: SystemPrompt[] = [];
+            return mockPrompts;
+        }),
+    }
+});
 
 // Mock child components
 vi.mock('../src/components/Markdown', () => ({
     default: ({ markdownText }: { markdownText: string }) => <div data-testid="markdown-mock">{markdownText}</div>
 }));
-vi.mock('../src/components/Combobox', () => ({
-    default: (props: any) => <div data-testid="combobox-mock" onClick={() => props.onSelect('mock-model-id')} />
-}));
 
+type MockComboboxProps = {
+    onSelect: (value: string) => void;
+};
+vi.mock('../src/components/Combobox', () => ({
+    default: (props: MockComboboxProps) => <div data-testid="combobox-mock" onClick={() => props.onSelect('mock-model-id')} />
+}));
 
 const mockOnUpdate = vi.fn().mockResolvedValue(undefined);
 const mockOnRemove = vi.fn().mockResolvedValue(undefined);
@@ -24,13 +77,24 @@ const mockSnippets: Snippet[] = [
     { name: 'snippet2', content: 'content2 references @snippet1', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
 ];
 
+// --- Create Stable Mock Actors ---
+const rootActor = createActor(rootMachine);
+const settingsActor = createActor(testSettingsMachine);
+const promptsActor = createActor(testPromptsMachine);
+const modelsActor = createActor(testModelsMachine, { input: { settingsActor } });
+const snippetsActor = createActor(testSnippetsMachine, { input: { settingsActor, promptsActor } });
+const sessionActor = createActor(sessionMachine, { input: { settingsActor, promptsActor, snippetsActor } });
+
+
 const mockGlobalState = {
-    modelsActor: createActor(vi.fn() as any, { snapshot: { context: { cachedModels: [] } } as any }),
-    snippetsActor: createActor(vi.fn() as any, { snapshot: { context: { regeneratingSnippetNames: [] } } as any }),
-    settingsActor: createActor(vi.fn() as any, { snapshot: { context: { modelName: 'default-model' } } as any }),
-    promptsActor: createActor(vi.fn() as any, { snapshot: { context: {} } } as any),
-    sessionActor: createActor(vi.fn() as any, { snapshot: { context: {} } } as any),
+    rootActor,
+    modelsActor,
+    snippetsActor,
+    settingsActor,
+    promptsActor,
+    sessionActor,
 };
+
 
 type SnippetItemTestProps = Partial<React.ComponentProps<typeof SnippetItem>>;
 
@@ -83,16 +147,57 @@ describe('SnippetItem', () => {
             renderComponent();
             fireEvent.click(screen.getByTestId('snippet-delete-button'));
             await act(async () => {
-                expect(mockOnRemove).toHaveBeenCalledTimes(1);
+                // this is a no-op to flush pending promises
             });
+            expect(mockOnRemove).toHaveBeenCalledTimes(1);
         });
 
-        it('shows spinner when regenerating', () => {
-            const regeneratingState = {
-                ...mockGlobalState,
-                snippetsActor: createActor(vi.fn() as any, { snapshot: { context: { regeneratingSnippetNames: ['snippet1'] } } as any }),
-            };
-            renderComponent({}, regeneratingState);
+        it('shows spinner when regenerating', async () => {
+            // Arrange: create a custom snippets actor whose dependency graph makes snippet1 a dependent
+            const customSnippets: Snippet[] = [
+                { name: 'base', content: 'base content', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+                { name: 'snippet1', content: 'old stuff', isGenerated: true, prompt: 'uses @base', model: 'm', createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            ];
+
+            // A noop regenerator that never completes to keep the parent in 'regenerating'
+            const noopRegenerator = snippetRegenerationMachineSetup.createMachine({
+                id: 'snippetRegenerator',
+                initial: 'regenerating',
+                context: ({ input }) => ({
+                    name: input.snippet.name,
+                    error: null,
+                    result: null,
+                    input,
+                }),
+                states: { regenerating: { on: {} }, done: { type: 'final' }, failed: { type: 'final' } }
+            });
+
+            const customSnippetsMachine = snippetsMachine.provide({
+                actions: { notifyParent: () => {} },
+                actors: {
+                    loadSnippets: fromPromise(async () => customSnippets),
+                    updateSnippet: fromPromise(async ({ input }) => input.snippet),
+                    regenerateSnippet: noopRegenerator,
+                }
+            });
+
+            const customSnippetsActor = createActor(customSnippetsMachine, { input: { settingsActor, promptsActor } });
+            customSnippetsActor.start();
+            await vi.waitFor(() => customSnippetsActor.getSnapshot().value === 'idle');
+
+            // Act: update the base snippet so that snippet1 (generated and depending on base) regenerates
+            await act(async () => {
+                customSnippetsActor.send({
+                    type: 'UPDATE',
+                    oldName: 'base',
+                    snippet: { ...customSnippets[0]!, content: 'new base content' }
+                });
+            });
+
+            // Render component bound to the custom actor and the custom snippets list
+            const customGlobalState = { ...mockGlobalState, snippetsActor: customSnippetsActor } as const;
+            renderComponent({ snippet: customSnippets[1]!, allSnippets: customSnippets }, customGlobalState);
+
             expect(screen.getByTestId('regenerating-spinner')).toBeInTheDocument();
             expect(screen.getByTestId('snippet-edit-button')).toBeDisabled();
         });
@@ -135,11 +240,16 @@ describe('SnippetItem', () => {
                 fireEvent.click(screen.getByTestId('snippet-save-button'));
             });
 
-            expect(mockOnUpdate).toHaveBeenCalledWith(expect.objectContaining({
-                name: 'newName',
-                content: 'newContent',
-                isGenerated: false,
-            }));
+            expect(mockOnUpdate).toHaveBeenCalledWith(
+                'snippet1',
+                expect.objectContaining({
+                    name: 'newName',
+                    content: 'newContent',
+                    isGenerated: false,
+                }),
+                expect.any(Object), // settings
+                [] as SystemPrompt[]  // systemPrompts
+            );
         });
 
         it('calls onCancel for new snippets', () => {

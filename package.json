@@ -35,6 +35,8 @@
     "@types/react-dom": "^19.1.7",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.0.2",
+    "core-js": "^3.45.1",
+    "fake-indexeddb": "^6.2.2",
     "jsdom": "^27.0.0",
     "oxlint": "^1.15.0",
     "oxlint-tsgolint": "^0.2.0",

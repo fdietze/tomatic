@@ -36,7 +36,8 @@ export class ChatPage {
    * Navigates to a new chat page.
    */
   async goto() {
-     await this.page.goto(ROUTES.chat.new);
+    await this.page.goto(ROUTES.chat.new);
+    await this.page.waitForFunction(() => window.sessionReady === true, {}, { timeout: 5000 });
   }
 
   /**

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo, useContext } from 'react';
-import type { Snippet } from '@/types/storage';
+import React, { useState, useRef, useEffect, useMemo, useContext, useCallback } from 'react';
+import type { Snippet, SystemPrompt } from '@/types/storage';
 import { useSelector } from '@xstate/react';
 import { DisplayModelInfo } from '@/types/storage';
 import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
@@ -8,13 +8,13 @@ import Markdown from './Markdown';
 import { GlobalStateContext } from '@/context/GlobalStateContext';
 import { ModelsSnapshot } from '@/machines/modelsMachine';
 import { SnippetsSnapshot } from '@/machines/snippetsMachine';
-import { SettingsSnapshot } from '@/machines/settingsMachine';
+import { SettingsSnapshot, SettingsContext } from '@/machines/settingsMachine';
 
 interface SnippetItemProps {
   snippet: Snippet;
   isInitiallyEditing: boolean;
   allSnippets: Snippet[]; // This will come from a selector
-  onUpdate: (updatedSnippet: Snippet) => Promise<void>;
+  onUpdate: (oldName: string, updatedSnippet: Snippet, settings: SettingsContext, systemPrompts: SystemPrompt[]) => Promise<void>;
   onRemove: () => Promise<void>;
   onCancel?: () => void;
 }
@@ -29,14 +29,32 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-    const { modelsActor, snippetsActor, settingsActor } = useContext(GlobalStateContext);
+    const { modelsActor, snippetsActor, settingsActor, promptsActor } = useContext(GlobalStateContext);
     const cachedModels = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.cachedModels);
-    const defaultModelName = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.modelName);
+    const settings = useSelector(settingsActor, (state: SettingsSnapshot) => state.context);
+    const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
+    const defaultModelName = settings.modelName;
     
-    const { regeneratingSnippetNames } = useSelector(snippetsActor, (state: SnippetsSnapshot) => ({
-        regeneratingSnippetNames: state.context.regeneratingSnippetNames,
-    }));
-
+    const isActuallyRegenerating = useSelector(
+        snippetsActor,
+        useCallback(
+            (state: SnippetsSnapshot) => {
+                const active = state.context.regeneratingSnippetNames.includes(snippet.name);
+                // Debug aid for spinner visibility issues
+                // eslint-disable-next-line no-console
+                console.log('[DEBUG] SnippetItem useSelector', {
+                    snippetName: snippet.name,
+                    machineState: state.value,
+                    regeneratingNames: state.context.regeneratingSnippetNames,
+                    isActuallyRegenerating: active,
+                    isDirty: snippet.isDirty,
+                });
+                return active;
+            },
+            [snippet.name]
+        )
+    );
+    const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
 
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(snippet.name);
@@ -47,9 +65,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const [nameError, setNameError] = useState<string | null>(null);
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
-
-  const isActuallyRegenerating = regeneratingSnippetNames.includes(snippet.name);
-  const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
 
   const modelItems = useMemo((): ComboboxItem[] => {
     return cachedModels.map((model: DisplayModelInfo) => ({
@@ -144,7 +159,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       model: editingModel,
     };
 
-    await onUpdate(snippetForSave);
+    await onUpdate(snippet.name, snippetForSave, settings, systemPrompts);
 
     setIsEditing(false);
     setNameError(null);

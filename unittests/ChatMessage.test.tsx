@@ -94,6 +94,16 @@ describe('ChatMessage', () => {
         expect(screen.getByText(/(30 tokens)/)).toBeInTheDocument();
     });
 
+    test('renders error message when provided', () => {
+        const messageWithError: Message = {
+            ...userMessage,
+            error: 'An error occurred.',
+        };
+        renderComponent({ message: messageWithError });
+        expect(screen.getByTestId('error-message')).toBeInTheDocument();
+        expect(screen.getByText('An error occurred.')).toBeInTheDocument();
+    });
+
     // --- Interaction Tests ---
 
     test('toggles collapsed state for system messages on click', () => {
