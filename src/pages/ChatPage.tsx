@@ -1,40 +1,33 @@
 import React, { useEffect, useMemo } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { useSelector } from '@xstate/react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import ChatHeader from '@/components/ChatHeader';
 import ChatInterface from '@/components/ChatInterface';
 import SystemPromptBar from '@/components/SystemPromptBar';
-import { useGlobalState } from '@/context/GlobalStateContext';
 import { SystemPrompt } from '@/types/storage';
+import { selectSettings, setSelectedPromptName } from '@/store/features/settings/settingsSlice';
+import { selectPrompts } from '@/store/features/prompts/promptsSlice';
+import { selectSession, loadSession } from '@/store/features/session/sessionSlice';
 
 const ChatPage: React.FC = () => {
   const { id: sessionIdFromUrl } = useParams<{ id: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const { rootActor, settingsActor, sessionActor, promptsActor } = useGlobalState();
-
-  // --- Granular Selectors ---
-  const selectedPromptName = useSelector(settingsActor, (state) => state.context.selectedPromptName);
-  const error = useSelector(settingsActor, (state) => state.context.error);
-  const prevSessionId = useSelector(sessionActor, (state) => state.context.prevSessionId);
-  const nextSessionId = useSelector(sessionActor, (state) => state.context.nextSessionId);
-  const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
+  // --- Redux State ---
+  const { selectedPromptName } = useSelector(selectSettings);
+  const { prompts: systemPrompts } = useSelector(selectPrompts);
+  const { prevSessionId, nextSessionId, error } = useSelector(selectSession);
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
     return systemPrompts.find(p => p.name === selectedPromptName);
   }, [systemPrompts, selectedPromptName]);
 
-
-  // Effect to notify the root machine of URL changes
   useEffect(() => {
-    rootActor.send({
-      type: 'URL_CHANGED',
-      sessionId: sessionIdFromUrl || null,
-      queryParams: searchParams,
-      setSearchParams: setSearchParams
-    });
-  }, [sessionIdFromUrl, searchParams, setSearchParams, rootActor]);
+    if (sessionIdFromUrl) {
+      dispatch(loadSession(sessionIdFromUrl));
+    }
+  }, [sessionIdFromUrl, dispatch]);
 
 
   const canGoPrev = !!prevSessionId;
@@ -53,11 +46,11 @@ const ChatPage: React.FC = () => {
   };
 
   const handleSelectPrompt = (name: string | null): void => {
-    settingsActor.send({ type: 'SET_SELECTED_PROMPT_NAME', name });
+    dispatch(setSelectedPromptName(name));
   };
 
   const handleErrorClear = (): void => {
-    settingsActor.send({ type: 'SET_ERROR', error: null });
+    // This will be handled by the session slice later
   };
 
 
