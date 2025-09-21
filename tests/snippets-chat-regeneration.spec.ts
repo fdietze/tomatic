@@ -1,5 +1,6 @@
 import { test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
+import { SettingsPage } from "./pom/SettingsPage";
 import { DBV3_ChatSession, DBV3_Snippet } from "@/types/storage";
 import {
   ChatCompletionMocker,
@@ -12,6 +13,7 @@ import { ROUTES } from "@/utils/routes";
 
 test.describe("Chat Regeneration with Snippets", () => {
   let chatPage: ChatPage;
+  let settingsPage: SettingsPage;
   let chatMocker: ChatCompletionMocker;
 
   test.beforeEach(async ({ context, page }) => {
@@ -73,6 +75,7 @@ test.describe("Chat Regeneration with Snippets", () => {
 
     // 3. Setup POMs and Mocks
     chatPage = new ChatPage(page);
+    settingsPage = new SettingsPage(page);
     chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
 
@@ -81,7 +84,6 @@ test.describe("Chat Regeneration with Snippets", () => {
   });
 
   test("uses updated snippet content when regenerating a response", async ({
-    context,
     page,
   }) => {
     // Purpose: This test verifies that when regenerating an assistant's response, the system
@@ -93,23 +95,17 @@ test.describe("Chat Regeneration with Snippets", () => {
     await chatPage.expectMessage(0, "user", /@greet world/);
     await chatPage.expectMessage(1, "assistant", /Initial response/);
 
-    // 2. Update the snippet's content in the database directly
-    const updatedSnippet: DBV3_Snippet = {
-      name: "greet",
-      content: "UPDATED GREETING",
-      isGenerated: false,
-      createdAt_ms: 0,
-      updatedAt_ms: 2000,
-      generationError: null,
-      isDirty: false,
-    };
-    await seedIndexedDB(context, { snippets: [updatedSnippet] });
-
-    // Reload the page to force the app to re-read snippets from the DB
+    // 2. Update the snippet's content via the UI
     const chatUrl = page.url();
+    await chatPage.navigation.goToSettings();
+    await settingsPage.startEditingSnippet("greet");
+    await settingsPage.fillSnippetForm("greet", "UPDATED GREETING");
+    await settingsPage.saveSnippet();
+
+    // 3. Navigate back to the chat session
     await page.goto(chatUrl);
 
-    // 3. Mock the API call for the regeneration
+    // 4. Mock the API call for the regeneration, expecting the *new* content
     chatMocker.mock({
       request: {
         model: "google/gemini-2.5-pro",
@@ -122,15 +118,17 @@ test.describe("Chat Regeneration with Snippets", () => {
       },
     });
 
-    // 4. Click the regenerate button and await the new response
+    // 5. Click the regenerate button and await the new response
     const responsePromise = page.waitForResponse(
       "https://openrouter.ai/api/v1/chat/completions",
     );
     await chatPage.regenerateMessage(1);
     await responsePromise;
 
-    // 5. Assertions
+    // 6. Assertions
+    // The user message still shows the original raw content for historical accuracy
     await chatPage.expectMessage(0, "user", /@greet world/);
+    // The assistant message is updated to the new response
     await chatPage.expectMessage(
       1,
       "assistant",
@@ -138,7 +136,7 @@ test.describe("Chat Regeneration with Snippets", () => {
     );
     await chatPage.expectMessageCount(2);
 
-    // 6. Verify all mocks were consumed
+    // 7. Verify all mocks were consumed
     chatMocker.verifyComplete();
   });
 });
