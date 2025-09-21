@@ -1,4 +1,6 @@
+@import './ress.min.css';
 @import "./variables.css";
+@import './fonts.css';
 @import "./base.css";
 @import "./components/chat.css";
 @import "./components/settings.css";
