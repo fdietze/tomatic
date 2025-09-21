@@ -57,6 +57,7 @@ test.describe('Generated Snippets', () => {
       request: {
         model: 'mock-model/mock-model',
         messages: [{ role: 'user', content: 'Tell me a joke' }],
+        stream: false,
       },
       response: { role: 'assistant', content: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
     });
@@ -78,6 +79,7 @@ test.describe('Generated Snippets', () => {
       request: {
         model: 'mock-model/mock-model',
         messages: [{ role: 'user', content: 'Tell me a joke' }],
+        stream: false,
       },
       response: { role: 'assistant', content: 'Why did the scarecrow win an award? Because he was outstanding in his field!' },
     });
@@ -89,6 +91,7 @@ test.describe('Generated Snippets', () => {
       request: {
         model: 'mock-model/mock-model',
         messages: [{ role: 'user', content: 'Tell me a short story' }],
+        stream: false,
       },
       response: { role: 'assistant', content: 'Once upon a time...' },
     });
@@ -125,6 +128,7 @@ test.describe('Generated Snippets', () => {
       request: {
         model: 'mock-model/mock-model',
         messages: [{ role: 'user', content: 'Tell me a story about space exploration' }],
+        stream: false,
       },
       response: { role: 'assistant', content: 'Once upon a time, in a galaxy far, far away...' },
     });
@@ -187,7 +191,8 @@ test.describe('Automatic Regeneration', () => {
 		chatMocker.mock({
 			request: {
 				model: 'mock-model/mock-model',
-				messages: [{ role: 'user', content: 'Hello World' }]
+				messages: [{ role: 'user', content: 'Hello World' }],
+				stream: false,
 			},
 			response: {
 				role: 'assistant',
@@ -224,12 +229,12 @@ test.describe('Automatic Regeneration', () => {
 
 		// 3. Set up mocks for the transitive regeneration
 		chatMocker.mock({ // Regeneration of B after A is updated
-			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }] },
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for B using v2' }], stream: false },
 			response: { role: 'assistant', content: 'Content of B from v2' },
 			manualTrigger: true,
 		});
 		chatMocker.mock({ // Regeneration of C after B is updated
-			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v2' }] },
+			request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'Prompt for C using Content of B from v2' }], stream: false },
 			response: { role: 'assistant', content: 'Content of C from B_v2' },
 			manualTrigger: true,
 		});

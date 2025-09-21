@@ -1,7 +1,7 @@
-import { type Page, type Locator, expect } from '@playwright/test';
-import { ModelComboboxPage } from './ModelComboboxPage';
-import { NavigationComponent } from './NavigationComponent';
-import { ROUTES } from '@/utils/routes';
+import { type Page, type Locator, expect } from "@playwright/test";
+import { ModelComboboxPage } from "./ModelComboboxPage";
+import { NavigationComponent } from "./NavigationComponent";
+import { ROUTES } from "@/utils/routes";
 
 /**
  * Page Object Model for the main chat interface.
@@ -17,18 +17,20 @@ export class ChatPage {
   readonly errorMessage: Locator;
 
   constructor(public readonly page: Page) {
-    this.chatInput = page.getByTestId('chat-input');
-    this.chatSubmitButton = page.getByTestId('chat-submit');
+    this.chatInput = page.getByTestId("chat-input");
+    this.chatSubmitButton = page.getByTestId("chat-submit");
     this.modelCombobox = new ModelComboboxPage(page);
     this.navigation = new NavigationComponent(page);
-    this.errorMessage = page.getByTestId('error-message');
+    this.errorMessage = page.getByTestId("error-message");
   }
 
-   async exposeTomaticTestGetStore() {
-    await this.page.exposeFunction('tomatic_test_getStore', () => {
-        return (this.page as unknown as { tomatic_test_getStore: () => unknown }).tomatic_test_getStore();
+  async exposeTomaticTestGetStore() {
+    await this.page.exposeFunction("tomatic_test_getStore", () => {
+      return (
+        this.page as unknown as { tomatic_test_getStore: () => unknown }
+      ).tomatic_test_getStore();
     });
-   }
+  }
 
   // --- Actions ---
 
@@ -37,7 +39,6 @@ export class ChatPage {
    */
   async goto() {
     await this.page.goto(ROUTES.chat.new);
-    await this.page.waitForFunction(() => window.sessionReady === true, {}, { timeout: 5000 });
   }
 
   /**
@@ -54,12 +55,11 @@ export class ChatPage {
    * @param messageIndex The index of the message to regenerate.
    */
   async regenerateMessage(messageIndex: number) {
-    const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByTestId('regenerate-button').click();
-
-
+    const messageLocator = this.page.locator(
+      `[data-testid="chat-message-${String(messageIndex)}"]`,
+    );
+    await messageLocator.getByTestId("regenerate-button").click();
   }
-
 
   /**
    * Clicks the edit button for a message, fills the input, and re-submits.
@@ -75,37 +75,40 @@ export class ChatPage {
   // --- Granular Edit Actions ---
 
   getMessageLocator(messageIndex: number): Locator {
-    return this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
+    return this.page.locator(
+      `[data-testid="chat-message-${String(messageIndex)}"]`,
+    );
   }
 
   async startEditingMessage(messageIndex: number) {
     const messageLocator = this.getMessageLocator(messageIndex);
-    await messageLocator.getByTestId('edit-button').click();
+    await messageLocator.getByTestId("edit-button").click();
   }
 
   getEditTextArea(messageIndex: number): Locator {
     const messageLocator = this.getMessageLocator(messageIndex);
-    return messageLocator.getByTestId('edit-textarea');
+    return messageLocator.getByTestId("edit-textarea");
   }
 
   async resubmitEdit(messageIndex: number) {
-      const messageLocator = this.getMessageLocator(messageIndex);
-      await messageLocator.getByTestId('resubmit-button').click();
+    const messageLocator = this.getMessageLocator(messageIndex);
+    await messageLocator.getByTestId("resubmit-button").click();
   }
-
 
   /**
    * Clicks the edit button for a message, then clicks the discard button.
    * @param messageIndex The index of the message to begin editing.
    */
-   async cancelEdit(messageIndex: number, newContent?: string) {
-    const messageLocator = this.page.locator(`[data-testid="chat-message-${String(messageIndex)}"]`);
-    await messageLocator.getByTestId('edit-button').click();
+  async cancelEdit(messageIndex: number, newContent?: string) {
+    const messageLocator = this.page.locator(
+      `[data-testid="chat-message-${String(messageIndex)}"]`,
+    );
+    await messageLocator.getByTestId("edit-button").click();
     if (newContent) {
-      await messageLocator.getByTestId('edit-textarea').fill(newContent);
+      await messageLocator.getByTestId("edit-textarea").fill(newContent);
     }
-    await messageLocator.getByTestId('discard-edit-button').click();
-   }
+    await messageLocator.getByTestId("discard-edit-button").click();
+  }
 
   // --- Assertions ---
 
@@ -116,9 +119,13 @@ export class ChatPage {
    * @param role The role of the message author ('user', 'assistant', or 'system').
    * @param expectedText The text or regex to match against the message content.
    */
-  async expectMessage(messageIndex: number, role: 'user' | 'assistant' | 'system', expectedText: string | RegExp) {
+  async expectMessage(
+    messageIndex: number,
+    role: "user" | "assistant" | "system",
+    expectedText: string | RegExp,
+  ) {
     const messageLocator = this.page.locator(
-      `[data-testid="chat-message-${String(messageIndex)}"][data-role="${role}"] .chat-message-content`
+      `[data-testid="chat-message-${String(messageIndex)}"][data-role="${role}"] .chat-message-content`,
     );
     await expect(messageLocator).toHaveText(expectedText);
   }
@@ -129,6 +136,8 @@ export class ChatPage {
    * @param count The expected number of messages.
    */
   async expectMessageCount(count: number) {
-    await expect(this.page.locator('[data-testid^="chat-message-"]')).toHaveCount(count);
+    await expect(
+      this.page.locator('[data-testid^="chat-message-"]'),
+    ).toHaveCount(count);
   }
 }

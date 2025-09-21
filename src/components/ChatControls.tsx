@@ -1,5 +1,5 @@
-import React from 'react';
-import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
+import React from "react";
+import { useTextAreaEnterHandler } from "@/hooks/useTextAreaEnterHandler";
 
 interface ChatControlsProps {
   input: string;
@@ -22,7 +22,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   apiKey,
   onCancel,
 }) => {
-
+  console.log("[ChatControls] render", { isStreaming, apiKey });
   const handleSend = (): void => {
     if (input.trim() && !isStreaming) {
       onSubmit(input.trim());
@@ -39,11 +39,13 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   return (
     <div className="chat-controls">
       <form onSubmit={handleFormSubmit}>
-        <div style={{ display: 'flex', padding: '4px', gap: '4px' }}>
+        <div style={{ display: "flex", padding: "4px", gap: "4px" }}>
           <textarea
             ref={inputRef}
             value={input}
-            onInput={(e) => { setInput(e.currentTarget.value); }}
+            onInput={(e) => {
+              setInput(e.currentTarget.value);
+            }}
             placeholder="Message"
             onKeyDown={handleKeyDown}
             disabled={isStreaming || !apiKey}

@@ -58,10 +58,10 @@ test.describe('Snippet Editor Validation', () => {
     const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
 
     await editContainer.getByTestId('snippet-prompt-input').fill('this prompt references @nonexistent');
-    
+
     const contentDisplay = editContainer.getByTestId('snippet-content-display');
     await expect(contentDisplay.locator('.error-message')).toHaveText("Warning: Snippet '@nonexistent' not found.");
-    
+
     // Save should still be enabled for warnings
     await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
   });
@@ -78,7 +78,7 @@ test.describe('Snippet Editor Validation', () => {
 
     // 3. Assert that the warning is shown below the content input
     await expect(editContainer.getByTestId('prompt-error-message')).toHaveText("Warning: Snippet '@nonexistent' not found.");
-    
+
     // 4. Save should still be enabled
     await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
   });
@@ -113,7 +113,7 @@ test.describe('Snippet Editor Validation', () => {
 
       // 2. Update 'b's prompt to reference standard snippet 'd', creating a cycle: b (prompt) -> d (content) -> b
       await editContainer.getByTestId('snippet-prompt-input').fill('Generated prompt referencing @d');
-      
+
       // 3. Assert that the cycle error is shown in 'b's editor
       const errorContainer = editContainer.getByTestId('prompt-error-message');
       // The starting point of the cycle detection can vary, so we check for the presence of both snippets.
@@ -134,7 +134,7 @@ test.describe('Snippet Editor Validation', () => {
 
     // The regenerate button should be disabled due to the error.
     await expect(editContainer.getByTestId('snippet-regenerate-button')).toBeDisabled();
-    
+
     // But the save button should be enabled.
     await expect(editContainer.getByTestId('snippet-save-button')).toBeEnabled();
 
@@ -155,7 +155,7 @@ test.describe('Snippet Editor Validation', () => {
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
     chatMocker.mock({
-      request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'A new prompt' }] },
+      request: { model: 'mock-model/mock-model', messages: [{ role: 'user', content: 'A new prompt' }], stream: false },
       response: { role: 'assistant', content: 'A new generated content' },
     });
 
@@ -165,7 +165,7 @@ test.describe('Snippet Editor Validation', () => {
 
     // 2. Change prompt and model
     await settingsPage.fillGeneratedSnippetForm({ prompt: 'A new prompt', modelName: 'Mock Model', modelId: 'mock-model/mock-model' });
-    
+
     // 3. Regenerate
     await editContainer.getByTestId('snippet-regenerate-button').click();
 

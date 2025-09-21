@@ -1,41 +1,44 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import SystemPromptItem from '@/components/SystemPromptItem';
-import SnippetItem from '@/components/SnippetItem';
-import type { Snippet, SystemPrompt } from '@/types/storage';
-import { topologicalSort } from '@/utils/snippetUtils';
+import React, { useState, useEffect, useMemo } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import SystemPromptItem from "@/components/SystemPromptItem";
+import SnippetItem from "@/components/SnippetItem";
+import type { Snippet, SystemPrompt } from "@/types/storage";
+import type { PromptEntity } from "@/store/features/prompts/promptsSlice";
+import { topologicalSort } from "@/utils/snippetUtils";
 import {
   selectSettings,
   setApiKey,
   toggleAutoScroll,
   loadSettings,
   saveSettings,
-} from '@/store/features/settings/settingsSlice';
+} from "@/store/features/settings/settingsSlice";
 import {
   selectPrompts,
   loadPrompts,
-  addPrompt,
-  updatePrompt,
-  deletePrompt,
-} from '@/store/features/prompts/promptsSlice';
+  addPromptRequest,
+  updatePromptRequest,
+  deletePromptRequest,
+} from "@/store/features/prompts/promptsSlice";
 import {
   selectSnippets,
   loadSnippets,
   addSnippet,
   updateSnippet,
   deleteSnippet,
-} from '@/store/features/snippets/snippetsSlice';
+} from "@/store/features/snippets/snippetsSlice";
 
 const SettingsPage: React.FC = () => {
   const dispatch = useDispatch();
 
   // --- Redux State ---
   const { apiKey, autoScrollEnabled, saving } = useSelector(selectSettings);
-  const { prompts: systemPrompts } = useSelector(selectPrompts);
-  const { snippets } = useSelector(selectSnippets);
+  const { prompts: systemPromptsMap } = useSelector(selectPrompts);
+  const { snippets, loading: snippetsLoading } = useSelector(selectSnippets);
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
-  const [isCreatingNewPrompt, setIsCreatingNewPrompt] = useState(false);
+  const [editingPromptName, setEditingPromptName] = useState<string | null>(
+    null,
+  );
   const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
 
   useEffect(() => {
@@ -48,6 +51,16 @@ const SettingsPage: React.FC = () => {
     setLocalApiKey(apiKey);
   }, [apiKey]);
 
+  const systemPromptEntities = useMemo(
+    () => Object.values(systemPromptsMap),
+    [systemPromptsMap],
+  );
+
+  const allPromptsData = useMemo(
+    () => systemPromptEntities.map((entity) => entity.data),
+    [systemPromptEntities],
+  );
+
   const handleSaveApiKey = (): void => {
     dispatch(setApiKey(localApiKey));
     dispatch(saveSettings({}));
@@ -59,28 +72,43 @@ const SettingsPage: React.FC = () => {
   };
 
   // --- Prompt Handlers ---
-  const handleNewPrompt = (): void => { setIsCreatingNewPrompt(true); };
-  const handleCancelNewPrompt = (): void => { setIsCreatingNewPrompt(false); };
-  const handleCreatePrompt = (newPrompt: SystemPrompt): void => {
-    dispatch(addPrompt(newPrompt));
-    setIsCreatingNewPrompt(false);
+  const handleNewPrompt = (): void => {
+    setEditingPromptName("__new__");
   };
-  const handleUpdatePrompt = (oldName: string, updatedPrompt: SystemPrompt): void => {
-    dispatch(updatePrompt({ oldName, prompt: updatedPrompt }));
+  const handleCancelNewPrompt = (): void => {
+    setEditingPromptName(null);
+  };
+  const handleCreatePrompt = (newPrompt: SystemPrompt): void => {
+    dispatch(addPromptRequest(newPrompt));
+    setEditingPromptName(null);
+  };
+  const handleUpdatePrompt = (
+    oldName: string,
+    updatedPrompt: SystemPrompt,
+  ): void => {
+    dispatch(updatePromptRequest({ oldName, prompt: updatedPrompt }));
+    setEditingPromptName(null);
   };
   const handleRemovePrompt = (name: string): void => {
-    dispatch(deletePrompt(name));
+    dispatch(deletePromptRequest(name));
   };
 
   // --- Snippet Handlers ---
-  const handleNewSnippet = (): void => { setIsCreatingNewSnippet(true); };
-  const handleCancelNewSnippet = (): void => { setIsCreatingNewSnippet(false); };
+  const handleNewSnippet = (): void => {
+    setIsCreatingNewSnippet(true);
+  };
+  const handleCancelNewSnippet = (): void => {
+    setIsCreatingNewSnippet(false);
+  };
   const handleCreateSnippet = (newSnippet: Snippet): Promise<void> => {
     dispatch(addSnippet(newSnippet));
     setIsCreatingNewSnippet(false);
     return Promise.resolve();
   };
-  const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet): Promise<void> => {
+  const handleUpdateSnippet = (
+    oldName: string,
+    updatedSnippet: Snippet,
+  ): Promise<void> => {
     dispatch(updateSnippet({ oldName, snippet: updatedSnippet }));
     return Promise.resolve();
   };
@@ -94,21 +122,34 @@ const SettingsPage: React.FC = () => {
     return sorted;
   }, [snippets]);
 
+  if (snippetsLoading === "loading") {
+    return <div className="loading-spinner">Loading...</div>;
+  }
 
   return (
-    <div style={{ marginBottom: '50px' }}>
+    <div style={{ marginBottom: "50px" }}>
       <div className="settings-section">
         <div className="settings-label">OPENROUTER_API_KEY</div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <input
             type="text"
             value={localApiKey}
-            onChange={(e) => { setLocalApiKey(e.currentTarget.value); }}
+            onChange={(e) => {
+              setLocalApiKey(e.currentTarget.value);
+            }}
             placeholder="OPENROUTER_API_KEY"
             style={{ flexGrow: 1 }}
           />
-          <button onClick={handleSaveApiKey} data-role="primary" disabled={saving === 'saving'}>
-            {saving === 'saving' ? 'Saving...' : saving === 'idle' ? 'Save' : 'Saved!'}
+          <button
+            onClick={handleSaveApiKey}
+            data-role="primary"
+            disabled={saving === "saving"}
+          >
+            {saving === "saving"
+              ? "Saving..."
+              : saving === "idle"
+                ? "Save"
+                : "Saved!"}
           </button>
         </div>
       </div>
@@ -134,30 +175,40 @@ const SettingsPage: React.FC = () => {
           data-role="primary"
           data-size="compact"
           onClick={handleNewPrompt}
-          style={{ marginBottom: '20px' }}
-          disabled={isCreatingNewPrompt || isCreatingNewSnippet}
+          style={{ marginBottom: "20px" }}
+          disabled={!!editingPromptName || isCreatingNewSnippet}
         >
           New
         </button>
         <div className="system-prompt-list">
-          {isCreatingNewPrompt && (
-             <SystemPromptItem
-              prompt={{ name: '', prompt: '' }}
+          {editingPromptName === "__new__" && (
+            <SystemPromptItem
+              prompt={{ name: "", prompt: "" }}
+              status="idle"
+              error={null}
               isInitiallyEditing={true}
-              allPrompts={systemPrompts}
-              onUpdate={(prompt) => { handleCreatePrompt(prompt); }}
+              allPrompts={allPromptsData}
+              onUpdate={handleCreatePrompt}
               onRemove={handleCancelNewPrompt}
               onCancel={handleCancelNewPrompt}
             />
           )}
-{systemPrompts.map((prompt: SystemPrompt) => (
+          {systemPromptEntities.map((entity: PromptEntity) => (
             <SystemPromptItem
-              key={prompt.name}
-              prompt={prompt}
-              isInitiallyEditing={false}
-              allPrompts={systemPrompts}
-              onUpdate={(updatedPrompt) => { handleUpdatePrompt(prompt.name, updatedPrompt); }}
-              onRemove={() => { handleRemovePrompt(prompt.name); }}
+              key={entity.data.name}
+              prompt={entity.data}
+              status={entity.status}
+              error={entity.error ?? null}
+              isInitiallyEditing={editingPromptName === entity.data.name}
+              allPrompts={allPromptsData}
+              onUpdate={(updatedPrompt) =>
+                handleUpdatePrompt(entity.data.name, updatedPrompt)
+              }
+              onRemove={() => {
+                handleRemovePrompt(entity.data.name);
+              }}
+              onEdit={() => setEditingPromptName(entity.data.name)}
+              onCancel={() => setEditingPromptName(null)}
             />
           ))}
         </div>
@@ -169,17 +220,27 @@ const SettingsPage: React.FC = () => {
           data-role="primary"
           data-size="compact"
           onClick={handleNewSnippet}
-          style={{ marginBottom: '20px' }}
-          disabled={isCreatingNewSnippet || isCreatingNewPrompt}
+          style={{ marginBottom: "20px" }}
+          disabled={isCreatingNewSnippet || !!editingPromptName}
         >
           New Snippet
         </button>
         <div className="snippet-list">
           {isCreatingNewSnippet && (
             <SnippetItem
-              snippet={{ name: '', content: '', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }}
+              snippet={{
+                name: "",
+                content: "",
+                isGenerated: false,
+                createdAt_ms: 0,
+                updatedAt_ms: 0,
+                generationError: null,
+                isDirty: false,
+              }}
               isInitiallyEditing={true}
-              onUpdate={(_oldName, updatedSnippet) => handleCreateSnippet(updatedSnippet)}
+              onUpdate={(_oldName, updatedSnippet) =>
+                handleCreateSnippet(updatedSnippet)
+              }
               onRemove={() => {
                 handleCancelNewSnippet();
                 return Promise.resolve();
@@ -192,7 +253,9 @@ const SettingsPage: React.FC = () => {
               key={snippet.name}
               snippet={snippet}
               isInitiallyEditing={false}
-              onUpdate={(_oldName, updatedSnippet) => handleUpdateSnippet(snippet.name, updatedSnippet)}
+              onUpdate={(_oldName, updatedSnippet) =>
+                handleUpdateSnippet(snippet.name, updatedSnippet)
+              }
               onRemove={() => handleRemoveSnippet(snippet.name)}
             />
           ))}

@@ -1,117 +1,60 @@
-// This service will contain the core logic for processing and submitting chat messages.
-// It will be invoked by the chatSubmissionMachine.
+// This service contains the core logic for making API requests for chat completions.
+// It is invoked by sagas, which are responsible for assembling the request payload.
 
-import { Message } from '@/types/chat';
-import { requestMessageContent } from '@/api/openrouter';
-import { resolveSnippets } from '@/utils/snippetUtils';
-import { Snippet, SystemPrompt } from '@/types/storage';
-import { v4 as uuidv4 } from 'uuid';
+import type { Stream } from "openai/streaming";
+import type OpenAI from "openai";
+import { Message } from "@/types/chat";
+import { requestMessageContentStream } from "@/api/openrouter";
 
 export type StreamChatResponseOutput = {
-    finalMessages: Message[];
-    assistantResponse: string;
+  finalMessages: Message[];
+  assistantResponse: string;
 };
 
-export type StreamChatResponseInput = {
-    messages: Message[];
-    modelName: string;
-    apiKey: string;
-    snippets: Snippet[];
-    systemPrompts: SystemPrompt[];
-    selectedPromptName: string | null;
-    prompt: string;
-    isRegeneration?: boolean;
+export type StreamChatInput = {
+  messagesToSubmit: Message[];
+  modelName: string;
+  apiKey: string;
 };
 
-const getCurrentSystemPrompt = (systemPrompts: SystemPrompt[], name: string | null): SystemPrompt | null => {
-    if (!name) return null;
-    return systemPrompts.find((p) => p.name === name) || null;
-}
+/**
+ * Initiates a streaming chat request and returns the raw stream iterator.
+ * This is the preferred method for real-time UI updates, allowing the UI
+ * to display the assistant's response as it's being generated.
+ */
+export const streamChat = async ({
+  messagesToSubmit,
+  modelName,
+  apiKey,
+}: StreamChatInput): Promise<
+  Stream<OpenAI.Chat.Completions.ChatCompletionChunk>
+> => {
+  return requestMessageContentStream(messagesToSubmit, modelName, apiKey);
+};
 
-// A simplified version of the original submitMessage logic
+/**
+ * @deprecated This function consumes the entire stream and returns only the final,
+ * complete response. It prevents real-time UI updates. Use `streamChat` instead
+ * to get the raw stream.
+ */
 export const streamChatResponse = async ({
-    messages,
+  messagesToSubmit,
+  modelName,
+  apiKey,
+}: StreamChatInput): Promise<StreamChatResponseOutput> => {
+  const streamCompletion = await streamChat({
+    messagesToSubmit,
     modelName,
     apiKey,
-    snippets,
-    systemPrompts,
-    selectedPromptName,
-    prompt,
-    isRegeneration,
-}: StreamChatResponseInput): Promise<StreamChatResponseOutput> => {
+  });
 
-    const processedContent = resolveSnippets(prompt, snippets);
+  let assistantResponse = "";
+  for await (const chunk of streamCompletion) {
+    assistantResponse += chunk.choices[0]?.delta?.content || "";
+  }
 
-    let messagesToSubmit = [...messages];
-
-    // Add system prompt if it's the start of a new chat
-    const systemPrompt = getCurrentSystemPrompt(systemPrompts, selectedPromptName);
-    if (messages.length === 0 && systemPrompt) {
-        const resolvedContent = resolveSnippets(systemPrompt.prompt, snippets);
-        messagesToSubmit.push({
-            id: 'system-prompt', // A temporary ID
-            role: 'system',
-            content: resolvedContent,
-            raw_content: systemPrompt.prompt,
-            prompt_name: systemPrompt.name,
-            model_name: null, cost: null
-        });
-    }
-
-    let finalMessagesToSubmit: Message[];
-
-    if (isRegeneration) {
-        messagesToSubmit = messages.filter(m => m.role !== 'assistant');
-
-        // Re-resolve snippets for system and user messages
-        messagesToSubmit = messagesToSubmit.map(message => {
-            if ((message.role === 'system' || message.role === 'user') && message.raw_content) {
-                const resolvedContent = resolveSnippets(message.raw_content, snippets);
-                return {
-                    ...message,
-                    content: resolvedContent,
-                };
-            }
-            return message;
-        });
-
-        if (prompt) { // Only modify if a new prompt is provided (i.e. for editing)
-            const lastUserMessageIndex = messagesToSubmit.map(m => m.role).lastIndexOf('user');
-            if (lastUserMessageIndex !== -1) {
-                const updatedMessages = [...messagesToSubmit];
-                const originalMessage = updatedMessages[lastUserMessageIndex];
-                if (originalMessage) {
-                    updatedMessages[lastUserMessageIndex] = {
-                        ...originalMessage,
-                        content: processedContent,
-                        raw_content: prompt,
-                    };
-                }
-                messagesToSubmit = updatedMessages;
-            }
-        }
-        finalMessagesToSubmit = messagesToSubmit;
-    } else {
-        messagesToSubmit.push({
-            id: uuidv4(), // A temporary ID
-            role: 'user',
-            content: processedContent,
-            raw_content: prompt,
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-        });
-        finalMessagesToSubmit = messagesToSubmit;
-    }
-
-    const assistantResponse = await requestMessageContent(
-        finalMessagesToSubmit,
-        modelName,
-        apiKey
-    );
-
-    return {
-        finalMessages: finalMessagesToSubmit,
-        assistantResponse,
-    };
+  return {
+    finalMessages: messagesToSubmit,
+    assistantResponse,
+  };
 };

@@ -1,25 +1,28 @@
-import { call, put, takeLatest, all } from 'redux-saga/effects';
-import { PayloadAction } from '@reduxjs/toolkit';
-import { SystemPrompt } from '@/types/storage';
-import * as db from '@/services/db/system-prompts';
+import { call, put, takeLatest, all } from "redux-saga/effects";
+import { PayloadAction } from "@reduxjs/toolkit";
+import { SystemPrompt } from "@/types/storage";
+import * as db from "@/services/persistence";
 import {
   loadPrompts,
   loadPromptsSuccess,
   loadPromptsFailure,
-  addPrompt,
+  addPromptRequest,
   addPromptSuccess,
-  updatePrompt,
+  addPromptFailure,
+  updatePromptRequest,
   updatePromptSuccess,
-  deletePrompt,
+  updatePromptFailure,
+  deletePromptRequest,
   deletePromptSuccess,
-} from './promptsSlice';
+  deletePromptFailure,
+} from "./promptsSlice";
 
 function* loadPromptsSaga() {
   try {
     const prompts: SystemPrompt[] = yield call(db.loadAllSystemPrompts);
     yield put(loadPromptsSuccess(prompts));
-  } catch (_error) {
-    yield put(loadPromptsFailure('Failed to load prompts.'));
+  } catch {
+    yield put(loadPromptsFailure("Failed to load prompts."));
   }
 }
 
@@ -27,39 +30,46 @@ function* addPromptSaga(action: PayloadAction<SystemPrompt>) {
   try {
     yield call(db.saveSystemPrompt, action.payload);
     yield put(addPromptSuccess(action.payload));
-  } catch (error) {
-    // In a real app, you'd dispatch a failure action
-    console.error('Failed to add prompt', error);
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    yield put(addPromptFailure({ name: action.payload.name, error }));
   }
 }
 
-function* updatePromptSaga(action: PayloadAction<{ oldName: string; prompt: SystemPrompt }>) {
+function* updatePromptSaga(
+  action: PayloadAction<{ oldName: string; prompt: SystemPrompt }>,
+) {
+  const { oldName, prompt } = action.payload;
   try {
-    const { oldName, prompt } = action.payload;
+    // If the name is changing, we need to delete the old one first.
     if (oldName !== prompt.name) {
       yield call(db.deleteSystemPrompt, oldName);
     }
     yield call(db.saveSystemPrompt, prompt);
-    yield put(updatePromptSuccess(prompt));
-  } catch (error) {
-    console.error('Failed to update prompt', error);
+    yield put(updatePromptSuccess({ oldName, prompt: prompt }));
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    // We pass the oldName so the reducer can find which prompt failed.
+    yield put(updatePromptFailure({ name: oldName, error }));
   }
 }
 
 function* deletePromptSaga(action: PayloadAction<string>) {
+  const name = action.payload;
   try {
-    yield call(db.deleteSystemPrompt, action.payload);
-    yield put(deletePromptSuccess(action.payload));
-  } catch (error) {
-    console.error('Failed to delete prompt', error);
+    yield call(db.deleteSystemPrompt, name);
+    yield put(deletePromptSuccess(name));
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    yield put(deletePromptFailure({ name, error }));
   }
 }
 
 export function* promptsSaga() {
   yield all([
     takeLatest(loadPrompts.type, loadPromptsSaga),
-    takeLatest(addPrompt.type, addPromptSaga),
-    takeLatest(updatePrompt.type, updatePromptSaga),
-    takeLatest(deletePrompt.type, deletePromptSaga),
+    takeLatest(addPromptRequest.type, addPromptSaga),
+    takeLatest(updatePromptRequest.type, updatePromptSaga),
+    takeLatest(deletePromptRequest.type, deletePromptSaga),
   ]);
 }

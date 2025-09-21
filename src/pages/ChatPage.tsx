@@ -1,13 +1,19 @@
-import React, { useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import ChatHeader from '@/components/ChatHeader';
-import ChatInterface from '@/components/ChatInterface';
-import SystemPromptBar from '@/components/SystemPromptBar';
-import { SystemPrompt } from '@/types/storage';
-import { selectSettings, setSelectedPromptName } from '@/store/features/settings/settingsSlice';
-import { selectPrompts } from '@/store/features/prompts/promptsSlice';
-import { selectSession, loadSession } from '@/store/features/session/sessionSlice';
+import React, { useEffect, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import ChatHeader from "@/components/ChatHeader";
+import ChatInterface from "@/components/ChatInterface";
+import SystemPromptBar from "@/components/SystemPromptBar";
+import { SystemPrompt } from "@/types/storage";
+import {
+  selectSettings,
+  setSelectedPromptName,
+} from "@/store/features/settings/settingsSlice";
+import { selectPrompts } from "@/store/features/prompts/promptsSlice";
+import {
+  selectSession,
+  loadSession,
+} from "@/store/features/session/sessionSlice";
 
 const ChatPage: React.FC = () => {
   const { id: sessionIdFromUrl } = useParams<{ id: string }>();
@@ -16,19 +22,22 @@ const ChatPage: React.FC = () => {
 
   // --- Redux State ---
   const { selectedPromptName } = useSelector(selectSettings);
-  const { prompts: systemPrompts } = useSelector(selectPrompts);
+  const { prompts: systemPromptsMap } = useSelector(selectPrompts);
   const { prevSessionId, nextSessionId, error } = useSelector(selectSession);
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
-    return systemPrompts.find(p => p.name === selectedPromptName);
-  }, [systemPrompts, selectedPromptName]);
+    if (!selectedPromptName) return undefined;
+    const entity = Object.values(systemPromptsMap).find(
+      (p) => p.data.name === selectedPromptName,
+    );
+    return entity?.data;
+  }, [systemPromptsMap, selectedPromptName]);
 
   useEffect(() => {
     if (sessionIdFromUrl) {
       dispatch(loadSession(sessionIdFromUrl));
     }
   }, [sessionIdFromUrl, dispatch]);
-
 
   const canGoPrev = !!prevSessionId;
   const canGoNext = !!nextSessionId;
@@ -45,14 +54,14 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  const handleSelectPrompt = (name: string | null): void => {
-    dispatch(setSelectedPromptName(name));
-  };
+  const systemPromptEntities = useMemo(
+    () => Object.values(systemPromptsMap),
+    [systemPromptsMap],
+  );
 
   const handleErrorClear = (): void => {
     // This will be handled by the session slice later
   };
-
 
   return (
     <>
@@ -63,9 +72,9 @@ const ChatPage: React.FC = () => {
         onNext={onNext}
       >
         <SystemPromptBar
-          systemPrompts={systemPrompts}
+          systemPrompts={systemPromptEntities}
           selectedPromptName={selectedPromptName}
-          onSelectPrompt={handleSelectPrompt}
+          onSelectPrompt={(name) => dispatch(setSelectedPromptName(name))}
         />
       </ChatHeader>
       {error && (

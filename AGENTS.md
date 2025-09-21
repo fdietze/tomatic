@@ -52,7 +52,7 @@ run the tests (fix linting if necessary) and see them failing. after each run of
 - what are the current hypotheses of the tests failing? Explain the hypotheses with log traces.
 - are we able to catch those problems with more future-proof unit tests?
 - where and which logging must we add to confirm or refute these hypotheses
-- add logging to trace the whole flow from start to finish
+- add logging to trace the whole flow from start to finish. always raw use console.log calls - never console.error.
 - which logs should we remove to reduce noise?
 - run the tests again
 - don't fix anything yet
