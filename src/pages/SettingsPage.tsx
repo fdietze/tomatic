@@ -1,78 +1,96 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSelector } from '@xstate/react';
+import { useSelector, useDispatch } from 'react-redux';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import SnippetItem from '@/components/SnippetItem';
 import type { Snippet, SystemPrompt } from '@/types/storage';
 import { topologicalSort } from '@/utils/snippetUtils';
-import { useGlobalState } from '@/context/GlobalStateContext';
-import { SnippetsSnapshot } from '@/machines/snippetsMachine';
+import {
+  selectSettings,
+  setApiKey,
+  toggleAutoScroll,
+  loadSettings,
+  saveSettings,
+} from '@/store/features/settings/settingsSlice';
+import {
+  selectPrompts,
+  loadPrompts,
+  addPrompt,
+  updatePrompt,
+  deletePrompt,
+} from '@/store/features/prompts/promptsSlice';
+import {
+  selectSnippets,
+  loadSnippets,
+  addSnippet,
+  updateSnippet,
+  deleteSnippet,
+} from '@/store/features/snippets/snippetsSlice';
 
 const SettingsPage: React.FC = () => {
-    const { settingsActor, promptsActor, snippetsActor } = useGlobalState();
+  const dispatch = useDispatch();
 
-    const apiKey = useSelector(settingsActor, (state) => state.context.apiKey);
-    const autoScrollEnabled = useSelector(settingsActor, (state) => state.context.autoScrollEnabled);
-    const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
-    const snippets = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.snippets);
+  // --- Redux State ---
+  const { apiKey, autoScrollEnabled, saving } = useSelector(selectSettings);
+  const { prompts: systemPrompts } = useSelector(selectPrompts);
+  const { snippets } = useSelector(selectSnippets);
 
-    const [localApiKey, setLocalApiKey] = useState(apiKey);
-    const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
-    const [isCreatingNewPrompt, setIsCreatingNewPrompt] = useState(false);
-    const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
+  const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [isCreatingNewPrompt, setIsCreatingNewPrompt] = useState(false);
+  const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
+
+  useEffect(() => {
+    dispatch(loadSettings());
+    dispatch(loadPrompts());
+    dispatch(loadSnippets());
+  }, [dispatch]);
 
   useEffect(() => {
     setLocalApiKey(apiKey);
   }, [apiKey]);
 
   const handleSaveApiKey = (): void => {
-    settingsActor.send({ type: 'SET_API_KEY', key: localApiKey });
-    setSaveStatus('saved');
-    setTimeout(() => { setSaveStatus('idle'); }, 2000);
+    dispatch(setApiKey(localApiKey));
+    dispatch(saveSettings({}));
+  };
+
+  const handleToggleAutoScroll = (): void => {
+    dispatch(toggleAutoScroll());
+    dispatch(saveSettings({}));
   };
 
   // --- Prompt Handlers ---
   const handleNewPrompt = (): void => { setIsCreatingNewPrompt(true); };
   const handleCancelNewPrompt = (): void => { setIsCreatingNewPrompt(false); };
   const handleCreatePrompt = (newPrompt: SystemPrompt): void => {
-    promptsActor.send({ type: 'ADD', prompt: newPrompt });
+    dispatch(addPrompt(newPrompt));
     setIsCreatingNewPrompt(false);
   };
   const handleUpdatePrompt = (oldName: string, updatedPrompt: SystemPrompt): void => {
-    promptsActor.send({ type: 'UPDATE', oldName, prompt: updatedPrompt });
+    dispatch(updatePrompt({ oldName, prompt: updatedPrompt }));
   };
   const handleRemovePrompt = (name: string): void => {
-    promptsActor.send({ type: 'DELETE', name });
+    dispatch(deletePrompt(name));
   };
 
   // --- Snippet Handlers ---
   const handleNewSnippet = (): void => { setIsCreatingNewSnippet(true); };
   const handleCancelNewSnippet = (): void => { setIsCreatingNewSnippet(false); };
   const handleCreateSnippet = (newSnippet: Snippet): Promise<void> => {
-    snippetsActor.send({ type: 'ADD', snippet: newSnippet });
+    dispatch(addSnippet(newSnippet));
     setIsCreatingNewSnippet(false);
-    return Promise.resolve(); // Keep signature for SnippetItem
+    return Promise.resolve();
   };
   const handleUpdateSnippet = (oldName: string, updatedSnippet: Snippet): Promise<void> => {
-    snippetsActor.send({ 
-        type: 'UPDATE', 
-        oldName, 
-        snippet: updatedSnippet,
-    });
+    dispatch(updateSnippet({ oldName, snippet: updatedSnippet }));
     return Promise.resolve();
   };
   const handleRemoveSnippet = (name: string): Promise<void> => {
-    snippetsActor.send({ type: 'DELETE', name });
+    dispatch(deleteSnippet(name));
     return Promise.resolve();
   };
 
   const sortedSnippets = useMemo(() => {
-    const { sorted, cyclic } = topologicalSort(snippets);
-
-    if (cyclic.length > 0) {
-      console.warn('[SettingsPage] Cycle detected in snippets, falling back to alphabetical sort for all items.');
-      return [...snippets].sort((a, b) => a.name.localeCompare(b.name));
-    }
-
+    const { sorted } = topologicalSort(snippets);
     return sorted;
   }, [snippets]);
 
@@ -89,8 +107,8 @@ const SettingsPage: React.FC = () => {
             placeholder="OPENROUTER_API_KEY"
             style={{ flexGrow: 1 }}
           />
-          <button onClick={handleSaveApiKey} data-role="primary" disabled={saveStatus === 'saved'}>
-            {saveStatus === 'saved' ? 'Saved!' : 'Save'}
+          <button onClick={handleSaveApiKey} data-role="primary" disabled={saving === 'saving'}>
+            {saving === 'saving' ? 'Saving...' : saving === 'idle' ? 'Save' : 'Saved!'}
           </button>
         </div>
       </div>
@@ -102,7 +120,7 @@ const SettingsPage: React.FC = () => {
               type="checkbox"
               id="auto-scroll-checkbox"
               checked={autoScrollEnabled}
-              onChange={() => { settingsActor.send({ type: 'TOGGLE_AUTO_SCROLL' }); }}
+              onChange={handleToggleAutoScroll}
             />
             <span className="checkbox-custom"></span>
             Auto-scroll to bottom
@@ -161,7 +179,6 @@ const SettingsPage: React.FC = () => {
             <SnippetItem
               snippet={{ name: '', content: '', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false }}
               isInitiallyEditing={true}
-              allSnippets={snippets}
               onUpdate={(_oldName, updatedSnippet) => handleCreateSnippet(updatedSnippet)}
               onRemove={() => {
                 handleCancelNewSnippet();
@@ -175,7 +192,6 @@ const SettingsPage: React.FC = () => {
               key={snippet.name}
               snippet={snippet}
               isInitiallyEditing={false}
-              allSnippets={snippets}
               onUpdate={(_oldName, updatedSnippet) => handleUpdateSnippet(snippet.name, updatedSnippet)}
               onRemove={() => handleRemoveSnippet(snippet.name)}
             />

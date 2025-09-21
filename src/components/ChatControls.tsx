@@ -1,6 +1,5 @@
 import React from 'react';
 import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
-import { useGlobalState } from '@/context/GlobalStateContext';
 
 interface ChatControlsProps {
   input: string;
@@ -10,6 +9,7 @@ interface ChatControlsProps {
   isMobile: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   apiKey: string;
+  onCancel: () => void;
 }
 
 const ChatControls: React.FC<ChatControlsProps> = ({
@@ -20,17 +20,13 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   isMobile,
   inputRef,
   apiKey,
+  onCancel,
 }) => {
-  const { sessionActor } = useGlobalState();
 
   const handleSend = (): void => {
     if (input.trim() && !isStreaming) {
       onSubmit(input.trim());
     }
-  };
-
-  const handleCancel = (): void => {
-    sessionActor.send({ type: 'CANCEL' });
   };
 
   const handleFormSubmit = (e: React.FormEvent): void => {
@@ -58,7 +54,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
               type="button"
               data-role="destructive"
               style={{ flexShrink: 0 }}
-              onClick={handleCancel}
+              onClick={onCancel}
             >
               <span className="spinner" />
               Cancel

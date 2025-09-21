@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,20 +9,20 @@ import {
 } from 'react-router-dom';
 import ChatPage from '@/pages/ChatPage';
 import SettingsPage from '@/pages/SettingsPage';
-import { useSelector,  } from '@xstate/react';
+import { useSelector } from 'react-redux';
 import { ROUTES } from '@/utils/routes';
-import { GlobalStateContext } from '@/context/GlobalStateContext';
-import { SessionSnapshot } from './machines/sessionMachine';
-import { SnippetsSnapshot } from './machines/snippetsMachine';
-import { SettingsSnapshot } from './machines/settingsMachine';
+import { selectSession } from '@/store/features/session/sessionSlice';
+import { selectSnippets } from '@/store/features/snippets/snippetsSlice';
+import { selectSettings } from './store/features/settings/settingsSlice';
+import { selectPrompts } from './store/features/prompts/promptsSlice';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { sessionActor, snippetsActor } = useContext(GlobalStateContext);
+  const { currentSessionId } = useSelector(selectSession);
+  const { regenerationStatus } = useSelector(selectSnippets);
 
-  const currentSessionId = useSelector(sessionActor, (state: SessionSnapshot) => state.context.currentSessionId);
-  const isRegenerating = useSelector(snippetsActor, (state: SnippetsSnapshot) => state.context.regeneratingSnippetNames.length > 0);
+  const isRegenerating = Object.values(regenerationStatus).some(s => s === 'in_progress');
 
   const onChat = (): void => {
     if (currentSessionId) {
@@ -72,8 +72,11 @@ const AppContent: React.FC = () => {
 
 
 export const App: React.FC = () => {
-  const { settingsActor } = useContext(GlobalStateContext);
-  const isInitializing = useSelector(settingsActor, (state: SettingsSnapshot) => state.context.isInitializing);
+  const { loading: settingsLoading } = useSelector(selectSettings);
+  const { loading: promptsLoading } = useSelector(selectPrompts);
+  const { loading: snippetsLoading } = useSelector(selectSnippets);
+
+  const isInitializing = settingsLoading === 'loading' || promptsLoading === 'loading' || snippetsLoading === 'loading';
 
   if (isInitializing) {
     return <div className="loading-spinner">Loading...</div>;

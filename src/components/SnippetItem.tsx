@@ -1,20 +1,19 @@
-import React, { useState, useRef, useEffect, useMemo, useContext, useCallback } from 'react';
-import type { Snippet, SystemPrompt } from '@/types/storage';
-import { useSelector } from '@xstate/react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import type { Snippet } from '@/types/storage';
+import { useSelector, useDispatch } from 'react-redux';
 import { DisplayModelInfo } from '@/types/storage';
 import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
-import { GlobalStateContext } from '@/context/GlobalStateContext';
-import { ModelsSnapshot } from '@/machines/modelsMachine';
-import { SnippetsSnapshot } from '@/machines/snippetsMachine';
-import { SettingsSnapshot, SettingsContext } from '@/machines/settingsMachine';
+import { selectModels } from '@/store/features/models/modelsSlice';
+import { selectSettings } from '@/store/features/settings/settingsSlice';
+import { selectPrompts } from '@/store/features/prompts/promptsSlice';
+import { selectSnippets, updateSnippet, deleteSnippet, setRegenerationStatus } from '@/store/features/snippets/snippetsSlice';
 
 interface SnippetItemProps {
   snippet: Snippet;
   isInitiallyEditing: boolean;
-  allSnippets: Snippet[]; // This will come from a selector
-  onUpdate: (oldName: string, updatedSnippet: Snippet, settings: SettingsContext, systemPrompts: SystemPrompt[]) => Promise<void>;
+  onUpdate: (oldName: string, updatedSnippet: Snippet) => Promise<void>;
   onRemove: () => Promise<void>;
   onCancel?: () => void;
 }
@@ -24,36 +23,15 @@ const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const SnippetItem: React.FC<SnippetItemProps> = ({
   snippet,
   isInitiallyEditing,
-  allSnippets,
-  onUpdate,
-  onRemove,
   onCancel,
 }) => {
-    const { modelsActor, snippetsActor, settingsActor, promptsActor } = useContext(GlobalStateContext);
-    const cachedModels = useSelector(modelsActor, (state: ModelsSnapshot) => state.context.cachedModels);
-    const settings = useSelector(settingsActor, (state: SettingsSnapshot) => state.context);
-    const systemPrompts = useSelector(promptsActor, (state) => state.context.systemPrompts);
-    const defaultModelName = settings.modelName;
+    const dispatch = useDispatch();
+    const { models: cachedModels } = useSelector(selectModels);
+    const { modelName: defaultModelName } = useSelector(selectSettings);
+    useSelector(selectPrompts);
+    const { snippets: allSnippets, regenerationStatus } = useSelector(selectSnippets);
     
-    const isActuallyRegenerating = useSelector(
-        snippetsActor,
-        useCallback(
-            (state: SnippetsSnapshot) => {
-                const active = state.context.regeneratingSnippetNames.includes(snippet.name);
-                // Debug aid for spinner visibility issues
-                // eslint-disable-next-line no-console
-                console.log('[DEBUG] SnippetItem useSelector', {
-                    snippetName: snippet.name,
-                    machineState: state.value,
-                    regeneratingNames: state.context.regeneratingSnippetNames,
-                    isActuallyRegenerating: active,
-                    isDirty: snippet.isDirty,
-                });
-                return active;
-            },
-            [snippet.name]
-        )
-    );
+    const isActuallyRegenerating = regenerationStatus[snippet.name] === 'in_progress';
     const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
 
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
@@ -70,7 +48,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     return cachedModels.map((model: DisplayModelInfo) => ({
       id: model.id,
       display_text: model.name,
-      model_info: model,
     }));
   }, [cachedModels]);
 
@@ -84,7 +61,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     const errors: string[] = [];
     const textToScan = editingIsGenerated ? editingPrompt : editingContent;
 
-    // We need a complete and up-to-date list of snippets for validation.
     const otherSnippets = allSnippets.filter(s => s.name !== snippet.name);
     const currentSnippetForValidation = {
       ...snippet,
@@ -96,14 +72,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     };
     const snippetsForValidation = [...otherSnippets, currentSnippetForValidation];
 
-    // 1. Check for cyclical dependencies (hard error).
     try {
       validateSnippetDependencies(textToScan, snippetsForValidation);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : 'An unknown cycle was detected.');
     }
     
-    // 2. Check for non-existent snippets (warning).
     const missingSnippets = findNonExistentSnippets(textToScan, snippetsForValidation);
     if(missingSnippets.length > 0) {
       for (const missing of missingSnippets) {
@@ -159,15 +133,14 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       model: editingModel,
     };
 
-    await onUpdate(snippet.name, snippetForSave, settings, systemPrompts);
+    dispatch(updateSnippet({ oldName: snippet.name, snippet: snippetForSave }));
 
     setIsEditing(false);
     setNameError(null);
   };
 
   const generateAndSetContent = (): void => {
-    // This function will need to be refactored to send an event to the snippetsActor
-    console.warn("generateAndSetContent is not yet refactored for XState");
+    dispatch(setRegenerationStatus({ name: snippet.name, status: 'in_progress' }));
   };
 
   const handleCancelEditing = (): void => {
@@ -186,7 +159,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
   if (isEditing) {
     return (
-      <div className="system-prompt-item-edit" data-testid={`snippet-item-edit-${snippet.name || 'new'}`}> {/* Re-using style for now */}
+      <div className="system-prompt-item-edit" data-testid={`snippet-item-edit-${snippet.name || 'new'}`}>
         <div className="system-prompt-inputs">
           <input
             ref={nameInputRef}
@@ -309,7 +282,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
               Edit
             </button>
             <button
-              onClick={() => { void onRemove(); }}
+              onClick={() => { dispatch(deleteSnippet(snippet.name)); }}
               data-size="compact"
               data-testid="snippet-delete-button"
               disabled={isActuallyRegenerating}
