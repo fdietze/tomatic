@@ -1,5 +1,5 @@
-import { call, put, takeLatest, all, select, take } from "redux-saga/effects";
-import { eventChannel, END, EventChannel } from "redux-saga";
+import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
+import { END, eventChannel, EventChannel } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";
 import type { Stream } from "openai/streaming";
@@ -10,14 +10,14 @@ import { streamChat, StreamChatInput } from "@/services/chatService";
 import { RootState } from "../../store";
 
 import {
-  loadSession,
-  loadSessionSuccess,
-  loadSessionFailure,
-  submitUserMessage,
-  submitUserMessageSuccess,
-  submitUserMessageFailure,
   addAssistantMessagePlaceholder,
   appendChunkToLatestMessage,
+  loadSession,
+  loadSessionFailure,
+  loadSessionSuccess,
+  submitUserMessage,
+  submitUserMessageFailure,
+  submitUserMessageSuccess,
 } from "./sessionSlice";
 
 // --- Worker Sagas ---
@@ -88,15 +88,16 @@ function createChatStreamChannel(
 }
 
 function* submitUserMessageSaga(
-  _action: PayloadAction<{
+  action: PayloadAction<{
     prompt: string;
     isRegeneration: boolean;
     editMessageIndex?: number;
   }>,
 ) {
   try {
+    const { isRegeneration } = action.payload;
     // --- 1. Get state and prepare for API call ---
-    const { settings, session }: RootState = yield select(
+    const { settings, session, prompts }: RootState = yield select(
       (state: RootState) => state,
     );
 
@@ -104,12 +105,36 @@ function* submitUserMessageSaga(
       throw new Error("OpenRouter API key is not set.");
     }
 
-    // The `submitUserMessage` reducer has already updated the messages array.
-    const messagesToSubmit: Message[] = session.messages;
+    // Base messages are from the current session state.
+    let messagesToSubmit: Message[] = [...session.messages];
+
+    // For regenerations, we need to ensure we're using the LATEST system prompt
+    // from the prompts store, not the one that was snapshotted in the message history.
+    if (isRegeneration) {
+      const systemMessage = messagesToSubmit.find(
+        (msg) => msg.role === "system",
+      );
+      if (systemMessage?.prompt_name && prompts?.prompts) {
+        const latestPromptEntity = prompts.prompts[systemMessage.prompt_name];
+
+        if (
+          latestPromptEntity &&
+          latestPromptEntity.data.prompt !== systemMessage.content
+        ) {
+          const latestPrompt = latestPromptEntity.data;
+          // Replace the stale system message with an updated one.
+          messagesToSubmit = messagesToSubmit.map((msg) =>
+            msg.id === systemMessage.id
+              ? { ...systemMessage, content: latestPrompt.prompt }
+              : msg,
+          );
+        }
+      }
+    }
 
     yield put(addAssistantMessagePlaceholder());
 
-    // --- 2. Create the event channel ---\
+    // --- 2. Create the event channel ---
     const channel: EventChannel<ChatStreamEvent> = yield call(
       createChatStreamChannel,
       {

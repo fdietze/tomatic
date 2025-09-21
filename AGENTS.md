@@ -48,7 +48,7 @@
 # Debugging Protocol
 Follow this process by creating a plan for it:
 State that you are "Entering the debugging protocol."
-run the tests (fix linting if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
+run the tests (fix type-errors if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
 - what are the current hypotheses of the tests failing? Explain the hypotheses with log traces.
 - are we able to catch those problems with more future-proof unit tests?
 - where and which logging must we add to confirm or refute these hypotheses
