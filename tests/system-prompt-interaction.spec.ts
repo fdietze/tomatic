@@ -3,6 +3,7 @@ import type { SystemPrompt } from "@/types/storage";
 import { DBV3_ChatSession } from "@/types/storage";
 import { ChatCompletionMocker } from "./test-helpers";
 import { ChatPage } from "./pom/ChatPage";
+import { SettingsPage } from "./pom/SettingsPage";
 import {
   mockGlobalApis,
   OPENROUTER_API_KEY,
@@ -15,14 +16,15 @@ test.describe("System Prompt Interaction", () => {
   test.beforeEach(async ({ context }) => {
     await mockGlobalApis(context);
   });
+
   test("uses the updated system prompt when regenerating a response", async ({
     context,
     page,
   }) => {
     // Purpose: This test verifies that when regenerating an assistant's response, the system
-    // uses the most up-to-date version of the active system prompt. Even though the originally
-    // displayed system prompt message in the chat remains for historical accuracy, the API
-    // request for regeneration must include the edited prompt content.
+    // uses the most up-to-date version of the active system prompt. The test simulates a user
+    // editing a prompt in settings and then returning to a chat to regenerate a response.
+
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: "Chef", prompt: "You are a master chef." },
@@ -53,6 +55,7 @@ test.describe("System Prompt Interaction", () => {
           id: "msg3",
           role: "assistant",
           content: "Hello there!",
+          // Note: The model here is historical. The regeneration will use the current app setting.
           model_name: "openai/gpt-4o",
           prompt_name: null,
           cost: null,
@@ -68,6 +71,7 @@ test.describe("System Prompt Interaction", () => {
     await seedLocalStorage(context, {
       state: {
         apiKey: OPENROUTER_API_KEY,
+        // This is the model the app will use for the regeneration request.
         modelName: "google/gemini-2.5-pro",
         cachedModels: [],
         input: "",
@@ -84,25 +88,31 @@ test.describe("System Prompt Interaction", () => {
     await chatMocker.setup();
 
     // 3. Navigate and create POMs
-    await page.goto(ROUTES.chat.session(SESSION_WITH_PROMPT.session_id));
     const chatPage = new ChatPage(page);
+    const settingsPage = new SettingsPage(page);
+    await page.goto(ROUTES.chat.session(SESSION_WITH_PROMPT.session_id));
 
     // 4. Verify initial state
     await chatPage.expectMessage(0, "system", /You are a master chef/);
 
-    // 5. Update the prompt by re-seeding the database
-    const UPDATED_PROMPTS: SystemPrompt[] = [
-      { name: "Chef", prompt: "You are a world-renowned French chef." },
-      { name: "Pirate", prompt: "You are a fearsome pirate." },
-    ];
-    await seedIndexedDB(context, { system_prompts: UPDATED_PROMPTS });
+    // 5. Update the prompt using the UI
+    await chatPage.navigation.goToSettings();
+    await settingsPage.startEditing("Chef");
+    await settingsPage.fillPromptForm(
+      "Chef",
+      "You are a world-renowned French chef.",
+    );
+    await settingsPage.savePrompt();
 
-    // 6. Mock the regeneration API call with the *new* system prompt.
-    // This must be done BEFORE the page reload, so the new prompt data is available
-    // to the saga when it constructs the API request.
+    // 6. Navigate back to the chat
+    await settingsPage.navigation.goBackToChat();
+    await page.waitForURL(`**/${SESSION_WITH_PROMPT.session_id}`);
+
+    // 7. Mock the regeneration API call with the *new* system prompt and the *correct* model.
     chatMocker.mock({
       request: {
-        model: "openai/gpt-4o",
+        // The model should match what's in the app's settings state.
+        model: "google/gemini-2.5-pro",
         messages: [
           {
             role: "system",
@@ -114,9 +124,6 @@ test.describe("System Prompt Interaction", () => {
       },
       response: { role: "assistant", content: "Bonjour!" },
     });
-
-    // 7. Reload the page to force the app to re-read prompts from the database
-    await page.reload();
 
     // 8. The display should still show the *old* prompt for historical accuracy
     await chatPage.expectMessage(0, "system", /You are a master chef/);

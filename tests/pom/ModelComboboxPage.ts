@@ -1,4 +1,4 @@
-import { type Page, type Locator, expect } from '@playwright/test';
+import { type Page, type Locator, expect } from "@playwright/test";
 
 /**
  * Page Object Model for the Model Combobox component.
@@ -8,7 +8,7 @@ export class ModelComboboxPage {
   readonly input: Locator;
 
   constructor(public readonly page: Page) {
-    this.input = page.getByTestId('model-combobox-input');
+    this.input = page.getByTestId("model-combobox-input");
   }
 
   /**
@@ -17,8 +17,17 @@ export class ModelComboboxPage {
    * @param modelId The unique ID of the model to select, e.g. 'mock-model/mock-model'.
    */
   async selectModel(name: string, modelId: string) {
+    console.log(
+      `[ModelComboboxPage|selectModel] Filling input with: "${name}"`,
+    );
     await this.input.fill(name);
-    await this.page.locator(`[data-testid="model-combobox-item-${modelId}"]`).click();
+    console.log(
+      `[ModelComboboxPage|selectModel] Clicking model item: "${modelId}"`,
+    );
+    await this.page
+      .locator(`[data-testid="model-combobox-item-${modelId}"]`)
+      .click();
+    console.log(`[ModelComboboxPage|selectModel] Model selected.`);
   }
 
   /**
