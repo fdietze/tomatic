@@ -1,18 +1,18 @@
-import { call, put, takeLatest } from 'redux-saga/effects';
-import { listAvailableModels } from '@/api/openrouter';
-import { DisplayModelInfo } from '@/types/storage';
+import { call, put, takeLatest } from "redux-saga/effects";
+import { listAvailableModels } from "@/api/openrouter";
+import { DisplayModelInfo } from "@/types/storage";
 import {
   fetchModels,
   fetchModelsSuccess,
   fetchModelsFailure,
-} from './modelsSlice';
+} from "./modelsSlice";
 
 function* fetchModelsSaga() {
   try {
     const models: DisplayModelInfo[] = yield call(listAvailableModels);
     yield put(fetchModelsSuccess(models));
-  } catch (_error) {
-    yield put(fetchModelsFailure('Failed to fetch models.'));
+  } catch {
+    yield put(fetchModelsFailure("Failed to fetch models."));
   }
 }
 

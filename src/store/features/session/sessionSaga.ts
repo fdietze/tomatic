@@ -1,7 +1,14 @@
-import { call, put, takeLatest, all, select, take } from 'redux-saga/effects';
-import { PayloadAction } from '@reduxjs/toolkit';
-import { Message, ChatSession } from '@/types/chat';
-import * as db from '@/services/db/chat-sessions';
+import { call, put, takeLatest, all, select, take } from "redux-saga/effects";
+import { eventChannel, END, EventChannel } from "redux-saga";
+import { PayloadAction } from "@reduxjs/toolkit";
+import OpenAI from "openai";
+import type { Stream } from "openai/streaming";
+
+import { ChatSession, Message } from "@/types/chat";
+import * as db from "@/services/db/chat-sessions";
+import { streamChat, StreamChatInput } from "@/services/chatService";
+import { RootState } from "../../store";
+
 import {
   loadSession,
   loadSessionSuccess,
@@ -9,84 +16,134 @@ import {
   submitUserMessage,
   submitUserMessageSuccess,
   submitUserMessageFailure,
-} from './sessionSlice';
-import { RootState } from '../../store';
-import { streamChatResponse } from '@/services/chatService';
-import { getReferencedSnippetNames } from '@/utils/snippetUtils';
-import { v4 as uuidv4 } from 'uuid';
+  addAssistantMessagePlaceholder,
+  appendChunkToLatestMessage,
+} from "./sessionSlice";
+
+// --- Worker Sagas ---
 
 function* loadSessionSaga(action: PayloadAction<string>) {
   try {
-    const session: ChatSession | null = yield call(db.loadSession, action.payload);
+    const session: ChatSession | null = yield call(
+      db.loadSession,
+      action.payload,
+    );
     if (session) {
-        const { prevId, nextId } = yield call(db.findNeighbourSessionIds, session);
-        yield put(loadSessionSuccess({ messages: session.messages, sessionId: session.session_id, prevId, nextId }));
+      const { prevId, nextId } = yield call(
+        db.findNeighbourSessionIds,
+        session,
+      );
+      yield put(
+        loadSessionSuccess({
+          messages: session.messages,
+          sessionId: session.session_id,
+          prevId,
+          nextId,
+        }),
+      );
     } else {
-        yield put(loadSessionFailure('Session not found.'));
+      yield put(loadSessionFailure("Session not found."));
     }
-  } catch (_error) {
-    yield put(loadSessionFailure('Failed to load session.'));
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    yield put(loadSessionFailure(message));
   }
 }
 
-function* submitUserMessageSaga(action: PayloadAction<string>) {
-    try {
-        const prompt = action.payload;
-        const { settings, snippets: allSnippets, prompts, session } = yield select((state: RootState) => state);
+type ChatStreamEvent = { chunk: string } | { done: true } | { error: Error };
 
-        const referencedSnippets = getReferencedSnippetNames(prompt);
-        const snippetsToWaitFor: string[] = [];
-        for (const name of referencedSnippets) {
-            if (allSnippets.regenerationStatus[name] === 'in_progress') {
-                snippetsToWaitFor.push(name);
-            }
+function createChatStreamChannel(
+  input: StreamChatInput,
+): EventChannel<ChatStreamEvent> {
+  return eventChannel((emitter) => {
+    const processStream = async () => {
+      try {
+        const stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk> =
+          await streamChat(input);
+
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            emitter({ chunk: content });
+          }
         }
+        emitter({ done: true });
+      } catch (error) {
+        const err =
+          error instanceof Error ? error : new Error("Streaming failed");
+        emitter({ error: err });
+      } finally {
+        emitter(END);
+      }
+    };
 
-        if (snippetsToWaitFor.length > 0) {
-            yield all(snippetsToWaitFor.map(name => take(
-                (action: PayloadAction<{ name: string; status: string }>) => (action.type === 'snippets/setRegenerationStatus' && action.payload.name === name && action.payload.status !== 'in_progress')
-            )));
-        }
+    void processStream();
 
-        const { assistantResponse, finalMessages } = yield call(streamChatResponse, {
-            messages: session.messages,
-            prompt,
-            modelName: settings.modelName,
-            apiKey: settings.apiKey,
-            snippets: allSnippets.snippets,
-            systemPrompts: prompts.prompts,
-            selectedPromptName: settings.selectedPromptName,
-            isRegeneration: false,
-        });
-
-        const assistantMessage: Message = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: assistantResponse,
-            model_name: settings.modelName,
-        };
-
-        const newMessages = [...finalMessages, assistantMessage];
-
-        yield put(submitUserMessageSuccess(newMessages));
-
-        const currentSessionId = session.currentSessionId || uuidv4();
-        const sessionToSave: ChatSession = {
-            session_id: currentSessionId,
-            messages: newMessages,
-            created_at_ms: Date.now(),
-            updated_at_ms: Date.now(),
-            name: 'New Chat'
-        };
-        yield call(db.saveSession, sessionToSave);
-
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-        yield put(submitUserMessageFailure(errorMessage));
-    }
+    // Return the unsubscribe function
+    return () => {
+      // In a real-world scenario with AbortController, you'd call abort() here.
+    };
+  });
 }
 
+function* submitUserMessageSaga(
+  _action: PayloadAction<{
+    prompt: string;
+    isRegeneration: boolean;
+    editMessageIndex?: number;
+  }>,
+) {
+  try {
+    // --- 1. Get state and prepare for API call ---
+    const { settings, session }: RootState = yield select(
+      (state: RootState) => state,
+    );
+
+    if (!settings.apiKey) {
+      throw new Error("OpenRouter API key is not set.");
+    }
+
+    // The `submitUserMessage` reducer has already updated the messages array.
+    const messagesToSubmit: Message[] = session.messages;
+
+    yield put(addAssistantMessagePlaceholder());
+
+    // --- 2. Create the event channel ---\
+    const channel: EventChannel<ChatStreamEvent> = yield call(
+      createChatStreamChannel,
+      {
+        messagesToSubmit,
+        modelName: settings.modelName,
+        apiKey: settings.apiKey,
+      },
+    );
+
+    // --- 3. Process events in a try/finally to ensure channel is closed ---\
+    try {
+      while (true) {
+        const event: ChatStreamEvent = yield take(channel);
+
+        if ("chunk" in event) {
+          yield put(appendChunkToLatestMessage({ chunk: event.chunk }));
+        } else if ("done" in event) {
+          yield put(submitUserMessageSuccess());
+          break; // Exit the loop
+        } else if ("error" in event) {
+          throw event.error;
+        }
+      }
+    } finally {
+      channel.close();
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    yield put(submitUserMessageFailure(message));
+  }
+}
+
+// --- Watcher Saga ---
 
 export function* sessionSaga() {
   yield all([

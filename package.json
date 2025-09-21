@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test:e2e": "npx playwright test | cat",
     "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run --reporter=dot"
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.9.0",
@@ -44,6 +44,7 @@
     "typescript": "^5.9.2",
     "vite": "npm:rolldown-vite@latest",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "web-streams-polyfill": "^4.2.0"
   }
 }

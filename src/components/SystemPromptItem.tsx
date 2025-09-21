@@ -1,30 +1,36 @@
-import React, { useState, useRef, useEffect } from 'react';
-import type { SystemPrompt } from '@/types/storage';
+import React, { useState, useRef, useEffect } from "react";
+import type { SystemPrompt } from "@/types/storage";
 
 interface SystemPromptItemProps {
   prompt: SystemPrompt;
+  status: "idle" | "saving" | "deleting" | "failed";
+  error: string | null;
   isInitiallyEditing: boolean;
   allPrompts: SystemPrompt[];
   onUpdate: (updatedPrompt: SystemPrompt) => void;
   onRemove: () => void;
   onCancel?: () => void;
+  onEdit?: () => void;
 }
 
 const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
 const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   prompt,
+  status,
+  error,
   isInitiallyEditing,
   allPrompts,
   onUpdate,
   onRemove,
   onCancel,
+  onEdit,
 }) => {
   // This component doesn't need to be connected to the context,
   // as it receives all necessary data and callbacks as props.
   // The parent (SettingsPage) is responsible for providing them.
 
-  const [isEditing, setIsEditing] = useState(isInitiallyEditing);
+  const isEditing = isInitiallyEditing;
   const [editingName, setEditingName] = useState(prompt.name);
   const [editingPrompt, setEditingPrompt] = useState(prompt.prompt);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -38,48 +44,52 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
 
   const handleSave = (): void => {
     const trimmedName = editingName.trim();
-    if (nameError || trimmedName === '') {
-        if (trimmedName === '') setNameError('Name cannot be empty.');
-        return;
+    if (nameError || trimmedName === "") {
+      if (trimmedName === "") setNameError("Name cannot be empty.");
+      return;
     }
     onUpdate({ name: trimmedName, prompt: editingPrompt });
-    setIsEditing(false);
+    // The parent will cause this component to unmount or re-render in view mode.
+    // No need to set editing state here.
     setNameError(null);
   };
 
   const handleCancelEditing = (): void => {
-    if (isInitiallyEditing && onCancel) {
+    // Reset local state in case it's re-opened
+    setEditingName(prompt.name);
+    setEditingPrompt(prompt.prompt);
+    setNameError(null);
+    // Tell the parent to cancel editing
+    if (onCancel) {
       onCancel();
-    } else {
-      setEditingName(prompt.name);
-      setEditingPrompt(prompt.prompt);
-      setNameError(null);
-      setIsEditing(false);
     }
   };
-
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newName = e.target.value;
     setEditingName(newName);
 
-    if (newName.trim() === '') {
-      setNameError('Name cannot be empty.');
+    if (newName.trim() === "") {
+      setNameError("Name cannot be empty.");
       return;
     }
 
     if (!NAME_REGEX.test(newName)) {
-      setNameError('Name can only contain alphanumeric characters and underscores.');
+      setNameError(
+        "Name can only contain alphanumeric characters and underscores.",
+      );
       return;
     }
 
     const originalName = prompt.name;
     const isDuplicate = allPrompts.some(
-      (p) => p.name.trim().toLowerCase() === newName.trim().toLowerCase() && p.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
+      (p) =>
+        p.name.trim().toLowerCase() === newName.trim().toLowerCase() &&
+        p.name.trim().toLowerCase() !== originalName.trim().toLowerCase(),
     );
 
     if (isDuplicate) {
-      setNameError('A prompt with this name already exists.');
+      setNameError("A prompt with this name already exists.");
     } else {
       setNameError(null);
     }
@@ -97,10 +107,16 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             placeholder="name"
             data-testid="system-prompt-name-input"
           />
-          {nameError && <div className="error-message" data-testid="error-message">{nameError}</div>}
+          {nameError && (
+            <div className="error-message" data-testid="error-message">
+              {nameError}
+            </div>
+          )}
           <textarea
             value={editingPrompt}
-            onChange={(e) => { setEditingPrompt(e.target.value); }}
+            onChange={(e) => {
+              setEditingPrompt(e.target.value);
+            }}
             placeholder="system prompt"
             data-testid="system-prompt-prompt-input"
           />
@@ -110,10 +126,10 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             onClick={handleSave}
             data-size="compact"
             data-role="primary"
-            disabled={!!nameError}
+            disabled={!!nameError || status === "saving"}
             data-testid="system-prompt-save-button"
           >
-            Save
+            {status === "saving" ? "Saving..." : "Save"}
           </button>
           <button
             onClick={handleCancelEditing}
@@ -128,25 +144,42 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
   }
 
   return (
-    <div className="system-prompt-item-view" data-testid={`system-prompt-item-${prompt.name}`}>
-      <span className="system-prompt-name">{prompt.name}</span>
-      <span className="system-prompt-text">{prompt.prompt}</span>
-      <div className="system-prompt-buttons">
-        <button
-          onClick={() => { setIsEditing(true); }}
-          data-size="compact"
-          data-testid="system-prompt-edit-button"
-        >
-          Edit
-        </button>
-        <button
-          onClick={onRemove}
-          data-size="compact"
-          data-testid="system-prompt-delete-button"
-        >
-          Delete
-        </button>
+    <div
+      className="system-prompt-item-view"
+      data-testid={`system-prompt-item-${prompt.name}`}
+    >
+      <div className="system-prompt-content">
+        <span className="system-prompt-name">{prompt.name}</span>
+        <span className="system-prompt-text">{prompt.prompt}</span>
+        {status === "failed" && error && (
+          <div className="error-message" data-testid="error-message">
+            {error}
+          </div>
+        )}
       </div>
+      {status === "deleting" ? (
+        <div className="spinner-container">
+          <div className="spinner" />
+        </div>
+      ) : (
+        <div className="system-prompt-buttons">
+          <button
+            onClick={onEdit}
+            data-size="compact"
+            data-testid="system-prompt-edit-button"
+          >
+            Edit
+          </button>
+          <button
+            onClick={onRemove}
+            data-size="compact"
+            data-testid="system-prompt-delete-button"
+            disabled={status === "saving"}
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 };

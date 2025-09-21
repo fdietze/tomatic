@@ -1,9 +1,10 @@
-import OpenAI, { APIError } from 'openai';
-import { z } from 'zod';
+import OpenAI, { APIError } from "openai";
+import type { Stream } from "openai/streaming";
+import { z } from "zod";
 
-import type { DisplayModelInfo } from '@/types/storage';
-import type { Message } from '@/types/chat';
-import type { ModelInfo } from '@/types/openrouter';
+import type { DisplayModelInfo } from "@/types/storage";
+import type { Message } from "@/types/chat";
+import type { ModelInfo } from "@/types/openrouter";
 
 // --- Zod Schemas for Runtime Validation ---
 
@@ -44,32 +45,32 @@ const modelInfoSchema = z.object({
 
 // Zod schema for the entire API response
 const apiModelsResponseSchema = z.object({
-    data: z.array(modelInfoSchema),
+  data: z.array(modelInfoSchema),
 });
-
 
 // Helper to safely parse price strings and convert to cost per million tokens
 const parsePriceToPerMillion = (priceStr: string): number | null => {
-    const price = parseFloat(priceStr);
-    return isNaN(price) ? null : price * 1_000_000;
-}
+  const price = parseFloat(priceStr);
+  return isNaN(price) ? null : price * 1_000_000;
+};
 
 // --- API Client Configuration ---
 
 const getOpenAIClient = (apiKey: string): OpenAI => {
   if (!apiKey) {
-    throw new Error('OpenRouter API key is missing.');
+    throw new Error("OpenRouter API key is missing.");
   }
   const maxRetries = window.__IS_TESTING__ ? 0 : 2;
+  console.log("Initializing OpenAI client (maxRetries: %d)", maxRetries);
   return new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
+    baseURL: "https://openrouter.ai/api/v1",
     apiKey: apiKey,
     // Disable retries for deterministic test behavior.
     maxRetries: maxRetries,
     // Recommended headers to identify your app to OpenRouter.
     defaultHeaders: {
-      'HTTP-Referer': window.location.host,
-      'X-Title': 'Tomatic',
+      "HTTP-Referer": window.location.host,
+      "X-Title": "Tomatic",
     },
     dangerouslyAllowBrowser: true,
   });
@@ -78,32 +79,38 @@ const getOpenAIClient = (apiKey: string): OpenAI => {
 // --- API Functions ---
 
 export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
-  console.debug('[API|listAvailableModels] Fetching from https://openrouter.ai/api/v1/models');
+  console.debug(
+    "[API|listAvailableModels] Fetching from https://openrouter.ai/api/v1/models",
+  );
   // We are not using the OpenAI client here because this is an OpenRouter-specific endpoint.
   // The official OpenAI client does not have a `models.list()` equivalent that works for OpenRouter's model discovery.
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/models');
+    const response = await fetch("https://openrouter.ai/api/v1/models");
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch models: ${String(response.status)} ${errorText}`);
+      throw new Error(
+        `Failed to fetch models: ${String(response.status)} ${errorText}`,
+      );
     }
-    const jsonResponse = await response.json() as unknown;
-    
+    const jsonResponse = (await response.json()) as unknown;
+
     // Validate the structure of the full API response.
     const validation = apiModelsResponseSchema.safeParse(jsonResponse);
     if (!validation.success) {
-      console.error('[API] Zod validation failed for model list:', validation.error.format());
-      throw new Error('Received invalid data structure for model list.');
+      console.error(
+        "[API] Zod validation failed for model list:",
+        validation.error.format(),
+      );
+      throw new Error("Received invalid data structure for model list.");
     }
 
     // Map the full, validated ModelInfo into the simpler DisplayModelInfo for the UI
     return validation.data.data.map((model: ModelInfo) => ({
-        id: model.id,
-        name: model.name,
-        prompt_cost_usd_pm: parsePriceToPerMillion(model.pricing.prompt),
-        completion_cost_usd_pm: parsePriceToPerMillion(model.pricing.completion),
+      id: model.id,
+      name: model.name,
+      prompt_cost_usd_pm: parsePriceToPerMillion(model.pricing.prompt),
+      completion_cost_usd_pm: parsePriceToPerMillion(model.pricing.completion),
     }));
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[API] listAvailableModels error: ${errorMessage}`);
@@ -112,37 +119,81 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
   }
 }
 
+export async function requestMessageContentStream(
+  messages: Message[],
+  model: string,
+  apiKey: string,
+): Promise<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+  const body = {
+    model: model,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  };
+
+  console.debug(
+    `[API] Requesting streaming chat completion with model ${model} and ${String(
+      messages.length,
+    )} messages.`,
+  );
+
+  const openai = getOpenAIClient(apiKey);
+
+  try {
+    return await openai.chat.completions.create({
+      model: body.model,
+      messages: body.messages,
+      stream: true,
+    });
+  } catch (e) {
+    if (e instanceof APIError) {
+      console.log(
+        `[API|requestMessageContentStream] Caught APIError: ${e.constructor.name}: ${e.message}`,
+      );
+      // Re-throw a simpler error to be handled by the store
+      throw new Error(e.message);
+    }
+    console.log("[API|requestMessageContentStream] Caught unknown error:", e);
+    throw new Error(
+      "An unknown error occurred while fetching the model response.",
+    );
+  }
+}
+
 export async function requestMessageContent(
   messages: Message[],
   model: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<string> {
-    const body = {
-        model: model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    };
-    
-    console.debug(`[API] Requesting chat completion with model ${model} and ${String(messages.length)} messages.`);
-    
-    const openai = getOpenAIClient(apiKey);
-    
-    try {
-        const response = await openai.chat.completions.create({
-            model: body.model,
-            messages: body.messages,
-            stream: false,
-        });
+  const body = {
+    model: model,
+    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  };
 
-        const newContent = response.choices[0]?.message.content || '';
-        return newContent;
+  console.debug(
+    `[API] Requesting non-streaming chat completion with model ${model} and ${String(
+      messages.length,
+    )} messages.`,
+  );
 
-    } catch (e) {
-        if (e instanceof APIError) {
-            console.log(`[API|requestMessageContent] Caught APIError: ${e.constructor.name}: ${e.message}`);
-            // Re-throw a simpler error to be handled by the store
-            throw new Error(e.message);
-        }
-        console.log('[API|requestMessageContent] Caught unknown error:', e);
-        throw new Error('An unknown error occurred while fetching the model response.');
+  const openai = getOpenAIClient(apiKey);
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: body.model,
+      messages: body.messages,
+      stream: false,
+    });
+    return completion.choices[0]?.message?.content ?? "";
+  } catch (e) {
+    if (e instanceof APIError) {
+      console.log(
+        `[API|requestMessageContent] Caught APIError: ${e.constructor.name}: ${e.message}`,
+      );
+      // Re-throw a simpler error to be handled by the store
+      throw new Error(e.message);
     }
+    console.log("[API|requestMessageContent] Caught unknown error:", e);
+    throw new Error(
+      "An unknown error occurred while fetching the model response.",
+    );
+  }
 }

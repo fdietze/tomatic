@@ -1,8 +1,9 @@
-import React from 'react';
-import type { SystemPrompt } from '@/types/storage';
+import React from "react";
+
+import { PromptEntity } from "../store/features/prompts/promptsSlice";
 
 interface SystemPromptBarProps {
-  systemPrompts: SystemPrompt[];
+  systemPrompts: PromptEntity[];
   selectedPromptName: string | null;
   onSelectPrompt: (name: string | null) => void;
 }
@@ -12,8 +13,13 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
   selectedPromptName,
   onSelectPrompt,
 }) => {
-  const selectedPrompt = systemPrompts.find((p) => p.name === selectedPromptName);
-  const unselectedPrompts = systemPrompts.filter((p) => p.name !== selectedPromptName);
+  const visiblePrompts = systemPrompts.filter((p) => p.status !== "deleting");
+  const selectedPrompt = visiblePrompts.find(
+    (p) => p.data.name === selectedPromptName,
+  );
+  const unselectedPrompts = visiblePrompts.filter(
+    (p) => p.data.name !== selectedPromptName,
+  );
 
   const handleSelectPrompt = (name: string): void => {
     if (selectedPromptName === name) {
@@ -27,33 +33,33 @@ const SystemPromptBar: React.FC<SystemPromptBarProps> = ({
     <>
       {selectedPrompt && (
         <button
-          key={selectedPrompt.name}
+          key={selectedPrompt.data.name}
           data-size="compact"
           data-role="outline"
           className="chat-controls-system-prompt"
           data-selected={true}
-          data-testid={`system-prompt-button-${selectedPrompt.name}`}
+          data-testid={`system-prompt-button-${selectedPrompt.data.name}`}
           onClick={() => {
-            handleSelectPrompt(selectedPrompt.name);
+            handleSelectPrompt(selectedPrompt.data.name);
           }}
         >
-          {selectedPrompt.name}
+          {selectedPrompt.data.name}
         </button>
       )}
       <div className="unselected-prompts">
         {unselectedPrompts.map((prompt) => (
           <button
-            key={prompt.name}
+            key={prompt.data.name}
             data-size="compact"
             data-role="outline"
             className="chat-controls-system-prompt"
             data-selected={false}
-            data-testid={`system-prompt-button-${prompt.name}`}
+            data-testid={`system-prompt-button-${prompt.data.name}`}
             onClick={() => {
-              handleSelectPrompt(prompt.name);
+              handleSelectPrompt(prompt.data.name);
             }}
           >
-            {prompt.name}
+            {prompt.data.name}
           </button>
         ))}
       </div>

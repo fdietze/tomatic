@@ -1,8 +1,8 @@
-import { type Page, type Locator, expect } from '@playwright/test';
+import { type Page, type Locator, expect } from "@playwright/test";
 
-import { NavigationComponent } from './NavigationComponent';
-import { ModelComboboxPage } from './ModelComboboxPage';
-import { ROUTES } from '@/utils/routes';
+import { NavigationComponent } from "./NavigationComponent";
+import { ModelComboboxPage } from "./ModelComboboxPage";
+import { ROUTES } from "@/utils/routes";
 /**
  * Page Object Model for the Settings page.
  * This class encapsulates locators and actions for managing system prompts,
@@ -11,13 +11,13 @@ import { ROUTES } from '@/utils/routes';
 export class SettingsPage {
   // --- Locators ---
   readonly newPromptButton: Locator;
-   readonly newSnippetButton: Locator;
+  readonly newSnippetButton: Locator;
   readonly navigation: NavigationComponent;
   readonly modelCombobox: ModelComboboxPage;
 
   constructor(public readonly page: Page) {
-    this.newPromptButton = page.getByTestId('new-system-prompt-button');
-     this.newSnippetButton = page.getByTestId('new-snippet-button');
+    this.newPromptButton = page.getByTestId("new-system-prompt-button");
+    this.newSnippetButton = page.getByTestId("new-snippet-button");
     this.navigation = new NavigationComponent(page);
     this.modelCombobox = new ModelComboboxPage(page);
   }
@@ -28,8 +28,7 @@ export class SettingsPage {
    * Navigates to the settings page.
    */
   async goto() {
-     await this.page.goto(ROUTES.settings);
-     await this.page.waitForFunction(() => window.sessionReady === true, {}, { timeout: 5000 });
+    await this.page.goto(ROUTES.settings);
   }
 
   /**
@@ -39,9 +38,9 @@ export class SettingsPage {
    */
   async createNewPrompt(name: string, prompt: string) {
     await this.newPromptButton.click();
-    await this.page.getByTestId('system-prompt-name-input').fill(name);
-    await this.page.getByTestId('system-prompt-prompt-input').fill(prompt);
-    await this.page.getByTestId('system-prompt-save-button').click();
+    await this.page.getByTestId("system-prompt-name-input").fill(name);
+    await this.page.getByTestId("system-prompt-prompt-input").fill(prompt);
+    await this.page.getByTestId("system-prompt-save-button").click();
   }
 
   /**
@@ -57,22 +56,28 @@ export class SettingsPage {
    * @param prompt The prompt content to fill in the prompt textarea.
    */
   async fillPromptForm(name: string, prompt: string) {
-    await this.page.getByTestId('system-prompt-name-input').fill(name);
-    await this.page.getByTestId('system-prompt-prompt-input').fill(prompt);
+    console.log(
+      `[SettingsPage|fillPromptForm] Filling form with name: "${name}"`,
+    );
+    await this.page.getByTestId("system-prompt-name-input").fill(name);
+    await this.page.getByTestId("system-prompt-prompt-input").fill(prompt);
+    console.log(`[SettingsPage|fillPromptForm] Form filled.`);
   }
 
   /**
    * Clicks the save button in the prompt edit form.
    */
   async savePrompt() {
-    await this.page.getByTestId('system-prompt-save-button').click();
+    console.log(`[SettingsPage|savePrompt] Clicking save button.`);
+    await this.page.getByTestId("system-prompt-save-button").click();
+    console.log(`[SettingsPage|savePrompt] Save button clicked.`);
   }
 
   /**
    * Clicks the cancel button in the prompt edit form.
    */
   async cancelEditing() {
-    await this.page.getByTestId('system-prompt-cancel-button').click();
+    await this.page.getByTestId("system-prompt-cancel-button").click();
   }
 
   /**
@@ -80,7 +85,9 @@ export class SettingsPage {
    * @param name The name of the prompt to delete.
    */
   async deletePrompt(name: string) {
-    await this.getPromptItem(name).getByTestId('system-prompt-delete-button').click();
+    await this.getPromptItem(name)
+      .getByTestId("system-prompt-delete-button")
+      .click();
   }
 
   /**
@@ -88,43 +95,71 @@ export class SettingsPage {
    * @param name The name of the prompt to edit.
    */
   async startEditing(name: string) {
-    await this.getPromptItem(name).getByTestId('system-prompt-edit-button').click();
+    console.log(
+      `[SettingsPage|startEditing] Starting to edit prompt: "${name}"`,
+    );
+    await this.getPromptItem(name)
+      .getByTestId("system-prompt-edit-button")
+      .click();
+    console.log(
+      `[SettingsPage|startEditing] Edit button clicked for prompt: "${name}"`,
+    );
   }
-
 
   // --- Snippet Actions ---
 
   async createNewSnippet(name: string, content: string) {
+    console.log(`[SettingsPage] Clicking new snippet button.`);
     await this.newSnippetButton.click();
-    const editContainer = this.page.getByTestId('snippet-item-edit-new');
-    await editContainer.getByTestId('snippet-name-input').fill(name);
-    await editContainer.getByTestId('snippet-content-input').fill(content);
-    await editContainer.getByTestId('snippet-save-button').click();
+    const editContainer = this.page.getByTestId("snippet-item-edit-new");
+    console.log(`[SettingsPage] Filling snippet form with name: ${name}`);
+    await editContainer.getByTestId("snippet-name-input").fill(name);
+    await editContainer.getByTestId("snippet-content-input").fill(content);
+    console.log(`[SettingsPage] Clicking save button.`);
+    await editContainer.getByTestId("snippet-save-button").click();
+    console.log(`[SettingsPage] Waiting for edit container to disappear.`);
     await expect(editContainer).not.toBeVisible();
+    console.log(
+      `[SettingsPage] Waiting for snippet item to be visible: ${name}`,
+    );
     await expect(this.getSnippetItem(name)).toBeVisible();
+    console.log(`[SettingsPage] New snippet created: ${name}`);
   }
 
   async deleteSnippet(name: string) {
-    await this.getSnippetItem(name).getByTestId('snippet-delete-button').click();
+    await this.getSnippetItem(name)
+      .getByTestId("snippet-delete-button")
+      .click();
   }
 
   async startEditingSnippet(name: string) {
-    await this.getSnippetItem(name).getByTestId('snippet-edit-button').click();
+    await this.getSnippetItem(name).getByTestId("snippet-edit-button").click();
   }
 
   async fillSnippetForm(name: string, content: string) {
-    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
-    await editContainer.getByTestId('snippet-name-input').fill(name);
-    await editContainer.getByTestId('snippet-content-input').fill(content);
+    const editContainer = this.page.locator(
+      '[data-testid^="snippet-item-edit-"]',
+    );
+    await editContainer.getByTestId("snippet-name-input").fill(name);
+    await editContainer.getByTestId("snippet-content-input").fill(content);
   }
 
-  async fillGeneratedSnippetForm(options: { name?: string; prompt?: string; modelName?: string; modelId?: string }) {
-    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
+  async fillGeneratedSnippetForm(options: {
+    name?: string;
+    prompt?: string;
+    modelName?: string;
+    modelId?: string;
+  }) {
+    const editContainer = this.page.locator(
+      '[data-testid^="snippet-item-edit-"]',
+    );
     if (options.name) {
-      await editContainer.getByTestId('snippet-name-input').fill(options.name);
+      await editContainer.getByTestId("snippet-name-input").fill(options.name);
     }
     if (options.prompt) {
-      await editContainer.getByTestId('snippet-prompt-input').fill(options.prompt);
+      await editContainer
+        .getByTestId("snippet-prompt-input")
+        .fill(options.prompt);
     }
     if (options.modelName && options.modelId) {
       await this.modelCombobox.selectModel(options.modelName, options.modelId);
@@ -132,26 +167,35 @@ export class SettingsPage {
   }
 
   async saveSnippet() {
-    const editContainer = this.page.locator('[data-testid^="snippet-item-edit-"]');
-    await editContainer.getByTestId('snippet-save-button').click();
+    const editContainer = this.page.locator(
+      '[data-testid^="snippet-item-edit-"]',
+    );
+    await editContainer.getByTestId("snippet-save-button").click();
   }
 
-  async createGeneratedSnippet(name: string, prompt: string, modelId: string, modelName?: string) {
+  async createGeneratedSnippet(
+    name: string,
+    prompt: string,
+    modelId: string,
+    modelName?: string,
+  ) {
     await this.newSnippetButton.click();
-    const editContainer = this.page.getByTestId('snippet-item-edit-new');
-    await editContainer.getByTestId('snippet-name-input').fill(name);
-    await editContainer.getByText('Generated Snippet').click();
+    const editContainer = this.page.getByTestId("snippet-item-edit-new");
+    await editContainer.getByTestId("snippet-name-input").fill(name);
+    await editContainer.getByText("Generated Snippet").click();
     await this.modelCombobox.selectModel(modelName ?? modelId, modelId);
-    await editContainer.getByTestId('snippet-prompt-input').fill(prompt);
+    await editContainer.getByTestId("snippet-prompt-input").fill(prompt);
     // With the new refactored flow, we no longer need to manually regenerate.
     // The save button now handles generation.
-    await editContainer.getByTestId('snippet-save-button').click();
+    await editContainer.getByTestId("snippet-save-button").click();
 
     // Wait for the save operation (which includes generation) to complete.
     await expect(editContainer).not.toBeVisible();
     await expect(this.getSnippetItem(name)).toBeVisible();
     // Also wait for the spinner to disappear to ensure generation is complete
-    await expect(this.getSnippetItem(name).getByTestId('regenerating-spinner')).not.toBeVisible({ timeout: 10000 });
+    await expect(
+      this.getSnippetItem(name).getByTestId("regenerating-spinner"),
+    ).not.toBeVisible({ timeout: 10000 });
   }
 
   // --- Snippet Helpers ---
@@ -165,19 +209,19 @@ export class SettingsPage {
   }
 
   getNewSnippetEditContainer(): Locator {
-    return this.page.getByTestId('snippet-item-edit-new');
+    return this.page.getByTestId("snippet-item-edit-new");
   }
 
   getSnippetNameInput(container: Locator): Locator {
-    return container.getByTestId('snippet-name-input');
+    return container.getByTestId("snippet-name-input");
   }
 
   getSnippetSaveButton(container: Locator): Locator {
-    return container.getByTestId('snippet-save-button');
+    return container.getByTestId("snippet-save-button");
   }
 
   getSnippetErrorMessage(container: Locator): Locator {
-    return container.getByTestId('error-message');
+    return container.getByTestId("error-message");
   }
 
   // --- Helpers ---
@@ -189,7 +233,6 @@ export class SettingsPage {
   getPromptItem(name: string): Locator {
     return this.page.getByTestId(`system-prompt-item-${name}`);
   }
-
 
   // --- Assertions ---
 
@@ -217,20 +260,27 @@ export class SettingsPage {
     await expect(this.getSnippetItem(name)).not.toBeVisible();
   }
 
-  async expectGeneratedSnippetContent(name: string, expectedContent: string | RegExp) {
+  async expectGeneratedSnippetContent(
+    name: string,
+    expectedContent: string | RegExp,
+  ) {
     // In view mode, the content is in a different element
-    const contentLocator = this.getSnippetItem(name).locator('.system-prompt-text');
+    const contentLocator = this.getSnippetItem(name).locator(
+      ".system-prompt-text",
+    );
     await expect(contentLocator).toHaveText(expectedContent);
   }
 
   async expectGenerationErrorMessage(message: string | RegExp) {
-    await expect(this.page.getByTestId('generation-error-message')).toHaveText(message);
+    await expect(this.page.getByTestId("generation-error-message")).toHaveText(
+      message,
+    );
   }
   /**
    * Asserts that a specific error message is visible.
    * @param message The exact error message text.
    */
   async expectErrorMessage(message: string) {
-    await expect(this.page.getByTestId('error-message')).toHaveText(message);
+    await expect(this.page.getByTestId("error-message")).toHaveText(message);
   }
 }

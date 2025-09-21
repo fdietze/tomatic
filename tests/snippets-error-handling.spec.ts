@@ -31,12 +31,19 @@ test.describe('Generated Snippets (Error Handling)', () => {
     // Purpose: This test verifies that if the API call for generating a snippet's content fails
     // (e.g., returns a 500 error), an appropriate error message is displayed to the user within
     // the snippet editor.
-    await settingsPage.page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: { message: 'Internal Server Error' } }),
-      });
+    const chatMocker = new ChatCompletionMocker(settingsPage.page);
+    await chatMocker.setup();
+    chatMocker.mock({
+      request: {
+        model: "mock-model/mock-model",
+        messages: [{ role: "user", content: "This will fail" }],
+        stream: false,
+      },
+      response: {
+        role: "assistant",
+        content: "",
+        error: { status: 500, message: "Internal Server Error" },
+      },
     });
 
     await settingsPage.newSnippetButton.click();

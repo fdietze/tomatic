@@ -1,4 +1,4 @@
-import { call, put, takeLatest, select, debounce } from 'redux-saga/effects';
+import { call, put, takeLatest, select, debounce } from "redux-saga/effects";
 import {
   loadSettings,
   loadSettingsSuccess,
@@ -13,14 +13,16 @@ import {
   toggleAutoScroll,
   setSelectedPromptName,
   setInitialChatPrompt,
-} from './settingsSlice';
-import * as persistence from '@/services/persistence/settings';
+} from "./settingsSlice";
+import * as persistence from "@/services/persistence/settings";
 
 function* loadSettingsSaga() {
   try {
-    const settings: Partial<SettingsState> = yield call(persistence.loadSettings);
+    const settings: Partial<SettingsState> = yield call(
+      persistence.loadSettings,
+    );
     yield put(loadSettingsSuccess(settings));
-  } catch (_error) {
+  } catch {
     yield put(loadSettingsFailure());
   }
 }
@@ -30,7 +32,7 @@ function* saveSettingsSaga() {
     const settings: SettingsState = yield select(selectSettings);
     yield call(persistence.saveSettings, settings);
     yield put(saveSettingsSuccess());
-  } catch (_error) {
+  } catch {
     yield put(saveSettingsFailure());
   }
 }
@@ -43,7 +45,7 @@ export function* settingsSaga() {
     toggleAutoScroll.type,
     setSelectedPromptName.type,
     setInitialChatPrompt.type,
-    saveSettingsAction.type
+    saveSettingsAction.type,
   ];
   yield debounce(500, actionsToSave, saveSettingsSaga);
 }

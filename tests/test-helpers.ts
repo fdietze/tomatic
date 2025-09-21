@@ -1,34 +1,34 @@
-import type { BrowserContext } from '@playwright/test';
-import { Buffer } from 'buffer';
+import type { BrowserContext } from "@playwright/test";
+import { Buffer } from "buffer";
 
 // Allow re-exporting expect
-import { expect } from '@playwright/test';
+import { expect } from "@playwright/test";
 
 // A mock response for the /models endpoint
 export const MOCK_MODELS_RESPONSE = {
   data: [
     {
-      id: 'openai/gpt-4o',
-      name: 'OpenAI: GPT-4o',
+      id: "openai/gpt-4o",
+      name: "OpenAI: GPT-4o",
       description: "GPT-4o is OpenAI's most advanced model.",
       context_length: 128000,
       created: 1677652288,
-      canonical_slug: 'openai/gpt-4o-2024-05-13',
-      hugging_face_id: '',
+      canonical_slug: "openai/gpt-4o-2024-05-13",
+      hugging_face_id: "",
       architecture: {
-        modality: 'text+image->text',
-        input_modalities: ['text', 'image'],
-        output_modalities: ['text'],
-        tokenizer: 'OpenAI',
-        instruct_type: 'openai',
+        modality: "text+image->text",
+        input_modalities: ["text", "image"],
+        output_modalities: ["text"],
+        tokenizer: "OpenAI",
+        instruct_type: "openai",
       },
       pricing: {
-        prompt: '0.000005',
-        completion: '0.000015',
-        request: '0',
-        image: '0',
-        web_search: '0',
-        internal_reasoning: '0',
+        prompt: "0.000005",
+        completion: "0.000015",
+        request: "0",
+        image: "0",
+        web_search: "0",
+        internal_reasoning: "0",
       },
       top_provider: {
         context_length: 128000,
@@ -36,30 +36,30 @@ export const MOCK_MODELS_RESPONSE = {
         is_moderated: true,
       },
       per_request_limits: null,
-      supported_parameters: ['tools', 'tool_choice', 'max_tokens'],
+      supported_parameters: ["tools", "tool_choice", "max_tokens"],
     },
     {
-      id: 'mock-model/mock-model',
-      name: 'Mock Model',
-      description: 'A mock model for testing purposes.',
+      id: "mock-model/mock-model",
+      name: "Mock Model",
+      description: "A mock model for testing purposes.",
       context_length: 4096,
       created: 1677652288,
-      canonical_slug: 'mock-model/mock-model',
-      hugging_face_id: '',
+      canonical_slug: "mock-model/mock-model",
+      hugging_face_id: "",
       architecture: {
-        modality: 'text->text',
-        input_modalities: ['text'],
-        output_modalities: ['text'],
-        tokenizer: 'Mock',
-        instruct_type: 'mock',
+        modality: "text->text",
+        input_modalities: ["text"],
+        output_modalities: ["text"],
+        tokenizer: "Mock",
+        instruct_type: "mock",
       },
       pricing: {
-        prompt: '0.000001',
-        completion: '0.000002',
-        request: '0',
-        image: '0',
-        web_search: '0',
-        internal_reasoning: '0',
+        prompt: "0.000001",
+        completion: "0.000002",
+        request: "0",
+        image: "0",
+        web_search: "0",
+        internal_reasoning: "0",
       },
       top_provider: {
         context_length: 4096,
@@ -67,12 +67,12 @@ export const MOCK_MODELS_RESPONSE = {
         is_moderated: false,
       },
       per_request_limits: null,
-      supported_parameters: ['max_tokens'],
+      supported_parameters: ["max_tokens"],
     },
   ],
 };
 
-export const OPENROUTER_API_KEY = 'TEST_API_KEY';
+export const OPENROUTER_API_KEY = "TEST_API_KEY";
 
 /**
  * Mocks the global /models API endpoint.
@@ -80,10 +80,10 @@ export const OPENROUTER_API_KEY = 'TEST_API_KEY';
  */
 export async function mockGlobalApis(context: BrowserContext): Promise<void> {
   // Mock the /models endpoint
-  await context.route('https://openrouter.ai/api/v1/models', async (route) => {
+  await context.route("https://openrouter.ai/api/v1/models", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: JSON.stringify(MOCK_MODELS_RESPONSE),
     });
   });
@@ -95,13 +95,18 @@ export async function mockGlobalApis(context: BrowserContext): Promise<void> {
  * @param content The text content of the response.
  * @returns A Buffer object with the simulated stream data.
  */
-export function createStreamResponse(model: string, content: string, role: 'assistant'): Buffer {
+export function createStreamResponse(
+  model: string,
+  content: string,
+  role: "assistant",
+): Buffer {
   const streamData = [
     `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{"role":"${role}","content":""},"finish_reason":null}]}`,
     `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{"content":"${content}"},"finish_reason":null}]}`,
     `{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"${model}","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
   ];
-  const responseString = streamData.map((line) => `data: ${line}\n\n`).join('') + 'data: [DONE]\n\n';
+  const responseString =
+    streamData.map((line) => `data: ${line}\n\n`).join("") + "data: [DONE]\n\n";
   return Buffer.from(responseString);
 }
 
@@ -111,20 +116,26 @@ export function createStreamResponse(model: string, content: string, role: 'assi
  * @param content The text content of the response.
  * @returns A Buffer object with the simulated JSON data.
  */
-export function createChatCompletionResponse(model: string, content: string, role: 'assistant'): Buffer {
+export function createChatCompletionResponse(
+  model: string,
+  content: string,
+  role: "assistant",
+): Buffer {
   const responseObject = {
-    id: 'chatcmpl-123',
-    object: 'chat.completion',
+    id: "chatcmpl-123",
+    object: "chat.completion",
     created: 1677652300,
     model: model,
-    choices: [{
-      index: 0,
-      message: {
-        role: role,
-        content: content,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: role,
+          content: content,
+        },
+        finish_reason: "stop",
       },
-      finish_reason: 'stop',
-    }],
+    ],
     usage: {
       prompt_tokens: 8,
       completion_tokens: 9,
@@ -134,10 +145,14 @@ export function createChatCompletionResponse(model: string, content: string, rol
   return Buffer.from(JSON.stringify(responseObject));
 }
 
-
 export { expect };
-import type { ChatSession } from '../src/types/chat';
-import type { Snippet, SystemPrompt, LocalStorageCurrent, IndexedDBDataCurrent } from '../src/types/storage';
+import type { ChatSession } from "../src/types/chat";
+import type {
+  Snippet,
+  SystemPrompt,
+  LocalStorageCurrent,
+  IndexedDBDataCurrent,
+} from "../src/types/storage";
 
 interface InjectedState {
   localStorage: Record<string, string>;
@@ -147,7 +162,11 @@ interface InjectedState {
     stores: {
       storeName: string;
       keyPath: string;
-      indexes?: { name: string; keyPath: string; options?: IDBIndexParameters }[];
+      indexes?: {
+        name: string;
+        keyPath: string;
+        options?: IDBIndexParameters;
+      }[];
       data: (ChatSession | SystemPrompt | Snippet)[];
     }[];
   };
@@ -156,27 +175,30 @@ interface InjectedState {
 /**
  * Injects strongly-typed data into IndexedDB.
  */
-export async function seedIndexedDB(context: BrowserContext, data: Partial<IndexedDBDataCurrent>) {
+export async function seedIndexedDB(
+  context: BrowserContext,
+  data: Partial<IndexedDBDataCurrent>,
+) {
   const injectedState: InjectedState = {
     localStorage: {},
     indexedDB: {
-      dbName: 'tomatic_chat_db',
+      dbName: "tomatic_chat_db",
       version: 3,
       stores: [
         {
-          storeName: 'chat_sessions',
-          keyPath: 'session_id',
-          indexes: [{ name: 'updated_at_ms', keyPath: 'updated_at_ms' }],
+          storeName: "chat_sessions",
+          keyPath: "session_id",
+          indexes: [{ name: "updated_at_ms", keyPath: "updated_at_ms" }],
           data: data.chat_sessions || [],
         },
         {
-          storeName: 'system_prompts',
-          keyPath: 'name',
+          storeName: "system_prompts",
+          keyPath: "name",
           data: data.system_prompts || [],
         },
         {
-          storeName: 'snippets',
-          keyPath: 'name',
+          storeName: "snippets",
+          keyPath: "name",
           data: data.snippets || [],
         },
       ],
@@ -187,7 +209,10 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
   await context.addInitScript((state: InjectedState) => {
     // 2. Populate IndexedDB
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(state.indexedDB.dbName, state.indexedDB.version);
+      const request = indexedDB.open(
+        state.indexedDB.dbName,
+        state.indexedDB.version,
+      );
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
@@ -200,7 +225,9 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
           if (db.objectStoreNames.contains(storeInfo.storeName)) {
             store = transaction.objectStore(storeInfo.storeName);
           } else {
-            store = db.createObjectStore(storeInfo.storeName, { keyPath: storeInfo.keyPath });
+            store = db.createObjectStore(storeInfo.storeName, {
+              keyPath: storeInfo.keyPath,
+            });
           }
 
           storeInfo.indexes?.forEach((index) => {
@@ -212,7 +239,9 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
       };
 
       request.onerror = () => {
-        reject(new Error(`IndexedDB error: ${request.error?.message ?? 'Unknown'}`));
+        reject(
+          new Error(`IndexedDB error: ${request.error?.message ?? "Unknown"}`),
+        );
       };
 
       request.onsuccess = (event) => {
@@ -224,7 +253,7 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
         }
 
         const storeNames = state.indexedDB.stores.map((s) => s.storeName);
-        const tx = db.transaction(storeNames, 'readwrite');
+        const tx = db.transaction(storeNames, "readwrite");
         const promises: Promise<unknown>[] = [];
 
         tx.oncomplete = () => {
@@ -232,23 +261,33 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
           resolve();
         };
         tx.onerror = () => {
-          reject(new Error(`Transaction error: ${tx.error?.message ?? 'Unknown'}`));
+          reject(
+            new Error(`Transaction error: ${tx.error?.message ?? "Unknown"}`),
+          );
         };
 
         state.indexedDB.stores.forEach((storeInfo) => {
           if (storeInfo.data.length > 0) {
             const store = tx.objectStore(storeInfo.storeName);
             storeInfo.data.forEach((item) => {
-              promises.push(new Promise((resolvePut, rejectPut) => {
-                const putRequest = store.put(item);
-                putRequest.onsuccess = () => { resolvePut(putRequest.result); };
-                putRequest.onerror = () => { rejectPut(new Error(putRequest.error?.message)); };
-              }));
+              promises.push(
+                new Promise((resolvePut, rejectPut) => {
+                  const putRequest = store.put(item);
+                  putRequest.onsuccess = () => {
+                    resolvePut(putRequest.result);
+                  };
+                  putRequest.onerror = () => {
+                    rejectPut(new Error(putRequest.error?.message));
+                  };
+                }),
+              );
             });
           }
         });
-        
-        Promise.all(promises).catch((err: unknown) => { reject(err instanceof Error ? err : new Error(String(err))); });
+
+        Promise.all(promises).catch((err: unknown) => {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
       };
     });
   }, injectedState);
@@ -256,30 +295,32 @@ export async function seedIndexedDB(context: BrowserContext, data: Partial<Index
 /**
  * Injects a strongly-typed object into localStorage under the 'tomatic-storage' key.
  */
-export async function seedLocalStorage(context: BrowserContext, data: LocalStorageCurrent) {
+export async function seedLocalStorage(
+  context: BrowserContext,
+  data: LocalStorageCurrent,
+) {
   await context.addInitScript((data) => {
-    window.localStorage.setItem('tomatic-storage', JSON.stringify(data));
+    window.localStorage.setItem("tomatic-storage", JSON.stringify(data));
   }, data);
 }
 
-
-import type { Page, Route } from '@playwright/test';
+import type { Page, Route } from "@playwright/test";
 
 // --- Chat Completion Mocking Utilities ---
 
 export interface ChatMessageMock {
-  role: 'system' | 'user' | 'assistant';
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
 export interface ChatCompletionRequestMock {
   model: string;
   messages: ChatMessageMock[];
-  stream?: boolean; // Add stream property
+  stream: boolean; // Add stream property
 }
 
 export interface ChatCompletionResponseMock {
-  role: 'assistant';
+  role: "assistant";
   content: string;
   error?: {
     status: number;
@@ -308,7 +349,10 @@ export class ChatCompletionMocker {
   }
 
   async setup() {
-    await this.page.route('https://openrouter.ai/api/v1/chat/completions', (route) => this.handleRequest(route));
+    await this.page.route(
+      "https://openrouter.ai/api/v1/chat/completions",
+      (route) => this.handleRequest(route),
+    );
   }
 
   /**
@@ -316,6 +360,10 @@ export class ChatCompletionMocker {
    * @param mock The mock definition, including the request to match and the response to serve.
    */
   mock(mock: MockedChatCompletion) {
+    console.log(
+      "[ChatCompletionMocker] Registering new mock:",
+      JSON.stringify(mock.request, null, 2),
+    );
     this.mocks.push(mock);
   }
 
@@ -324,70 +372,162 @@ export class ChatCompletionMocker {
   }
 
   private async handleRequest(route: Route) {
-    const requestBody = (await route.request().postDataJSON()) as ChatCompletionRequestMock;
-    
-    // Find a matching mock without removing it yet
-    const mockIndex = this.mocks.findIndex(m => {
-        if (m.request.model !== requestBody.model) return false;
-        if (m.request.messages.length !== requestBody.messages.length) return false;
+    const requestBody = (await route
+      .request()
+      .postDataJSON()) as ChatCompletionRequestMock;
+    console.log(
+      "[ChatCompletionMocker] Intercepted request:",
+      JSON.stringify(requestBody, null, 2),
+    );
+    console.log(
+      `[ChatCompletionMocker] ${this.mocks.length} mocks remaining in queue.`,
+    );
 
-        return m.request.messages.every((mockMsg, i) => {
-            const reqMsg = requestBody.messages[i];
-            if (!reqMsg) return false;
-            // Only compare role and content for robust matching
-            return mockMsg.role === reqMsg.role && mockMsg.content === reqMsg.content;
-        });
-    });
+    // Find a matching mock without removing it yet
+    let mockIndex = -1;
+    for (let i = 0; i < this.mocks.length; i++) {
+      const m = this.mocks[i];
+      if (!m) continue;
+
+      console.log(`[ChatCompletionMocker] --- [${i}] CHECKING MOCK ---`);
+      let isMatch = true;
+
+      if (m.request.model !== requestBody.model) {
+        console.log(
+          `[ChatCompletionMocker] [${i}] Model mismatch: Expected='${m.request.model}', Received='${requestBody.model}'`,
+        );
+        isMatch = false;
+      }
+
+      const mockStream = m.request.stream === true;
+      const requestStream = requestBody.stream === true;
+      if (mockStream !== requestStream) {
+        console.log(
+          `[ChatCompletionMocker] [${i}] Stream mismatch: Expected=${String(
+            mockStream,
+          )}, Received=${String(requestStream)}`,
+        );
+        isMatch = false;
+      }
+
+      if (m.request.messages.length !== requestBody.messages.length) {
+        console.log(
+          `[ChatCompletionMocker] [${i}] Message length mismatch: Expected=${m.request.messages.length}, Received=${requestBody.messages.length}`,
+        );
+        isMatch = false;
+      }
+
+      if (isMatch) {
+        for (let j = 0; j < m.request.messages.length; j++) {
+          const mockMsg = m.request.messages[j];
+          const reqMsg = requestBody.messages[j];
+          if (!reqMsg || !mockMsg) {
+            console.log(
+              `[ChatCompletionMocker] [${i}] Message missing at index ${j}`,
+            );
+            isMatch = false;
+            break;
+          }
+          if (mockMsg.role !== reqMsg.role) {
+            console.log(
+              `[ChatCompletionMocker] [${i}] Message[${j}] role mismatch: Expected='${mockMsg.role}', Received='${reqMsg.role}'`,
+            );
+            isMatch = false;
+          }
+          if (mockMsg.content !== reqMsg.content) {
+            console.log(
+              `[ChatCompletionMocker] [${i}] Message[${j}] content mismatch:`,
+            );
+            console.log(`  EXPECTED: "${mockMsg.content}"`);
+            console.log(`  RECEIVED: "${reqMsg.content}"`);
+            isMatch = false;
+          }
+        }
+      }
+
+      if (isMatch) {
+        mockIndex = i;
+        console.log(`[ChatCompletionMocker] --- [${i}] MOCK MATCHED ---`);
+        break; // Found a match, stop searching
+      } else {
+        console.log(`[ChatCompletionMocker] --- [${i}] MOCK DID NOT MATCH ---`);
+      }
+    }
 
     if (mockIndex === -1) {
-      console.error(`[ChatCompletionMocker] Unexpected API call. No mock found for request:`, JSON.stringify(requestBody, null, 2));
-      console.error(`[ChatCompletionMocker] Available mocks:`, JSON.stringify(this.mocks, null, 2));
+      console.error(
+        `[ChatCompletionMocker] Unexpected API call. No mock found for request:`,
+        JSON.stringify(requestBody, null, 2),
+      );
+      console.error(
+        `[ChatCompletionMocker] Available mocks:`,
+        JSON.stringify(this.mocks, null, 2),
+      );
       const errorMessage = `[ChatCompletionMocker] Unexpected API call to /chat/completions. No matching mock found.\nRECEIVED:\n${JSON.stringify(
         requestBody,
         null,
-        2
+        2,
       )}\n\nAVAILABLE MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
       throw new Error(errorMessage);
     }
-    
+    console.log(
+      `[ChatCompletionMocker] Found matching mock at index ${mockIndex}.`,
+    );
+
     // Remove the matched mock from the queue
     const nextMock = this.mocks.splice(mockIndex, 1)[0];
 
     if (!nextMock) {
-        throw new Error(`[ChatCompletionMocker] Mock not found after splice, this should not happen.`);
+      throw new Error(
+        `[ChatCompletionMocker] Mock not found after splice, this should not happen.`,
+      );
     }
 
     if (nextMock.manualTrigger) {
-        const triggerPromise = new Promise<void>(resolve => {
-            this.pendingTriggers.push(resolve);
-        });
-        await triggerPromise;
+      console.log(
+        "[ChatCompletionMocker] Mock requires manual trigger, pausing request.",
+      );
+      const triggerPromise = new Promise<void>((resolve) => {
+        this.pendingTriggers.push(resolve);
+      });
+      await triggerPromise;
+      console.log(
+        "[ChatCompletionMocker] Manual trigger received, resuming request.",
+      );
     }
 
     if (nextMock.response.error) {
       const errorBody = {
         error: {
           message: nextMock.response.error.message,
-          type: 'invalid_request_error', // A common error type
+          type: "invalid_request_error", // A common error type
           param: null,
-          code: 'invalid_request_error',
-        }
+          code: "invalid_request_error",
+        },
       };
       await route.fulfill({
         status: nextMock.response.error.status,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(errorBody),
       });
     } else {
       const isStreaming = requestBody.stream === true;
-      
+
       const responseBody = isStreaming
-          ? createStreamResponse(requestBody.model, nextMock.response.content, nextMock.response.role)
-          : createChatCompletionResponse(requestBody.model, nextMock.response.content, nextMock.response.role);
+        ? createStreamResponse(
+          requestBody.model,
+          nextMock.response.content,
+          nextMock.response.role,
+        )
+        : createChatCompletionResponse(
+          requestBody.model,
+          nextMock.response.content,
+          nextMock.response.role,
+        );
 
       await route.fulfill({
         status: 200,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers: { "Content-Type": "application/json; charset=utf-8" },
         body: responseBody,
       });
     }
@@ -398,16 +538,23 @@ export class ChatCompletionMocker {
    * This is the "trigger" that the test can call.
    */
   async resolveNextCompletion() {
+    console.log(
+      `[ChatCompletionMocker] Attempting to resolve next manual trigger. Pending triggers: ${this.pendingTriggers.length}`,
+    );
     if (this.pendingTriggers.length === 0) {
       // It's possible this is called before the app has had time to make the request.
       // Give it a very short moment to see if a trigger appears.
       await this.page.waitForTimeout(100);
     }
     if (this.pendingTriggers.length === 0) {
-      throw new Error('[ChatCompletionMocker] No pending chat completions to resolve.');
+      console.error("[ChatCompletionMocker] No pending triggers found.");
+      throw new Error(
+        "[ChatCompletionMocker] No pending chat completions to resolve.",
+      );
     }
     const trigger = this.pendingTriggers.shift();
-    if(trigger) {
+    if (trigger) {
+      console.log("[ChatCompletionMocker] Manually triggering completion.");
       trigger();
     }
   }
@@ -419,18 +566,24 @@ export class ChatCompletionMocker {
    */
   verifyComplete() {
     if (this.mocks.length > 0) {
-       const errorMessage = `[ChatCompletionMocker] Test completed, but ${String(
-        this.mocks.length
-       )} mock(s) were not consumed.\n\nUNCONSUMED MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
+      const errorMessage = `[ChatCompletionMocker] Test completed, but ${String(
+        this.mocks.length,
+      )} mock(s) were not consumed.\n\nUNCONSUMED MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
+      console.error(errorMessage);
       throw new Error(errorMessage);
     }
-   }
+    console.log("[ChatCompletionMocker] All mocks consumed successfully.");
+  }
 }
 
 /**
  * Waits for a custom event to be dispatched on the window object.
  */
-export async function waitForEvent(page: Page, eventName: string, timeout = 5000): Promise<void> {
+export async function waitForEvent(
+  page: Page,
+  eventName: string,
+  timeout = 5000,
+): Promise<void> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const eventFound = await page.evaluate<boolean, string>((name) => {
@@ -444,4 +597,3 @@ export async function waitForEvent(page: Page, eventName: string, timeout = 5000
   }
   throw new Error(`Timed out waiting for event "${eventName}"`);
 }
-
