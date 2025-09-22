@@ -1,3 +1,4 @@
+import { ROUTES } from "@/utils/routes";
 import { test } from "./fixtures";
 import { SettingsPage } from "./pom/SettingsPage";
 import type { SystemPrompt } from "../src/types/storage";
@@ -14,6 +15,10 @@ test.describe("System Prompt CRUD", () => {
 
   test.beforeEach(async ({ context, page }) => {
     await mockGlobalApis(context);
+    await seedLocalStorage(context, {
+      state: { apiKey: OPENROUTER_API_KEY },
+      version: 1,
+    });
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: "Chef", prompt: "You are a master chef." },
@@ -36,7 +41,8 @@ test.describe("System Prompt CRUD", () => {
 
     // 3. Navigate and provide POM
     settingsPage = new SettingsPage(page);
-    await settingsPage.goto();
+    await page.goto(ROUTES.settings);
+    await page.waitForSelector('[data-testid^="system-prompt-item-"]');
   });
 
   test("displays existing system prompts", async () => {
@@ -165,5 +171,34 @@ test.describe("System Prompt CRUD", () => {
     await expect(
       settingsPage.page.getByTestId("system-prompt-save-button"),
     ).toBeDisabled();
+  });
+});
+
+test.describe("API Key Management", () => {
+  let settingsPage: SettingsPage;
+
+  test.beforeEach(async ({ context, page }) => {
+    await mockGlobalApis(context);
+    settingsPage = new SettingsPage(page);
+    await page.goto(ROUTES.settings);
+  });
+
+  test("should save the API key and persist it after reload", async ({
+    page,
+  }) => {
+    // Purpose: This test verifies that the API key is correctly saved and persists
+    // across page reloads.
+
+    // 1. Enter and save the API key
+    const testApiKey = "test-api-key-12345";
+    await settingsPage.setApiKey(testApiKey);
+    await expect(settingsPage.apiKeySaveButton).toHaveText("Saved!");
+
+    // 2. Reload the page
+    await page.waitForTimeout(550);
+    await page.reload();
+
+    // 3. Verify the API key is still in the input field
+    await expect(settingsPage.apiKeyInput).toHaveValue(testApiKey);
   });
 });

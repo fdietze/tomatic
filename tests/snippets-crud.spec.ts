@@ -32,7 +32,7 @@ test.describe("Snippet Management (CRUD)", () => {
   test("creates a new standard snippet", async () => {
     // Purpose: This test verifies the basic functionality of creating a new, standard
     // (non-generated) snippet on the settings page.
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.newSnippetButton.click();
     const editContainer = settingsPage.page.getByTestId(
       "snippet-item-edit-new",
@@ -65,7 +65,7 @@ test.describe("Snippet Management (CRUD)", () => {
           },
         ],
       });
-      await settingsPage.goto();
+      await settingsPage.navigation.goToSettings();
     });
 
     test("updates an existing snippet", async () => {
@@ -118,7 +118,7 @@ test.describe("Snippet Name Validation", () => {
   test("prevents saving a new snippet with an empty name", async () => {
     // Purpose: This test verifies input validation, ensuring a snippet cannot be saved
     // if its name is empty.
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.newSnippetButton.click();
     const editContainer = settingsPage.getNewSnippetEditContainer();
 
@@ -135,7 +135,7 @@ test.describe("Snippet Name Validation", () => {
   test("prevents saving a new snippet with invalid characters", async () => {
     // Purpose: This test verifies input validation, ensuring that a snippet name can only
     // contain alphanumeric characters and underscores.
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.newSnippetButton.click();
     const editContainer = settingsPage.getNewSnippetEditContainer();
     const nameInput = settingsPage.getSnippetNameInput(editContainer);
@@ -165,7 +165,7 @@ test.describe("Snippet Name Validation", () => {
           },
         ],
       });
-      await settingsPage.goto();
+      await settingsPage.navigation.goToSettings();
     });
 
     test("prevents saving a new snippet with a duplicate name", async () => {

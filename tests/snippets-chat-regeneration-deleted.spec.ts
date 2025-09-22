@@ -9,7 +9,6 @@ import {
   mockGlobalApis,
 } from "./test-helpers";
 import { DBV3_ChatSession } from "@/types/storage";
-import { ROUTES } from "@/utils/routes";
 
 test.describe("Chat Regeneration with Deleted Snippets", () => {
   let chatPage: ChatPage;
@@ -72,7 +71,7 @@ test.describe("Chat Regeneration with Deleted Snippets", () => {
       chatMocker = new ChatCompletionMocker(page);
       await chatMocker.setup();
 
-      await page.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
+      await chatPage.goto("session-with-snippet");
     });
 
     test("blocks regeneration and shows an error", async () => {

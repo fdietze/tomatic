@@ -37,8 +37,8 @@ export class ChatPage {
   /**
    * Navigates to a new chat page.
    */
-  async goto() {
-    await this.page.goto(ROUTES.chat.new);
+  async goto(sessionId: string = "new") {
+    await this.page.goto(ROUTES.chat.session(sessionId));
   }
 
   /**

@@ -38,8 +38,6 @@ afterEach((context: TestContext) => {
   consoleErrorSpy.mockRestore();
 
   if (context.task.result?.state === "fail") {
-    console.log(`logs for test '${context.task.name}'`);
-    logBuffer.forEach((args) => console.log(...args));
   }
 
   logBuffer.length = 0;

@@ -1,3 +1,4 @@
+import { ROUTES } from "@/utils/routes";
 import { test } from "./fixtures";
 import { SettingsPage } from "./pom/SettingsPage";
 import {
@@ -33,9 +34,9 @@ test.describe("Generated Snippets", () => {
   });
 
   test.describe("from a clean state", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, { snippets: [] });
-      await settingsPage.goto();
+      await page.goto(ROUTES.settings);
     });
 
     test("UI shows correct fields for a generated snippet", async ({
@@ -169,7 +170,7 @@ test.describe("Generated Snippets", () => {
   });
 
   test.describe("with a dependency snippet", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, {
         snippets: [
           {
@@ -183,7 +184,7 @@ test.describe("Generated Snippets", () => {
           },
         ],
       });
-      await settingsPage.goto();
+      await page.goto(ROUTES.settings);
     });
 
     test("resolves snippets in the prompt before generation", async () => {
@@ -254,12 +255,13 @@ test.describe("Automatic Regeneration", () => {
 
   test("regenerates a dependent snippet when its dependency is updated", async ({
     context,
+    page,
   }) => {
     // Purpose: This test verifies that when a standard snippet (A) is updated, any generated
     // snippet (B) that depends on it (i.e., uses '@A' in its prompt) is automatically
     // and correctly regenerated in the background.
     await seedIndexedDB(context, { snippets: [] });
-    await settingsPage.goto();
+    await page.goto(ROUTES.settings);
 
     // 1. Create initial snippets: A (base) and B (depends on A)
     await settingsPage.createNewSnippet("A", "World");
@@ -298,7 +300,7 @@ test.describe("Automatic Regeneration", () => {
   });
 
   test.describe("with a dependency chain", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, {
         snippets: [
           {
@@ -334,7 +336,7 @@ test.describe("Automatic Regeneration", () => {
           },
         ],
       });
-      await settingsPage.goto();
+      await page.goto(ROUTES.settings);
     });
 
     test("transitively regenerates snippets in the correct order", async () => {
@@ -424,7 +426,7 @@ test.describe("Automatic Regeneration", () => {
   });
 
   test.describe("with a dependency that becomes empty", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, {
         snippets: [
           {
@@ -449,7 +451,7 @@ test.describe("Automatic Regeneration", () => {
           },
         ],
       });
-      await settingsPage.goto();
+      await page.goto(ROUTES.settings);
     });
 
     test("skips automatic regeneration if the resolved prompt is empty", async () => {

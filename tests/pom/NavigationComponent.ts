@@ -26,11 +26,12 @@ export class NavigationComponent {
 
   async goBackToChat() {
     await this.newChatButton.click();
+    await this.page.waitForURL("**/chat/**");
   }
 
   async goToSettings() {
     await this.settingsButton.click();
-    await this.page.waitForURL('**/settings');
+    await this.page.waitForURL("**/settings");
   }
 
   async goToNextSession() {

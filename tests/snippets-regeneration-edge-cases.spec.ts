@@ -1,3 +1,4 @@
+import { ROUTES } from "@/utils/routes";
 import { test } from "./fixtures";
 import { SettingsPage } from "./pom/SettingsPage";
 import {
@@ -34,7 +35,7 @@ test.describe("Automatic Regeneration Edge Cases", () => {
     settingsPage = new SettingsPage(page);
     // chatMocker = new ChatCompletionMocker(page);
     // await chatMocker.setup();
-    await settingsPage.goto();
+    await page.goto(ROUTES.settings);
   });
 
   test.describe("halts regeneration when an update introduces a cycle", () => {

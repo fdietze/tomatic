@@ -1,16 +1,18 @@
-import { all, fork } from 'redux-saga/effects';
-import { settingsSaga } from './features/settings/settingsSaga';
-import { promptsSaga } from './features/prompts/promptsSaga';
-import { modelsSaga } from './features/models/modelsSaga';
-import { snippetsSaga } from './features/snippets/snippetsSaga';
-import { sessionSaga } from './features/session/sessionSaga';
+import { all, fork } from "redux-saga/effects";
+import { modelsSaga } from "./features/models/modelsSaga";
+import { settingsSaga } from "./features/settings/settingsSaga";
+import { sessionSaga } from "./features/session/sessionSaga";
+import { promptsSaga } from "./features/prompts/promptsSaga";
+import { snippetsSaga } from "./features/snippets/snippetsSaga";
+import { appSaga } from "./features/app/appSaga";
 
 export default function* rootSaga() {
   yield all([
-    fork(settingsSaga),
-    fork(promptsSaga),
     fork(modelsSaga),
-    fork(snippetsSaga),
+    fork(settingsSaga),
     fork(sessionSaga),
+    fork(promptsSaga),
+    fork(snippetsSaga),
+    fork(appSaga),
   ]);
 }

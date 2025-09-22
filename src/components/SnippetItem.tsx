@@ -9,6 +9,7 @@ import { selectModels } from '@/store/features/models/modelsSlice';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
 import { selectSnippets, updateSnippet, deleteSnippet, setRegenerationStatus } from '@/store/features/snippets/snippetsSlice';
+import { assertUnreachable } from '@/utils/assert';
 
 interface SnippetItemProps {
   snippet: Snippet;
@@ -31,9 +32,6 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     useSelector(selectPrompts);
     const { snippets: allSnippets, regenerationStatus } = useSelector(selectSnippets);
     
-    const isActuallyRegenerating = regenerationStatus[snippet.name] === 'in_progress';
-    const shouldShowSpinner = isActuallyRegenerating || snippet.isDirty;
-
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
   const [editingName, setEditingName] = useState(snippet.name);
   const [editingContent, setEditingContent] = useState(snippet.content);
@@ -271,25 +269,36 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       <div className="system-prompt-header">
         <span className="system-prompt-name">{snippet.name}</span>
         <div className="system-prompt-actions">
-          {shouldShowSpinner && <span className="spinner" data-testid="regenerating-spinner" />}
-          <div className="system-prompt-buttons">
-            <button
-              onClick={() => { setIsEditing(true); }}
-              data-size="compact"
-              data-testid="snippet-edit-button"
-              disabled={isActuallyRegenerating}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => { dispatch(deleteSnippet(snippet.name)); }}
-              data-size="compact"
-              data-testid="snippet-delete-button"
-              disabled={isActuallyRegenerating}
-            >
-              Delete
-            </button>
-          </div>
+          {(() => {
+            const status = regenerationStatus[snippet.name] || 'idle';
+            switch (status) {
+              case 'idle':
+              case 'success':
+              case 'error':
+                return (
+                  <div className="system-prompt-buttons">
+                    <button
+                      onClick={() => { setIsEditing(true); }}
+                      data-size="compact"
+                      data-testid="snippet-edit-button"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => { dispatch(deleteSnippet(snippet.name)); }}
+                      data-size="compact"
+                      data-testid="snippet-delete-button"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                );
+              case 'in_progress':
+                return <span className="spinner" data-testid="regenerating-spinner" />;
+              default:
+                assertUnreachable(status);
+            }
+          })()}
         </div>
       </div>
       <span className="system-prompt-text">{snippet.content}</span>

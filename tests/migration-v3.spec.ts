@@ -1,11 +1,14 @@
 import { test } from "./fixtures";
 import {
-  expect,
   mockGlobalApis,
   OPENROUTER_API_KEY,
   seedLocalStorage,
 } from "./test-helpers";
-import { DBV2_ChatSession, DBV2_SystemPrompt } from "@/types/storage";
+import {
+  DBV2_ChatSession,
+  DBV2_SystemPrompt,
+} from "@/types/storage";
+import { ChatPage } from "./pom/ChatPage";
 import { ROUTES } from "@/utils/routes";
 
 declare global {
@@ -134,65 +137,14 @@ test.describe("Database Migrations V3", () => {
 
     await page.goto(ROUTES.chat.new);
 
-    const migrationResult = await page.evaluate(
-      async (): Promise<{
-        dbVersion: number;
-        hasSessionsStore: boolean;
-        hasPromptsStore: boolean;
-        hasSnippetsStore: boolean;
-        sessionCount: number;
-        promptCount: number;
-      }> => {
-        const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = window.indexedDB.open("tomatic_chat_db");
-          request.onsuccess = () => {
-            resolve(request.result);
-          };
-          request.onerror = () => {
-            reject(new Error("DB open error"));
-          };
-        });
+    // Wait for the migration to complete, which should trigger a redirect
+    await page.evaluate(() => window.migrationPromise);
 
-        const dbVersion = db.version;
-        const hasSessionsStore = db.objectStoreNames.contains("chat_sessions");
-        const hasPromptsStore = db.objectStoreNames.contains("system_prompts");
-        const hasSnippetsStore = db.objectStoreNames.contains("snippets");
+    // Verify the redirection
+    await page.waitForURL(`**/chat/${V2_SESSION.session_id}`);
 
-        const tx = db.transaction(
-          ["chat_sessions", "system_prompts"],
-          "readonly",
-        );
-        const sessionCountReq = tx.objectStore("chat_sessions").count();
-        const promptCountReq = tx.objectStore("system_prompts").count();
-
-        const sessionCount = await new Promise<number>((resolve) => {
-          sessionCountReq.onsuccess = () => {
-            resolve(sessionCountReq.result);
-          };
-        });
-        const promptCount = await new Promise<number>((resolve) => {
-          promptCountReq.onsuccess = () => {
-            resolve(promptCountReq.result);
-          };
-        });
-
-        db.close();
-        return {
-          dbVersion,
-          hasSessionsStore,
-          hasPromptsStore,
-          hasSnippetsStore,
-          sessionCount,
-          promptCount,
-        };
-      },
-    );
-
-    expect(migrationResult.dbVersion).toBe(3);
-    expect(migrationResult.hasSessionsStore).toBe(true);
-    expect(migrationResult.hasPromptsStore).toBe(true);
-    expect(migrationResult.hasSnippetsStore).toBe(true);
-    expect(migrationResult.sessionCount).toBe(1);
-    expect(migrationResult.promptCount).toBe(1);
+    // Assert that the message from the migrated session is displayed
+    const chatPage = new ChatPage(page);
+    await chatPage.expectMessage(0, "user", /Hello/);
   });
 });

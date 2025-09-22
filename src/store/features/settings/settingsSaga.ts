@@ -45,7 +45,7 @@ export function* settingsSaga() {
     toggleAutoScroll.type,
     setSelectedPromptName.type,
     setInitialChatPrompt.type,
-    saveSettingsAction.type,
   ];
   yield debounce(500, actionsToSave, saveSettingsSaga);
+  yield takeLatest(saveSettingsAction.type, saveSettingsSaga);
 }

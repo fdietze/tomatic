@@ -8,6 +8,7 @@
 - before commiting, opening a PR or considering a task as done, `just check` must have run successfully
 - When `just check` results in a failed test, you must immediately enter the debugging protocol.
 - if you cannot satisfy the linter, it is ok to disable linting rules in the code on a per-case basis.
+- e2e tests often report the number of failed tests and the number of passed tests. pay special attention to these numbers.
 
 # General
 - trust the type checker.
@@ -29,7 +30,8 @@
 - make illegal states irrepresentable
 - parse, don't validate
 - aid type inference by adding more explicit types
-- When debugging XState machines with `always` transitions that depend on context updated by events, ensure the state is re-entered (e.g., via a self-transition) to force re-evaluation of the `always` transition.
+- use exhaustiveness matching of typescript wherever possible
+- handled errors should never use console.error, only console.log. console.error is considered an error by the tests.
 
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 
@@ -46,13 +48,14 @@
 - for bigger tasks, break it down into smaller steps, that can be individually typechecked and tested, before moving on to the next step.
 
 # Debugging Protocol
-Follow this process by creating a plan for it:
+Strictly follow this process by creating a plan for it:
 State that you are "Entering the debugging protocol."
 run the tests (fix type-errors if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
 - what are the current hypotheses of the tests failing? Explain the hypotheses with log traces.
 - are we able to catch those problems with more future-proof unit tests?
 - where and which logging must we add to confirm or refute these hypotheses
-- add logging to trace the whole flow from start to finish. always raw use console.log calls - never console.error.
+- add logging to trace the whole flow from start to finish (always use console.log).
+- if applicable add a simple unit test.
 - which logs should we remove to reduce noise?
 - run the tests again
 - don't fix anything yet

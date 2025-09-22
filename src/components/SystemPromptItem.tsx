@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { SystemPrompt } from "@/types/storage";
+import { assertUnreachable } from "@/utils/assert";
 
 interface SystemPromptItemProps {
   prompt: SystemPrompt;
@@ -62,6 +63,22 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
     // Tell the parent to cancel editing
     if (onCancel) {
       onCancel();
+    }
+  };
+
+  const getSaveButtonText = (
+    status: "idle" | "saving" | "deleting" | "failed",
+  ) => {
+    switch (status) {
+      case "idle":
+      case "failed":
+        return "Save";
+      case "saving":
+        return "Saving...";
+      case "deleting":
+        return "Save";
+      default:
+        assertUnreachable(status);
     }
   };
 
@@ -129,7 +146,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
             disabled={!!nameError || status === "saving"}
             data-testid="system-prompt-save-button"
           >
-            {status === "saving" ? "Saving..." : "Save"}
+            {getSaveButtonText(status)}
           </button>
           <button
             onClick={handleCancelEditing}
@@ -157,29 +174,40 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
           </div>
         )}
       </div>
-      {status === "deleting" ? (
-        <div className="spinner-container">
-          <div className="spinner" />
-        </div>
-      ) : (
-        <div className="system-prompt-buttons">
-          <button
-            onClick={onEdit}
-            data-size="compact"
-            data-testid="system-prompt-edit-button"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onRemove}
-            data-size="compact"
-            data-testid="system-prompt-delete-button"
-            disabled={status === "saving"}
-          >
-            Delete
-          </button>
-        </div>
-      )}
+      {(() => {
+        switch (status) {
+          case "idle":
+          case "saving":
+          case "failed":
+            return (
+              <div className="system-prompt-buttons">
+                <button
+                  onClick={onEdit}
+                  data-size="compact"
+                  data-testid="system-prompt-edit-button"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={onRemove}
+                  data-size="compact"
+                  data-testid="system-prompt-delete-button"
+                  disabled={status === "saving"}
+                >
+                  Delete
+                </button>
+              </div>
+            );
+          case "deleting":
+            return (
+              <div className="spinner-container">
+                <div className="spinner" />
+              </div>
+            );
+          default:
+            assertUnreachable(status);
+        }
+      })()}
     </div>
   );
 };

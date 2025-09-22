@@ -97,7 +97,7 @@ test.describe("Chat Editing with Snippets", () => {
     });
 
     // 3. Navigate and create POMs
-    await page.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
+    await chatPage.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
 
     // 4. Verify initial state
     await chatPage.expectMessage(0, "user", /@greet world/);

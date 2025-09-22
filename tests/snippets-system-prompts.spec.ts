@@ -98,7 +98,7 @@ test.describe("Snippet Usage in System Prompts", () => {
       version: 1,
     });
 
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.createNewSnippet("character", "helpful assistant");
     await settingsPage.createNewPrompt("TestPrompt", "You are a @character.");
 
@@ -139,13 +139,13 @@ test.describe("Snippet Usage in System Prompts", () => {
 
     // 4. Update snippet via UI
     const chatUrl = page.url(); // Store the chat URL
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.startEditingSnippet("character");
     await settingsPage.fillSnippetForm("character", "fearsome pirate");
     await settingsPage.saveSnippet();
 
     // 5. Regenerate and assert
-    await page.goto(chatUrl); // Go back to the chat
+    await chatPage.goto(chatUrl); // Go back to the chat
 
     const regenerateButton = chatPage
       .getMessageLocator(2)
@@ -287,7 +287,7 @@ test.describe("Snippet Usage in System Prompts", () => {
 
     // 4. Update snippet via UI, which triggers the chain
     const chatUrl = page.url();
-    await settingsPage.goto();
+    await settingsPage.navigation.goToSettings();
     await settingsPage.startEditingSnippet("base_snippet");
     await settingsPage.fillSnippetForm("base_snippet", "v2");
     await settingsPage.saveSnippet();
@@ -296,7 +296,7 @@ test.describe("Snippet Usage in System Prompts", () => {
     await waitForEvent(page, "app:snippet:regeneration:batch:complete");
 
     // 6. Navigate back to chat and trigger regeneration.
-    await page.goto(chatUrl);
+    await chatPage.goto(chatUrl);
 
     const responsePromise2 = page.waitForResponse(
       "https://openrouter.ai/api/v1/chat/completions",

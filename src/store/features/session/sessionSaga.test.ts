@@ -8,10 +8,21 @@ import { streamChat } from "@/services/chatService";
 import { submitUserMessage } from "./sessionSlice";
 import { type RootState } from "@/store/store";
 import type { Message } from "@/types/chat";
+import { expectSaga } from "redux-saga-test-plan";
+import { select } from "redux-saga/effects";
+
+import { goToPrevSession, selectSession } from "./sessionSlice";
+import { sessionSaga } from "./sessionSaga";
+import { ROUTES } from "@/utils/routes";
+import { getNavigationService } from "@/services/NavigationProvider";
 
 // Mock the chat service to avoid real API calls
 vi.mock("@/services/chatService", () => ({
   streamChat: vi.fn(),
+}));
+
+vi.mock("@/services/NavigationProvider", () => ({
+  getNavigationService: vi.fn(),
 }));
 
 // Mock nanoid to have predictable IDs for snapshot consistency
@@ -222,5 +233,34 @@ describe("sessionSaga", () => {
       modelName: "test-model",
       apiKey: "test-api-key",
     });
+  });
+
+  test("should navigate to the previous session when goToPrevSession is dispatched", () => {
+    // Purpose: This test verifies that the saga retrieves the previous session ID from the state
+    // and calls the navigation service to change the URL.
+    const mockState = {
+      session: {
+        prevSessionId: "prev-session-id",
+      },
+    };
+
+    const mockNavigationService = {
+      navigate: vi.fn(),
+    };
+
+    (getNavigationService as Mock).mockReturnValue(mockNavigationService);
+
+    return expectSaga(sessionSaga)
+      .withState(mockState)
+      .provide([
+        [select(selectSession), mockState.session],
+      ])
+      .dispatch(goToPrevSession())
+      .call(getNavigationService)
+      .call(
+        [mockNavigationService, mockNavigationService.navigate],
+        ROUTES.chat.session("prev-session-id"),
+      )
+      .run();
   });
 });

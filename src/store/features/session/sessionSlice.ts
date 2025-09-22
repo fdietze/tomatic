@@ -124,6 +124,12 @@ export const sessionSlice = createSlice({
     cancelSubmission: (state) => {
       state.submitting = false;
     },
+    goToPrevSession: () => {
+      // No state change, this is handled by a saga
+    },
+    goToNextSession: () => {
+      // No state change, this is handled by a saga
+    },
   },
 });
 
@@ -138,6 +144,8 @@ export const {
   submitUserMessageSuccess,
   submitUserMessageFailure,
   cancelSubmission,
+  goToPrevSession,
+  goToNextSession,
 } = sessionSlice.actions;
 
 export const selectSession = (state: RootState) => state.session;
