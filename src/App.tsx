@@ -6,7 +6,6 @@ import {
   Navigate,
   useLocation,
   useNavigate,
-  useMatch,
 } from "react-router-dom";
 import ChatPage from "@/pages/ChatPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -14,7 +13,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { ROUTES } from "@/utils/routes";
 import {
   selectSession,
-  loadSession,
+  loadInitialSessionSaga,
 } from "@/store/features/session/sessionSlice";
 import { selectSnippets } from "@/store/features/snippets/snippetsSlice";
 import { NavigationProvider } from "@/services/NavigationProvider";
@@ -27,14 +26,9 @@ const Header: React.FC = () => {
   const { currentSessionId } = session;
   const { regenerationStatus } = useSelector(selectSnippets);
 
-  const chatMatch = useMatch(ROUTES.chat.byId);
-  const sessionIdFromUrl = chatMatch?.params.id;
-
   useEffect(() => {
-    if (sessionIdFromUrl && sessionIdFromUrl !== currentSessionId) {
-      dispatch(loadSession(sessionIdFromUrl));
-    }
-  }, [sessionIdFromUrl, currentSessionId, dispatch]);
+    dispatch(loadInitialSessionSaga());
+  }, [dispatch]);
 
   const isRegenerating = Object.values(regenerationStatus).some(
     (s) => s === "in_progress",

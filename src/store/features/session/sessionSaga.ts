@@ -23,30 +23,43 @@ import {
   submitUserMessageFailure,
   submitUserMessageSuccess,
   selectSession,
+  setHasSessions,
+  loadInitialSessionSaga as loadInitialSessionSagaAction,
+  initializeNewSession,
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
+import { SessionState } from "./sessionSlice";
 
 // --- Worker Sagas ---
 
 function* goToPrevSessionSaga(): SagaIterator {
-  const { prevSessionId } = yield select(selectSession);
-  if (prevSessionId) {
-    const navigationService = yield call(getNavigationService);
+  const session: SessionState = yield select(selectSession);
+  const navigationService = yield call(getNavigationService);
+  if (session.prevSessionId) {
     yield call(
       [navigationService, navigationService.navigate],
-      ROUTES.chat.session(prevSessionId),
+      ROUTES.chat.session(session.prevSessionId),
     );
+  } else if (!session.currentSessionId) {
+    // If there's no current session, go to the most recent one.
+    const mostRecentId: string | null = yield call(db.getMostRecentSessionId);
+    if (mostRecentId) {
+      yield call(
+        [navigationService, navigationService.navigate],
+        ROUTES.chat.session(mostRecentId),
+      );
+    }
   }
 }
 
 function* goToNextSessionSaga(): SagaIterator {
-  const { nextSessionId } = yield select(selectSession);
-  if (nextSessionId) {
-    const navigationService = yield call(getNavigationService);
+  const session: SessionState = yield select(selectSession);
+  const navigationService = yield call(getNavigationService);
+  if (session.nextSessionId) {
     yield call(
       [navigationService, navigationService.navigate],
-      ROUTES.chat.session(nextSessionId),
+      ROUTES.chat.session(session.nextSessionId),
     );
   }
 }
@@ -81,6 +94,21 @@ function* loadSessionSaga(action: PayloadAction<string>) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred";
     yield put(loadSessionFailure(message));
+  }
+}
+
+function* initializeNewSessionSaga() {
+  const lastSessionId: string | null = yield call(db.getMostRecentSessionId);
+  yield put(initializeNewSession({ lastSessionId }));
+}
+
+function* loadInitialSessionSaga(): SagaIterator {
+  try {
+    const hasSessions: boolean = yield call(db.hasSessions);
+    yield put(setHasSessions(hasSessions));
+  } catch (error) {
+    // Handle potential errors if necessary
+    console.error("Failed to check for sessions:", error);
   }
 }
 
@@ -208,8 +236,13 @@ function* submitUserMessageSaga(
 export function* sessionSaga() {
   yield all([
     takeLatest(loadSession.type, loadSessionSaga),
-    takeLatest(submitUserMessage.type, submitUserMessageSaga),
+    takeLatest(
+      loadInitialSessionSagaAction.type,
+      loadInitialSessionSaga,
+    ),
+    takeLatest(startNewSession.type, loadInitialSessionSaga),
     takeLatest(goToPrevSession.type, goToPrevSessionSaga),
     takeLatest(goToNextSession.type, goToNextSessionSaga),
+    takeLatest(submitUserMessage.type, submitUserMessageSaga),
   ]);
 }

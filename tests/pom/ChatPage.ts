@@ -15,6 +15,7 @@ export class ChatPage {
   readonly modelCombobox: ModelComboboxPage;
   readonly navigation: NavigationComponent;
   readonly errorMessage: Locator;
+  readonly chatMessages: Locator;
 
   constructor(public readonly page: Page) {
     this.chatInput = page.getByTestId("chat-input");
@@ -22,6 +23,7 @@ export class ChatPage {
     this.modelCombobox = new ModelComboboxPage(page);
     this.navigation = new NavigationComponent(page);
     this.errorMessage = page.getByTestId("error-message");
+    this.chatMessages = page.locator('[data-testid^="chat-message-"]');
   }
 
   async exposeTomaticTestGetStore() {
