@@ -360,10 +360,6 @@ export class ChatCompletionMocker {
    * @param mock The mock definition, including the request to match and the response to serve.
    */
   mock(mock: MockedChatCompletion) {
-    console.log(
-      "[ChatCompletionMocker] Registering new mock:",
-      JSON.stringify(mock.request, null, 2),
-    );
     this.mocks.push(mock);
   }
 
@@ -375,13 +371,6 @@ export class ChatCompletionMocker {
     const requestBody = (await route
       .request()
       .postDataJSON()) as ChatCompletionRequestMock;
-    console.log(
-      "[ChatCompletionMocker] Intercepted request:",
-      JSON.stringify(requestBody, null, 2),
-    );
-    console.log(
-      `[ChatCompletionMocker] ${this.mocks.length} mocks remaining in queue.`,
-    );
 
     // Find a matching mock without removing it yet
     let mockIndex = -1;
@@ -389,31 +378,19 @@ export class ChatCompletionMocker {
       const m = this.mocks[i];
       if (!m) continue;
 
-      console.log(`[ChatCompletionMocker] --- [${i}] CHECKING MOCK ---`);
       let isMatch = true;
 
       if (m.request.model !== requestBody.model) {
-        console.log(
-          `[ChatCompletionMocker] [${i}] Model mismatch: Expected='${m.request.model}', Received='${requestBody.model}'`,
-        );
         isMatch = false;
       }
 
       const mockStream = m.request.stream === true;
       const requestStream = requestBody.stream === true;
       if (mockStream !== requestStream) {
-        console.log(
-          `[ChatCompletionMocker] [${i}] Stream mismatch: Expected=${String(
-            mockStream,
-          )}, Received=${String(requestStream)}`,
-        );
         isMatch = false;
       }
 
       if (m.request.messages.length !== requestBody.messages.length) {
-        console.log(
-          `[ChatCompletionMocker] [${i}] Message length mismatch: Expected=${m.request.messages.length}, Received=${requestBody.messages.length}`,
-        );
         isMatch = false;
       }
 
@@ -422,24 +399,13 @@ export class ChatCompletionMocker {
           const mockMsg = m.request.messages[j];
           const reqMsg = requestBody.messages[j];
           if (!reqMsg || !mockMsg) {
-            console.log(
-              `[ChatCompletionMocker] [${i}] Message missing at index ${j}`,
-            );
             isMatch = false;
             break;
           }
           if (mockMsg.role !== reqMsg.role) {
-            console.log(
-              `[ChatCompletionMocker] [${i}] Message[${j}] role mismatch: Expected='${mockMsg.role}', Received='${reqMsg.role}'`,
-            );
             isMatch = false;
           }
           if (mockMsg.content !== reqMsg.content) {
-            console.log(
-              `[ChatCompletionMocker] [${i}] Message[${j}] content mismatch:`,
-            );
-            console.log(`  EXPECTED: "${mockMsg.content}"`);
-            console.log(`  RECEIVED: "${reqMsg.content}"`);
             isMatch = false;
           }
         }
@@ -447,10 +413,8 @@ export class ChatCompletionMocker {
 
       if (isMatch) {
         mockIndex = i;
-        console.log(`[ChatCompletionMocker] --- [${i}] MOCK MATCHED ---`);
         break; // Found a match, stop searching
       } else {
-        console.log(`[ChatCompletionMocker] --- [${i}] MOCK DID NOT MATCH ---`);
       }
     }
 
@@ -470,9 +434,6 @@ export class ChatCompletionMocker {
       )}\n\nAVAILABLE MOCKS:\n${JSON.stringify(this.mocks, null, 2)}`;
       throw new Error(errorMessage);
     }
-    console.log(
-      `[ChatCompletionMocker] Found matching mock at index ${mockIndex}.`,
-    );
 
     // Remove the matched mock from the queue
     const nextMock = this.mocks.splice(mockIndex, 1)[0];
@@ -484,16 +445,10 @@ export class ChatCompletionMocker {
     }
 
     if (nextMock.manualTrigger) {
-      console.log(
-        "[ChatCompletionMocker] Mock requires manual trigger, pausing request.",
-      );
       const triggerPromise = new Promise<void>((resolve) => {
         this.pendingTriggers.push(resolve);
       });
       await triggerPromise;
-      console.log(
-        "[ChatCompletionMocker] Manual trigger received, resuming request.",
-      );
     }
 
     if (nextMock.response.error) {
@@ -538,9 +493,6 @@ export class ChatCompletionMocker {
    * This is the "trigger" that the test can call.
    */
   async resolveNextCompletion() {
-    console.log(
-      `[ChatCompletionMocker] Attempting to resolve next manual trigger. Pending triggers: ${this.pendingTriggers.length}`,
-    );
     if (this.pendingTriggers.length === 0) {
       // It's possible this is called before the app has had time to make the request.
       // Give it a very short moment to see if a trigger appears.
@@ -554,7 +506,6 @@ export class ChatCompletionMocker {
     }
     const trigger = this.pendingTriggers.shift();
     if (trigger) {
-      console.log("[ChatCompletionMocker] Manually triggering completion.");
       trigger();
     }
   }
@@ -572,7 +523,6 @@ export class ChatCompletionMocker {
       console.error(errorMessage);
       throw new Error(errorMessage);
     }
-    console.log("[ChatCompletionMocker] All mocks consumed successfully.");
   }
 }
 

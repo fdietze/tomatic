@@ -46,7 +46,6 @@ export class ChatPage {
    * @param message The text to send.
    */
   async sendMessage(message: string) {
-    console.log(`[ChatPage|sendMessage] Sending message: "${message}"`);
     await this.chatInput.fill(message);
     await this.chatSubmitButton.click();
   }

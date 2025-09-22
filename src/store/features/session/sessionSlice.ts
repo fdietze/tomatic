@@ -68,20 +68,15 @@ export const sessionSlice = createSlice({
       state.error = null;
       const { prompt, isRegeneration, editMessageIndex } = action.payload;
 
-      if (isRegeneration) {
-        // The last message is the assistant's response to be regenerated. Remove it.
-        // The history now ends with the user message that prompted it. The saga will
-        // then resubmit this truncated history.
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (lastMessage?.role === "assistant") {
-          state.messages.pop();
-        }
-      } else {
-        // This handles both new messages and edited messages.
-        // If editing, truncate the history up to the message being edited.
-        if (editMessageIndex !== undefined && editMessageIndex >= 0) {
-          state.messages.splice(editMessageIndex);
-        }
+      if (
+        editMessageIndex !== undefined &&
+        editMessageIndex >= 0 &&
+        editMessageIndex < state.messages.length
+      ) {
+        state.messages.splice(editMessageIndex);
+      }
+
+      if (!isRegeneration) {
         // Add the new/edited user message.
         state.messages.push({
           id: nanoid(),
@@ -106,9 +101,16 @@ export const sessionSlice = createSlice({
         lastMessage.content += action.payload.chunk;
       }
     },
-    submitUserMessageSuccess: (state) => {
+    submitUserMessageSuccess: (
+      state,
+      action: PayloadAction<{ model: string }>,
+    ) => {
       state.submitting = false;
       state.error = null;
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (lastMessage?.role === "assistant") {
+        lastMessage.model_name = action.payload.model;
+      }
     },
     submitUserMessageFailure: (state, action: PayloadAction<string>) => {
       state.submitting = false;

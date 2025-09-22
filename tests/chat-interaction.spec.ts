@@ -154,7 +154,6 @@ test("can regenerate an assistant response", async ({ context, page }) => {
   // Purpose: This test verifies the "regenerate" functionality. It checks that when a user requests
   // a regeneration of an assistant's message, a new request is sent with the same user prompt,
   // and the original assistant message is replaced with the new response.
-  console.log("[TEST] Starting: can regenerate an assistant response");
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
@@ -172,7 +171,6 @@ test("can regenerate an assistant response", async ({ context, page }) => {
   await chatPage.goto();
 
   // 1. Mock the initial response
-  console.log("[TEST] Mocking initial response");
   chatMocker.mock({
     request: {
       model: "google/gemini-2.5-pro",
@@ -194,17 +192,13 @@ test("can regenerate an assistant response", async ({ context, page }) => {
       content: "This is a regenerated response.",
     },
   });
-  console.log(`[TEST] Mocks pending: ${chatMocker.getPendingMocks().length}`);
 
   // 3. Send the first message and await the response
-  console.log("[TEST] Sending initial message");
   const responsePromise1 = page.waitForResponse(
     "https://openrouter.ai/api/v1/chat/completions",
   );
   await chatPage.sendMessage("Initial message");
   await responsePromise1;
-  console.log("[TEST] Initial response received");
-  console.log(`[TEST] Mocks pending: ${chatMocker.getPendingMocks().length}`);
 
   // Verify initial messages
   await chatPage.expectMessage(0, "user", /Initial message/);
@@ -212,14 +206,11 @@ test("can regenerate an assistant response", async ({ context, page }) => {
   await chatPage.expectMessageCount(2);
 
   // 4. Click the regenerate button and await the new response
-  console.log("[TEST] Regenerating message");
   const responsePromise2 = page.waitForResponse(
     "https://openrouter.ai/api/v1/chat/completions",
   );
   await chatPage.regenerateMessage(1);
   await responsePromise2;
-  console.log("[TEST] Regenerated response received");
-  console.log(`[TEST] Mocks pending: ${chatMocker.getPendingMocks().length}`);
 
   // 5. Assertions
   await chatPage.expectMessage(0, "user", /Initial message/);
@@ -231,9 +222,7 @@ test("can regenerate an assistant response", async ({ context, page }) => {
   await chatPage.expectMessageCount(2);
 
   // 6. Verify all mocks were consumed
-  console.log("[TEST] Verifying mocks are complete");
   chatMocker.verifyComplete();
-  console.log("[TEST] Finished: can regenerate an assistant response");
 });
 
 test("shows system prompt immediately in a new chat", async ({

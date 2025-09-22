@@ -79,9 +79,6 @@ const getOpenAIClient = (apiKey: string): OpenAI => {
 // --- API Functions ---
 
 export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
-  console.debug(
-    "[API|listAvailableModels] Fetching from https://openrouter.ai/api/v1/models",
-  );
   // We are not using the OpenAI client here because this is an OpenRouter-specific endpoint.
   // The official OpenAI client does not have a `models.list()` equivalent that works for OpenRouter's model discovery.
   try {
@@ -129,12 +126,6 @@ export async function requestMessageContentStream(
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
 
-  console.debug(
-    `[API] Requesting streaming chat completion with model ${model} and ${String(
-      messages.length,
-    )} messages.`,
-  );
-
   const openai = getOpenAIClient(apiKey);
 
   try {
@@ -167,12 +158,6 @@ export async function requestMessageContent(
     model: model,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
-
-  console.debug(
-    `[API] Requesting non-streaming chat completion with model ${model} and ${String(
-      messages.length,
-    )} messages.`,
-  );
 
   const openai = getOpenAIClient(apiKey);
 
