@@ -179,7 +179,6 @@ const Combobox: React.FC<ComboboxProps> = ({
           aria-autocomplete="list"
           aria-expanded={showSuggestions}
         />
-         <CopyButton textToCopy={selectedId} />
          {onReload && (
             <button onClick={onReload} className={`combobox-reload ${loading ? 'reloading' : ''}`} disabled={loading} data-testid="reload-models-button">
                 <i className="codicon codicon-refresh"></i>
