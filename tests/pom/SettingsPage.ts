@@ -56,21 +56,15 @@ export class SettingsPage {
    * @param prompt The prompt content to fill in the prompt textarea.
    */
   async fillPromptForm(name: string, prompt: string) {
-    console.log(
-      `[SettingsPage|fillPromptForm] Filling form with name: "${name}"`,
-    );
     await this.page.getByTestId("system-prompt-name-input").fill(name);
     await this.page.getByTestId("system-prompt-prompt-input").fill(prompt);
-    console.log(`[SettingsPage|fillPromptForm] Form filled.`);
   }
 
   /**
    * Clicks the save button in the prompt edit form.
    */
   async savePrompt() {
-    console.log(`[SettingsPage|savePrompt] Clicking save button.`);
     await this.page.getByTestId("system-prompt-save-button").click();
-    console.log(`[SettingsPage|savePrompt] Save button clicked.`);
   }
 
   /**
@@ -95,35 +89,21 @@ export class SettingsPage {
    * @param name The name of the prompt to edit.
    */
   async startEditing(name: string) {
-    console.log(
-      `[SettingsPage|startEditing] Starting to edit prompt: "${name}"`,
-    );
     await this.getPromptItem(name)
       .getByTestId("system-prompt-edit-button")
       .click();
-    console.log(
-      `[SettingsPage|startEditing] Edit button clicked for prompt: "${name}"`,
-    );
   }
 
   // --- Snippet Actions ---
 
   async createNewSnippet(name: string, content: string) {
-    console.log(`[SettingsPage] Clicking new snippet button.`);
     await this.newSnippetButton.click();
     const editContainer = this.page.getByTestId("snippet-item-edit-new");
-    console.log(`[SettingsPage] Filling snippet form with name: ${name}`);
     await editContainer.getByTestId("snippet-name-input").fill(name);
     await editContainer.getByTestId("snippet-content-input").fill(content);
-    console.log(`[SettingsPage] Clicking save button.`);
     await editContainer.getByTestId("snippet-save-button").click();
-    console.log(`[SettingsPage] Waiting for edit container to disappear.`);
     await expect(editContainer).not.toBeVisible();
-    console.log(
-      `[SettingsPage] Waiting for snippet item to be visible: ${name}`,
-    );
     await expect(this.getSnippetItem(name)).toBeVisible();
-    console.log(`[SettingsPage] New snippet created: ${name}`);
   }
 
   async deleteSnippet(name: string) {

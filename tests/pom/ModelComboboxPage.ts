@@ -17,17 +17,10 @@ export class ModelComboboxPage {
    * @param modelId The unique ID of the model to select, e.g. 'mock-model/mock-model'.
    */
   async selectModel(name: string, modelId: string) {
-    console.log(
-      `[ModelComboboxPage|selectModel] Filling input with: "${name}"`,
-    );
     await this.input.fill(name);
-    console.log(
-      `[ModelComboboxPage|selectModel] Clicking model item: "${modelId}"`,
-    );
     await this.page
       .locator(`[data-testid="model-combobox-item-${modelId}"]`)
       .click();
-    console.log(`[ModelComboboxPage|selectModel] Model selected.`);
   }
 
   /**

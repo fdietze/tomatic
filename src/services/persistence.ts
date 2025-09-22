@@ -51,13 +51,7 @@ interface TomaticDB extends DBSchema {
 function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
   return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, tx) {
-      console.log(
-        `[DEBUG] Entering upgrade handler. oldVersion: ${oldVersion}, newVersion: ${_newVersion}`,
-      );
       if (oldVersion < 2) {
-        console.log(
-          "[DEBUG] Upgrading from <2: Creating sessions and prompts stores.",
-        );
         // Create sessions store
         if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
           const store = db.createObjectStore(SESSIONS_STORE_NAME, {
@@ -80,7 +74,6 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
           .then(function migrate(cursor) {
             if (!cursor) {
               dispatchEvent("db_migration_complete", { from: 1, to: 2 });
-              console.log("[DEBUG] Migration from 1 to 2 completed.");
               return;
             }
 
@@ -106,7 +99,6 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
           });
       }
       if (oldVersion < 3) {
-        console.log("[DEBUG] Upgrading from <3: Creating snippets store.");
         // Create snippets store
         if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
           db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
@@ -119,7 +111,6 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
           .then(function migrateSnippets(cursor) {
             if (!cursor) {
               dispatchEvent("db_migration_complete", { from: 2, to: 3 });
-              console.log("[DEBUG] Migration from 2 to 3 completed.");
               return;
             }
 
@@ -138,7 +129,6 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
             void cursor.continue().then(migrateSnippets);
           });
       }
-      console.log("[DEBUG] Exiting upgrade handler.");
     },
   });
 }
@@ -158,15 +148,9 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
     updatedAt_ms: now,
   };
   try {
-    console.debug(
-      `[DB|saveSnippet] Attempting to save snippet: @${snippetToSave.name}, content: "${snippetToSave.content}"`,
-    );
     const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
     await tx.store.put(snippetToSave);
     await tx.done;
-    console.debug(
-      `[DB|saveSnippet] Successfully saved snippet: @${snippetToSave.name}`,
-    );
   } catch (e) {
     console.error("[DB|saveSnippet] Failed to save snippet:", e);
     throw new Error("Failed to save snippet.");
@@ -177,12 +161,6 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
   const db = await dbPromise;
   try {
     const snippets = await db.getAll(SNIPPETS_STORE_NAME);
-    console.debug(
-      "[DB|loadAllSnippets] Loaded snippets from DB:",
-      JSON.stringify(
-        snippets.map((s) => ({ name: s.name, content: s.content })),
-      ),
-    );
     // Validate each snippet
     const validation = z.array(snippetSchema).safeParse(snippets);
     if (validation.success) {
@@ -226,17 +204,9 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
 export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
   const db = await dbPromise;
   try {
-    console.log("[DB|saveSystemPrompt] Saving prompt:", prompt);
-    console.log("[DB|saveSystemPrompt] Saving prompt:", prompt);
-    console.log("[DB|saveSystemPrompt] Saving prompt:", prompt);
-    console.log("[DB|saveSystemPrompt] Saving prompt:", prompt);
     const tx = db.transaction(SYSTEM_PROMPTS_STORE_NAME, "readwrite");
     await tx.store.put(prompt);
     await tx.done;
-    console.log("[DB|saveSystemPrompt] Prompt saved successfully.");
-    console.log("[DB|saveSystemPrompt] Prompt saved successfully.");
-    console.log("[DB|saveSystemPrompt] Prompt saved successfully.");
-    console.log("[DB|saveSystemPrompt] Prompt saved successfully.");
   } catch (error) {
     console.error("[DB] Save: Failed to save system prompt:", error);
     throw new Error("Failed to save system prompt.");
@@ -266,21 +236,9 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
 export async function deleteSystemPrompt(promptName: string): Promise<void> {
   const db = await dbPromise;
   try {
-    console.log(`[DB|deleteSystemPrompt] Deleting prompt: ${promptName}`);
-    console.log(`[DB|deleteSystemPrompt] Deleting prompt: ${promptName}`);
-    console.log(`[DB|deleteSystemPrompt] Deleting prompt: ${promptName}`);
     const tx = db.transaction(SYSTEM_PROMPTS_STORE_NAME, "readwrite");
     await tx.store.delete(promptName);
     await tx.done;
-    console.log(
-      `[DB|deleteSystemPrompt] Prompt deleted successfully: ${promptName}`,
-    );
-    console.log(
-      `[DB|deleteSystemPrompt] Prompt deleted successfully: ${promptName}`,
-    );
-    console.log(
-      `[DB|deleteSystemPrompt] Prompt deleted successfully: ${promptName}`,
-    );
   } catch (error) {
     console.error(
       `[DB] Delete: Failed to delete system prompt '${promptName}':`,

@@ -152,7 +152,9 @@ function* submitUserMessageSaga(
         if ("chunk" in event) {
           yield put(appendChunkToLatestMessage({ chunk: event.chunk }));
         } else if ("done" in event) {
-          yield put(submitUserMessageSuccess());
+          yield put(
+            submitUserMessageSuccess({ model: settings.modelName }),
+          );
           break; // Exit the loop
         } else if ("error" in event) {
           throw event.error;

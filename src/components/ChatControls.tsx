@@ -22,7 +22,6 @@ const ChatControls: React.FC<ChatControlsProps> = ({
   apiKey,
   onCancel,
 }) => {
-  console.log("[ChatControls] render", { isStreaming, apiKey });
   const handleSend = (): void => {
     if (input.trim() && !isStreaming) {
       onSubmit(input.trim());

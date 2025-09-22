@@ -45,10 +45,6 @@ const Combobox: React.FC<ComboboxProps> = ({
 
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId]);
 
-  console.log('[DEBUG] Combobox render. Props:', { loading, errorMessage, itemCount: items.length, selectedId });
-
-  console.log('[DEBUG] Combobox state:', { showSuggestions, inputValue, isPristine, highlightedIndex });
-
   useOnClickOutside(comboboxWrapperRef as React.RefObject<HTMLElement>, () => {
     // Only act if the suggestions are currently shown
     if (showSuggestions) {
@@ -150,14 +146,12 @@ const Combobox: React.FC<ComboboxProps> = ({
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    console.log('[DEBUG] Combobox input changed, showing suggestions. New value:', newValue);
     setShowSuggestions(true);
     setHighlightedIndex(null);
     setIsPristine(false);
   };
 
   const handleFocus = (): void => {
-    console.log('[DEBUG] Combobox focused, showing suggestions.');
     setShowSuggestions(true);
     // Clear the input to allow the user to easily type a new search
     setInputValue('');
