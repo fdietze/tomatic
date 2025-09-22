@@ -91,9 +91,10 @@ test.describe("Chat Session Navigation", () => {
     });
     await seedIndexedDB(context, { chat_sessions: sessions });
 
-    // 3. Navigate to the newest session
-    await page.goto(ROUTES.chat.session("session-new"));
     const chatPage = new ChatPage(page);
+    await chatPage.goto("session-new");
+
+    // 3. Assert initial state: Next button disabled, Prev button enabled
     await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
     await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
     await chatPage.expectMessage(0, "user", /New message/);

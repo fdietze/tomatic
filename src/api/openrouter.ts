@@ -61,7 +61,6 @@ const getOpenAIClient = (apiKey: string): OpenAI => {
     throw new Error("OpenRouter API key is missing.");
   }
   const maxRetries = window.__IS_TESTING__ ? 0 : 2;
-  console.log("Initializing OpenAI client (maxRetries: %d)", maxRetries);
   return new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: apiKey,
@@ -136,13 +135,12 @@ export async function requestMessageContentStream(
     });
   } catch (e) {
     if (e instanceof APIError) {
-      console.log(
+      console.error(
         `[API|requestMessageContentStream] Caught APIError: ${e.constructor.name}: ${e.message}`,
       );
       // Re-throw a simpler error to be handled by the store
       throw new Error(e.message);
     }
-    console.log("[API|requestMessageContentStream] Caught unknown error:", e);
     throw new Error(
       "An unknown error occurred while fetching the model response.",
     );
@@ -170,13 +168,12 @@ export async function requestMessageContent(
     return completion.choices[0]?.message?.content ?? "";
   } catch (e) {
     if (e instanceof APIError) {
-      console.log(
+      console.error(
         `[API|requestMessageContent] Caught APIError: ${e.constructor.name}: ${e.message}`,
       );
       // Re-throw a simpler error to be handled by the store
       throw new Error(e.message);
     }
-    console.log("[API|requestMessageContent] Caught unknown error:", e);
     throw new Error(
       "An unknown error occurred while fetching the model response.",
     );

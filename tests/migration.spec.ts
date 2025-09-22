@@ -1,7 +1,12 @@
 import { test } from './fixtures';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, waitForEvent } from './test-helpers';
-import { DBV1_ChatSession, DBV2_ChatSession, DBV2_Message } from '@/types/storage';
-import { ROUTES } from '@/utils/routes';
+import {
+  DBV1_ChatSession,
+  DBV2_ChatSession,
+  DBV2_Message,
+} from '@/types/storage';
+import { ChatPage } from "./pom/ChatPage";
+import { ROUTES } from "@/utils/routes";
 
 test.describe('Database Migrations', () => {
   test.beforeEach(async ({ context }) => {
@@ -71,11 +76,19 @@ test.describe('Database Migrations', () => {
       });
     }, V1_SESSION);
 
-    // 3. Navigate to a page to trigger the app's DB initialization and migration
     await page.goto(ROUTES.chat.new);
 
-    // Wait for the custom event that signals the V2 migration is complete
-    await waitForEvent(page, 'db_migration_complete');
+    // Wait for the custom event that signals the V2 migration is complete.
+    // The app should redirect to the migrated session upon this event.
+    await waitForEvent(page, "db_migration_complete");
+
+    // Verify the redirection
+    await page.waitForURL(`**/chat/${V1_SESSION.session_id}`);
+
+    // Verify the content of the migrated session is displayed
+    const chatPage = new ChatPage(page);
+    await chatPage.expectMessage(0, "user", /Hello/);
+    await chatPage.expectMessage(1, "assistant", /Hi from V1/);
 
     // 4. Verify the data has been migrated in the browser context
     const migrationResult = await page.evaluate(

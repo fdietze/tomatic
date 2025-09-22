@@ -8,7 +8,7 @@ export interface SettingsState {
   selectedPromptName: string | null;
   initialChatPrompt: string | null;
   loading: "idle" | "loading" | "failed";
-  saving: "idle" | "saving" | "failed";
+  saving: "idle" | "saving" | "failed" | "saved";
 }
 
 export const initialState: SettingsState = {
@@ -32,8 +32,11 @@ export const settingsSlice = createSlice({
       state,
       action: PayloadAction<Partial<SettingsState>>,
     ) => {
-      state.loading = "idle";
-      Object.assign(state, action.payload);
+      return {
+        ...state,
+        ...action.payload,
+        loading: "idle",
+      };
     },
     loadSettingsFailure: (state) => {
       state.loading = "failed";
@@ -43,7 +46,7 @@ export const settingsSlice = createSlice({
       Object.assign(state, action.payload);
     },
     saveSettingsSuccess: (state) => {
-      state.saving = "idle";
+      state.saving = "saved";
     },
     saveSettingsFailure: (state) => {
       state.saving = "failed";

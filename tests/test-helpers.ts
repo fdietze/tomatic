@@ -74,6 +74,19 @@ export const MOCK_MODELS_RESPONSE = {
 
 export const OPENROUTER_API_KEY = "TEST_API_KEY";
 
+export const DEFAULT_LOCAL_STORAGE = {
+  state: {
+    apiKey: OPENROUTER_API_KEY,
+    modelName: "openai/gpt-4o",
+    autoScrollEnabled: true,
+    selectedPromptName: null,
+    initialChatPrompt: null,
+    loading: "idle",
+    saving: "idle",
+  },
+  version: 1,
+};
+
 /**
  * Mocks the global /models API endpoint.
  * This is a common requirement for almost all tests.
@@ -150,7 +163,7 @@ import type { ChatSession } from "../src/types/chat";
 import type {
   Snippet,
   SystemPrompt,
-  LocalStorageCurrent,
+  LocalStorageV1State,
   IndexedDBDataCurrent,
 } from "../src/types/storage";
 
@@ -297,11 +310,19 @@ export async function seedIndexedDB(
  */
 export async function seedLocalStorage(
   context: BrowserContext,
-  data: LocalStorageCurrent,
+  data: { state?: Partial<LocalStorageV1State>; version?: number },
 ) {
+  const finalData = {
+    ...DEFAULT_LOCAL_STORAGE,
+    ...data,
+    state: {
+      ...DEFAULT_LOCAL_STORAGE.state,
+      ...data.state,
+    },
+  };
   await context.addInitScript((data) => {
     window.localStorage.setItem("tomatic-storage", JSON.stringify(data));
-  }, data);
+  }, finalData);
 }
 
 import type { Page, Route } from "@playwright/test";

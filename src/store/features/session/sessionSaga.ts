@@ -3,6 +3,7 @@ import { END, eventChannel, EventChannel } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";
 import type { Stream } from "openai/streaming";
+import { SagaIterator } from "redux-saga";
 
 import { ChatSession, Message } from "@/types/chat";
 import * as db from "@/services/db/chat-sessions";
@@ -12,17 +13,49 @@ import { RootState } from "../../store";
 import {
   addAssistantMessagePlaceholder,
   appendChunkToLatestMessage,
+  goToNextSession,
+  goToPrevSession,
   loadSession,
   loadSessionFailure,
   loadSessionSuccess,
+  startNewSession,
   submitUserMessage,
   submitUserMessageFailure,
   submitUserMessageSuccess,
+  selectSession,
 } from "./sessionSlice";
+import { getNavigationService } from "@/services/NavigationProvider";
+import { ROUTES } from "@/utils/routes";
 
 // --- Worker Sagas ---
 
+function* goToPrevSessionSaga(): SagaIterator {
+  const { prevSessionId } = yield select(selectSession);
+  if (prevSessionId) {
+    const navigationService = yield call(getNavigationService);
+    yield call(
+      [navigationService, navigationService.navigate],
+      ROUTES.chat.session(prevSessionId),
+    );
+  }
+}
+
+function* goToNextSessionSaga(): SagaIterator {
+  const { nextSessionId } = yield select(selectSession);
+  if (nextSessionId) {
+    const navigationService = yield call(getNavigationService);
+    yield call(
+      [navigationService, navigationService.navigate],
+      ROUTES.chat.session(nextSessionId),
+    );
+  }
+}
+
 function* loadSessionSaga(action: PayloadAction<string>) {
+  if (action.payload === "new") {
+    yield put(startNewSession());
+    return;
+  }
   try {
     const session: ChatSession | null = yield call(
       db.loadSession,
@@ -176,5 +209,7 @@ export function* sessionSaga() {
   yield all([
     takeLatest(loadSession.type, loadSessionSaga),
     takeLatest(submitUserMessage.type, submitUserMessageSaga),
+    takeLatest(goToPrevSession.type, goToPrevSessionSaga),
+    takeLatest(goToNextSession.type, goToNextSessionSaga),
   ]);
 }

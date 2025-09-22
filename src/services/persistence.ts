@@ -46,11 +46,24 @@ interface TomaticDB extends DBSchema {
   };
 }
 
-// --- Database Interaction Functions ---
+let dbInstancePromise: Promise<{
+  db: IDBPDatabase<TomaticDB>;
+  migrated: boolean;
+}> | null = null;
 
-function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
-  return openDB<TomaticDB>(DB_NAME, DB_VERSION, {
+function openTomaticDB(): Promise<{
+  db: IDBPDatabase<TomaticDB>;
+  migrated: boolean;
+}> {
+  if (dbInstancePromise) {
+    return dbInstancePromise;
+  }
+  let migrated = false;
+  dbInstancePromise = openDB<TomaticDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, tx) {
+      if (oldVersion > 0) {
+        migrated = true;
+      }
       if (oldVersion < 2) {
         // Create sessions store
         if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
@@ -130,12 +143,12 @@ function openTomaticDB(): Promise<IDBPDatabase<TomaticDB>> {
           });
       }
     },
-  });
+  }).then((db) => ({ db, migrated }));
+  return dbInstancePromise;
 }
 
-const dbPromise = openTomaticDB();
-
-export { dbPromise, openTomaticDB };
+export const dbPromise = openTomaticDB().then((result) => result.db);
+export const migrationPromise = openTomaticDB().then((result) => result.migrated);
 
 // --- Snippet Functions ---
 

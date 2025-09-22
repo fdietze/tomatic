@@ -10,11 +10,21 @@ import {
   seedIndexedDB,
   seedLocalStorage,
 } from "./test-helpers";
-import { ROUTES } from "@/utils/routes";
 
 test.describe("System Prompt Interaction", () => {
-  test.beforeEach(async ({ context }) => {
+  let _chatPage: ChatPage;
+  let _settingsPage: SettingsPage;
+  let _chatCompletionMocker: ChatCompletionMocker;
+
+  test.beforeEach(async ({ page, context }) => {
     await mockGlobalApis(context);
+    await seedLocalStorage(context, {
+      state: { apiKey: OPENROUTER_API_KEY },
+      version: 1,
+    });
+    _chatPage = new ChatPage(page);
+    _settingsPage = new SettingsPage(page);
+    _chatCompletionMocker = new ChatCompletionMocker(page);
   });
 
   test("uses the updated system prompt when regenerating a response", async ({
@@ -90,7 +100,7 @@ test.describe("System Prompt Interaction", () => {
     // 3. Navigate and create POMs
     const chatPage = new ChatPage(page);
     const settingsPage = new SettingsPage(page);
-    await page.goto(ROUTES.chat.session(SESSION_WITH_PROMPT.session_id));
+    await chatPage.goto(SESSION_WITH_PROMPT.session_id);
 
     // 4. Verify initial state
     await chatPage.expectMessage(0, "system", /You are a master chef/);
@@ -106,7 +116,6 @@ test.describe("System Prompt Interaction", () => {
 
     // 6. Navigate back to the chat
     await settingsPage.navigation.goBackToChat();
-    await page.waitForURL(`**/${SESSION_WITH_PROMPT.session_id}`);
 
     // 7. Mock the regeneration API call with the *new* system prompt and the *correct* model.
     chatMocker.mock({

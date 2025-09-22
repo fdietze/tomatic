@@ -1,4 +1,5 @@
 import { test } from './fixtures';
+import { ROUTES } from '../src/utils/routes';
 import { SettingsPage } from './pom/SettingsPage';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
 test.describe('Snippet Editor Validation', () => {
@@ -30,7 +31,7 @@ test.describe('Snippet Editor Validation', () => {
     });
 
     settingsPage = new SettingsPage(page);
-    await settingsPage.goto();
+    await page.goto(ROUTES.settings);
   });
 
   test.describe('shows a live error when an edit introduces a snippet cycle', () => {

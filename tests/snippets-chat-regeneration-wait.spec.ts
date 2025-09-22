@@ -1,3 +1,4 @@
+import { ROUTES } from "@/utils/routes";
 import { test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import { SettingsPage } from "./pom/SettingsPage";
@@ -129,12 +130,12 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await waitForEvent(page, "app:snippet:regeneration:start");
 
       // Ensure the regeneration spinner for snippet B is visible on the settings page
-      await settingsPage.goto();
+      await page.goto(ROUTES.settings);
       const snippetB = settingsPage.getSnippetItem("B");
       await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
 
       // Immediately go back to chat and try to send a message that uses B
-      await chatPage.goto();
+      await settingsPage.navigation.goBackToChat();
       const responsePromise = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",
       );

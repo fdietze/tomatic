@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import ChatHeader from "@/components/ChatHeader";
 import ChatInterface from "@/components/ChatInterface";
@@ -10,14 +9,9 @@ import {
   setSelectedPromptName,
 } from "@/store/features/settings/settingsSlice";
 import { selectPrompts } from "@/store/features/prompts/promptsSlice";
-import {
-  selectSession,
-  loadSession,
-} from "@/store/features/session/sessionSlice";
+import { selectSession, goToPrevSession, goToNextSession } from "@/store/features/session/sessionSlice";
 
 const ChatPage: React.FC = () => {
-  const { id: sessionIdFromUrl } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   // --- Redux State ---
@@ -33,24 +27,25 @@ const ChatPage: React.FC = () => {
     return entity?.data;
   }, [systemPromptsMap, selectedPromptName]);
 
+  const session = useSelector(selectSession);
+
   useEffect(() => {
-    if (sessionIdFromUrl) {
-      dispatch(loadSession(sessionIdFromUrl));
-    }
-  }, [sessionIdFromUrl, dispatch]);
+    return () => {
+    };
+  }, [session]);
 
   const canGoPrev = !!prevSessionId;
   const canGoNext = !!nextSessionId;
 
   const onPrev = (): void => {
     if (prevSessionId) {
-      void navigate(`/chat/${prevSessionId}`);
+      dispatch(goToPrevSession());
     }
   };
 
   const onNext = (): void => {
     if (nextSessionId) {
-      void navigate(`/chat/${nextSessionId}`);
+      dispatch(goToNextSession());
     }
   };
 

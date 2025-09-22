@@ -9,6 +9,8 @@ import {
   seedIndexedDB,
 } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
+import { NavigationComponent } from "./pom/NavigationComponent";
+import { SystemPrompt } from "@/types/storage";
 
 test.beforeEach(async ({ context }) => {
   await mockGlobalApis(context);
@@ -229,32 +231,30 @@ test("shows system prompt immediately in a new chat", async ({
   page,
   context,
 }) => {
-  // Purpose: This test ensures that if a system prompt is selected, it is displayed as the
-  // first message when a new chat session is initiated.
-  const chatPage = new ChatPage(page);
-
-  // 1. Setup State and Mock APIs
+  // Use a system prompt for the test
+  const MOCK_PROMPTS: SystemPrompt[] = [
+    { name: "test_prompt", prompt: "You are a helpful assistant." },
+  ];
+  await seedIndexedDB(context, {
+    system_prompts: MOCK_PROMPTS,
+  });
   await seedLocalStorage(context, {
     state: {
       apiKey: OPENROUTER_API_KEY,
-      modelName: "google/gemini-2.5-pro",
-      cachedModels: [],
-      input: "",
-      selectedPromptName: "TestPrompt",
-      autoScrollEnabled: false,
+      selectedPromptName: "test_prompt",
     },
     version: 1,
   });
-  await seedIndexedDB(context, {
-    system_prompts: [{ name: "TestPrompt", prompt: "You are a test bot." }],
-  });
+
+  const _navigation = new NavigationComponent(page);
+  const chatPage = new ChatPage(page);
 
   // 2. Navigate
   await page.goto(ROUTES.settings);
   await chatPage.navigation.goToNewChat();
 
   // 3. Assert
-  await chatPage.expectMessage(0, "system", /You are a test bot/);
+  await chatPage.expectMessage(0, "system", /You are a helpful assistant/);
 });
 
 test("can edit a user message and resubmit", async ({ context, page }) => {
@@ -379,7 +379,7 @@ test("can edit a user message and discard changes", async ({
   const chatMocker = new ChatCompletionMocker(page);
   await chatMocker.setup(); // setup to intercept calls
 
-  await page.goto(ROUTES.chat.session("test-session-discard"));
+  await chatPage.goto("test-session-discard");
 
   // Verify initial messages are displayed correctly
   await chatPage.expectMessage(0, "user", /Initial message/);

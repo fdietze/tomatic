@@ -2,7 +2,6 @@ import { type Page, type Locator, expect } from "@playwright/test";
 
 import { NavigationComponent } from "./NavigationComponent";
 import { ModelComboboxPage } from "./ModelComboboxPage";
-import { ROUTES } from "@/utils/routes";
 /**
  * Page Object Model for the Settings page.
  * This class encapsulates locators and actions for managing system prompts,
@@ -12,23 +11,25 @@ export class SettingsPage {
   // --- Locators ---
   readonly newPromptButton: Locator;
   readonly newSnippetButton: Locator;
+  readonly apiKeyInput: Locator;
+  readonly apiKeySaveButton: Locator;
   readonly navigation: NavigationComponent;
   readonly modelCombobox: ModelComboboxPage;
 
   constructor(public readonly page: Page) {
     this.newPromptButton = page.getByTestId("new-system-prompt-button");
     this.newSnippetButton = page.getByTestId("new-snippet-button");
+    this.apiKeyInput = page.getByPlaceholder("OPENROUTER_API_KEY");
+    this.apiKeySaveButton = page.getByRole("button", { name: /save/i });
     this.navigation = new NavigationComponent(page);
     this.modelCombobox = new ModelComboboxPage(page);
   }
 
   // --- Actions ---
 
-  /**
-   * Navigates to the settings page.
-   */
-  async goto() {
-    await this.page.goto(ROUTES.settings);
+  async setApiKey(apiKey: string) {
+    await this.apiKeyInput.fill(apiKey);
+    await this.apiKeySaveButton.click();
   }
 
   /**

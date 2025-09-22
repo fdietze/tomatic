@@ -3,6 +3,7 @@ import type { Message } from '@/types/chat';
 import Markdown from './Markdown';
 import CopyButton from './CopyButton';
 import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
+import { assertUnreachable } from '@/utils/assert';
 
 interface CostProps {
   value: number;
@@ -84,21 +85,24 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   const renderButtons = (): React.JSX.Element | null => {
-    if (message.role === 'assistant') {
-      return (
-        <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }} data-testid="regenerate-button">
-          regenerate
-        </button>
-      );
+    switch (message.role) {
+      case 'assistant':
+        return (
+          <button data-size="compact" onClick={() => { onRegenerate(messageIndex); }} data-testid="regenerate-button">
+            regenerate
+          </button>
+        );
+      case 'user':
+        return (
+          <button data-size="compact" onClick={() => { setIsEditing(!isEditing); }} data-testid="edit-button">
+            edit
+          </button>
+        );
+      case 'system':
+        return null;
+      default:
+        return assertUnreachable(message.role);
     }
-    if (message.role === 'user') {
-      return (
-        <button data-size="compact" onClick={() => { setIsEditing(!isEditing); }} data-testid="edit-button">
-          edit
-        </button>
-      );
-    }
-    return null;
   };
 
   return (

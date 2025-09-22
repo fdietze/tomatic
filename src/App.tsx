@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,31 +6,43 @@ import {
   Navigate,
   useLocation,
   useNavigate,
+  useMatch,
 } from "react-router-dom";
 import ChatPage from "@/pages/ChatPage";
 import SettingsPage from "@/pages/SettingsPage";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ROUTES } from "@/utils/routes";
-import { selectSession } from "@/store/features/session/sessionSlice";
+import {
+  selectSession,
+  loadSession,
+} from "@/store/features/session/sessionSlice";
 import { selectSnippets } from "@/store/features/snippets/snippetsSlice";
+import { NavigationProvider } from "@/services/NavigationProvider";
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentSessionId } = useSelector(selectSession);
+  const dispatch = useDispatch();
+  const session = useSelector(selectSession);
+  const { currentSessionId } = session;
   const { regenerationStatus } = useSelector(selectSnippets);
+
+  const chatMatch = useMatch(ROUTES.chat.byId);
+  const sessionIdFromUrl = chatMatch?.params.id;
+
+  useEffect(() => {
+    if (sessionIdFromUrl && sessionIdFromUrl !== currentSessionId) {
+      dispatch(loadSession(sessionIdFromUrl));
+    }
+  }, [sessionIdFromUrl, currentSessionId, dispatch]);
 
   const isRegenerating = Object.values(regenerationStatus).some(
     (s) => s === "in_progress",
   );
 
-  const onChat = (): void => {
-    if (currentSessionId) {
-      void navigate(ROUTES.chat.session(currentSessionId));
-    } else {
-      void navigate(ROUTES.chat.new);
-    }
-  };
+  const lastChatUrl = currentSessionId
+    ? ROUTES.chat.session(currentSessionId)
+    : ROUTES.chat.new;
 
   const onSettings = (): void => {
     void navigate(ROUTES.settings);
@@ -42,13 +54,17 @@ const Header: React.FC = () => {
   return (
     <header>
       <div className="tabs">
-        <button
-          onClick={onChat}
+        <a
+          href={lastChatUrl}
           data-active={isChatActive}
           data-testid="chat-button"
+          onClick={(e) => {
+            e.preventDefault();
+            void navigate(lastChatUrl);
+          }}
         >
           Chat
-        </button>
+        </a>
         <button
           onClick={onSettings}
           data-active={isSettingsActive}
@@ -64,9 +80,9 @@ const Header: React.FC = () => {
   );
 };
 
-const AppContent: React.FC = () => {
+export const AppContent: React.FC = () => {
   return (
-    <Router>
+    <>
       <Header />
       <main>
         <Routes>
@@ -80,10 +96,16 @@ const AppContent: React.FC = () => {
           <Route path="*" element={<h1>Not Found</h1>} />
         </Routes>
       </main>
-    </Router>
+    </>
   );
 };
 
 export const App: React.FC = () => {
-  return <AppContent />;
+  return (
+    <Router>
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
+    </Router>
+  );
 };

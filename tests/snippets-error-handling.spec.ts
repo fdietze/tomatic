@@ -1,4 +1,5 @@
 import { test } from './fixtures';
+import { ROUTES } from '../src/utils/routes';
 import { SettingsPage } from './pom/SettingsPage';
 import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
 
@@ -23,7 +24,7 @@ test.describe('Generated Snippets (Error Handling)', () => {
     settingsPage = new SettingsPage(page);
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
-    await settingsPage.goto();
+    await page.goto(ROUTES.settings);
   });
 
   test('shows an error if snippet generation fails', async ({ expectedConsoleErrors }) => {
