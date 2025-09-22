@@ -48,23 +48,23 @@ const Header: React.FC = () => {
     void navigate(ROUTES.settings);
   };
 
+  const onChat = (): void => {
+    void navigate(lastChatUrl);
+  };
+
   const isChatActive = location.pathname.startsWith("/chat");
   const isSettingsActive = location.pathname.startsWith("/settings");
 
   return (
     <header>
       <div className="tabs">
-        <a
-          href={lastChatUrl}
+        <button
+          onClick={onChat}
           data-active={isChatActive}
           data-testid="chat-button"
-          onClick={(e) => {
-            e.preventDefault();
-            void navigate(lastChatUrl);
-          }}
         >
           Chat
-        </a>
+        </button>
         <button
           onClick={onSettings}
           data-active={isSettingsActive}
