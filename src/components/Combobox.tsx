@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useId } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
 import CopyButton from './CopyButton';
@@ -37,6 +37,7 @@ const Combobox: React.FC<ComboboxProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [isPristine, setIsPristine] = useState(true);
+  const id = useId();
 
   const comboboxWrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -167,9 +168,10 @@ const Combobox: React.FC<ComboboxProps> = ({
 
   return (
     <div className="combobox-wrapper" ref={comboboxWrapperRef}>
-      {label && <label className="combobox-label">{label}</label>}
+      {label && <label htmlFor={id} className="combobox-label">{label}</label>}
       <div className="combobox-input-wrapper">
         <input
+          id={id}
           data-testid="model-combobox-input"
           ref={inputRef}
           type="text"
