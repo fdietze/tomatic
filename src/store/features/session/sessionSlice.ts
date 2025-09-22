@@ -7,6 +7,7 @@ export interface SessionState {
   currentSessionId: string | null;
   prevSessionId: string | null;
   nextSessionId: string | null;
+  hasSessions: boolean;
   loading: "idle" | "loading" | "failed";
   submitting: boolean;
   error: string | null;
@@ -17,6 +18,7 @@ const initialState: SessionState = {
   currentSessionId: null,
   prevSessionId: null,
   nextSessionId: null,
+  hasSessions: false,
   loading: "idle",
   submitting: false,
   error: null,
@@ -48,6 +50,23 @@ export const sessionSlice = createSlice({
     loadSessionFailure: (state, action: PayloadAction<string>) => {
       state.loading = "failed";
       state.error = action.payload;
+    },
+    loadInitialSessionSaga: (state) => {
+      state.loading = "loading";
+      state.error = null;
+    },
+    initializeNewSession: (
+      state,
+      action: PayloadAction<{ lastSessionId: string | null }>,
+    ) => {
+      state.messages = [];
+      state.currentSessionId = null;
+      state.prevSessionId = action.payload.lastSessionId;
+      state.nextSessionId = null;
+      state.error = null;
+    },
+    setHasSessions: (state, action: PayloadAction<boolean>) => {
+      state.hasSessions = action.payload;
     },
     startNewSession: (state) => {
       state.messages = [];
@@ -137,7 +156,10 @@ export const {
   loadSession,
   loadSessionSuccess,
   loadSessionFailure,
+  loadInitialSessionSaga,
+  initializeNewSession,
   startNewSession,
+  setHasSessions,
   submitUserMessage,
   addAssistantMessagePlaceholder,
   appendChunkToLatestMessage,

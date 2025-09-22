@@ -97,3 +97,9 @@ export async function deleteSession(sessionId: string): Promise<void> {
     throw new Error('Failed to delete session.');
   }
 }
+
+export async function hasSessions(): Promise<boolean> {
+  const db = await dbPromise;
+  const count = await db.count("chat_sessions");
+  return count > 0;
+}

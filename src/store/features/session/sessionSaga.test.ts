@@ -184,6 +184,7 @@ describe("sessionSaga", () => {
         loading: "idle",
         submitting: false,
         error: null,
+        hasSessions: false,
       },
       settings: {
         apiKey: "test-api-key",

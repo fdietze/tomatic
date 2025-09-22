@@ -118,4 +118,75 @@ test.describe("Chat Session Navigation", () => {
     await page.waitForURL(ROUTES.chat.session("session-middle"));
     await chatPage.expectMessage(0, "user", /Middle message/);
   });
+
+  test("shows a new, empty session when visiting /chat/new", async ({
+    context,
+    page,
+  }) => {
+    // Purpose: This test verifies that when a user navigates to the generic 'new chat' page
+    // while having existing sessions, the app shows a new empty session.
+    // 1. Define Mock Data (similar to the other test, order is important)
+    const sessions: DBV3_ChatSession[] = [
+      {
+        session_id: "session-old",
+        name: null,
+        messages: [
+          {
+            id: "msg1",
+            role: "user",
+            content: "Old message",
+            prompt_name: null,
+            model_name: null,
+            cost: null,
+            raw_content: undefined,
+          },
+        ],
+        created_at_ms: 1000,
+        updated_at_ms: 1000,
+      },
+      {
+        session_id: "session-new",
+        name: null,
+        messages: [
+          {
+            id: "msg3",
+            role: "user",
+            content: "New message",
+            prompt_name: null,
+            model_name: null,
+            cost: null,
+            raw_content: undefined,
+          },
+        ],
+        created_at_ms: 3000,
+        updated_at_ms: 3000,
+      },
+    ];
+
+    // 2. Setup Test State
+    await seedLocalStorage(context, {
+      state: {
+        apiKey: OPENROUTER_API_KEY,
+        modelName: "google/gemini-2.5-pro",
+        autoScrollEnabled: false,
+      },
+      version: 1,
+    });
+    await seedIndexedDB(context, { chat_sessions: sessions });
+
+    const chatPage = new ChatPage(page);
+    // Navigate to /chat/new
+    await chatPage.goto();
+
+    // 3. Assert no redirection and URL is /chat/new
+    await page.waitForURL(ROUTES.chat.new);
+    expect(page.url()).toContain(ROUTES.chat.new);
+
+    // 4. Assert button states
+    await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
+    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+
+    // 5. Assert that there are no messages
+    await expect(chatPage.chatMessages).toHaveCount(0);
+  });
 });

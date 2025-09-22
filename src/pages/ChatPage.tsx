@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useParams } from "react-router-dom";
 import ChatHeader from "@/components/ChatHeader";
 import ChatInterface from "@/components/ChatInterface";
 import SystemPromptBar from "@/components/SystemPromptBar";
@@ -9,15 +10,27 @@ import {
   setSelectedPromptName,
 } from "@/store/features/settings/settingsSlice";
 import { selectPrompts } from "@/store/features/prompts/promptsSlice";
-import { selectSession, goToPrevSession, goToNextSession } from "@/store/features/session/sessionSlice";
+import {
+  selectSession,
+  goToPrevSession,
+  goToNextSession,
+  loadSession,
+} from "@/store/features/session/sessionSlice";
 
 const ChatPage: React.FC = () => {
   const dispatch = useDispatch();
+  const { id: sessionIdFromUrl } = useParams<{ id: string }>();
 
   // --- Redux State ---
   const { selectedPromptName } = useSelector(selectSettings);
   const { prompts: systemPromptsMap } = useSelector(selectPrompts);
-  const { prevSessionId, nextSessionId, error } = useSelector(selectSession);
+  const {
+    prevSessionId,
+    nextSessionId,
+    error,
+    currentSessionId,
+    hasSessions,
+  } = useSelector(selectSession);
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
     if (!selectedPromptName) return undefined;
@@ -30,15 +43,14 @@ const ChatPage: React.FC = () => {
   const session = useSelector(selectSession);
 
   useEffect(() => {
-    return () => {
-    };
-  }, [session]);
-
-  const canGoPrev = !!prevSessionId;
-  const canGoNext = !!nextSessionId;
+    dispatch(loadSession(sessionIdFromUrl ?? "new"));
+  }, [sessionIdFromUrl, dispatch]);
 
   const onPrev = (): void => {
     if (prevSessionId) {
+      dispatch(goToPrevSession());
+    } else if (!currentSessionId && hasSessions) {
+      // If we are on a new chat and there are sessions, go to the most recent one.
       dispatch(goToPrevSession());
     }
   };
@@ -61,8 +73,8 @@ const ChatPage: React.FC = () => {
   return (
     <>
       <ChatHeader
-        canGoPrev={canGoPrev}
-        canGoNext={canGoNext}
+        canGoPrev={!!prevSessionId || (!currentSessionId && hasSessions)}
+        canGoNext={!!nextSessionId}
         onPrev={onPrev}
         onNext={onNext}
       >

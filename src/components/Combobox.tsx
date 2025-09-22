@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useId } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
-import CopyButton from './CopyButton';
 
 export interface ComboboxItem {
   id: string;
