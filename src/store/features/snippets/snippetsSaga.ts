@@ -1,4 +1,4 @@
-import { call, put, takeLatest, all, select } from "redux-saga/effects";
+import { call, put, takeLatest, all, select, takeEvery } from "redux-saga/effects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
@@ -12,8 +12,9 @@ import {
   updateSnippetSuccess,
   deleteSnippet,
   deleteSnippetSuccess,
-  setRegenerationStatus,
-  updateSnippetContent,
+  regenerateSnippet,
+  regenerateSnippetSuccess,
+  regenerateSnippetFailure,
 } from "./snippetsSlice";
 import { RootState } from "../../store";
 import {
@@ -66,42 +67,59 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
   }
 }
 
-function* regenerateSnippetSaga(snippetName: string) {
+function* handleRegenerateSnippetSaga(
+  action: PayloadAction<{ oldName: string; snippet: Snippet }>,
+) {
+  const { snippet: snippetToRegenerate } = action.payload;
+  const snippetName = snippetToRegenerate.name;
   try {
-    yield put(
-      setRegenerationStatus({ name: snippetName, status: "in_progress" }),
-    );
-    window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:start", {
-        detail: { name: snippetName },
-      }),
-    );
-
     const {
-      snippets,
       settings,
     }: {
-      snippets: Snippet[];
       settings: RootState["settings"];
     } = yield select((state: RootState) => ({
-      snippets: state.snippets.snippets,
       settings: state.settings,
     }));
-
-    const snippetToRegenerate = snippets.find((s) => s.name === snippetName);
 
     if (
       !snippetToRegenerate ||
       !snippetToRegenerate.isGenerated ||
-      !snippetToRegenerate.prompt ||
+      typeof snippetToRegenerate.prompt !== "string" ||
       !snippetToRegenerate.model
     ) {
-      throw new Error("Invalid snippet for regeneration");
+      const error = "Invalid snippet for regeneration.";
+      yield put(
+        regenerateSnippetFailure({
+          name: snippetName,
+          error,
+        }),
+      );
+      return;
     }
-
+    
+    const allSnippets: Snippet[] = yield select(
+      (state: RootState) => state.snippets.snippets,
+    );
     const resolvedPrompt = resolveSnippets(
       snippetToRegenerate.prompt,
-      snippets,
+      allSnippets,
+    );
+
+    // If the prompt is empty, we don't need to do anything else.
+    if (resolvedPrompt.trim() === "") {
+      yield put(regenerateSnippetSuccess({ name: snippetName, content: "" }));
+      window.dispatchEvent(
+        new CustomEvent("app:snippet:regeneration:complete", {
+          detail: { name: snippetName },
+        }),
+      );
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("app:snippet:regeneration:start", {
+        detail: { name: snippetName },
+      }),
     );
 
     const assistantResponse: string = yield call(() =>
@@ -113,9 +131,8 @@ function* regenerateSnippetSaga(snippetName: string) {
     );
 
     yield put(
-      updateSnippetContent({ name: snippetName, content: assistantResponse }),
+      regenerateSnippetSuccess({ name: snippetName, content: assistantResponse }),
     );
-    yield put(setRegenerationStatus({ name: snippetName, status: "success" }));
     window.dispatchEvent(
       new CustomEvent("app:snippet:regeneration:complete", {
         detail: { name: snippetName },
@@ -128,7 +145,7 @@ function* regenerateSnippetSaga(snippetName: string) {
         detail: { name: snippetName, error: errorMessage },
       }),
     );
-    yield put(setRegenerationStatus({ name: snippetName, status: "error" }));
+    yield put(regenerateSnippetFailure({ name: snippetName, error: errorMessage }));
     console.error(`Failed to regenerate snippet ${snippetName}`, error);
   }
 }
@@ -157,14 +174,14 @@ function* regenerationOrchestrationSaga(
 
   if (cyclic.length > 0) {
     // TODO: Dispatch an error to the UI to inform the user about the cycle
-    console.error("Cyclic dependency detected in snippets:", cyclic);
+    // console.error("Cyclic dependency detected in snippets:", cyclic);
   }
 
   try {
     // Use a simple for...of loop for sequential execution with `call`
     for (const dependentSnippet of sortedDependents) {
       if (dependentSnippet.isGenerated) {
-        yield call(regenerateSnippetSaga, dependentSnippet.name);
+        yield put(regenerateSnippet({ oldName: dependentSnippet.name, snippet: dependentSnippet }));
       }
     }
   } finally {
@@ -181,5 +198,6 @@ export function* snippetsSaga() {
     takeLatest(updateSnippet.type, updateSnippetSaga),
     takeLatest(deleteSnippet.type, deleteSnippetSaga),
     takeLatest(updateSnippetSuccess.type, regenerationOrchestrationSaga),
+    takeEvery(regenerateSnippet.type, handleRegenerateSnippetSaga),
   ]);
 }

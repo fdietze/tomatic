@@ -2,9 +2,14 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Snippet } from '@/types/storage';
 import { RootState } from '../../store';
 
+export type RegenerationStatus = {
+  status: 'in_progress' | 'error' | 'success';
+  error?: string;
+}
+
 export interface SnippetsState {
   snippets: Snippet[];
-  regenerationStatus: Record<string, 'in_progress' | 'error' | 'success'>;
+  regenerationStatus: Record<string, RegenerationStatus>;
   loading: 'idle' | 'loading' | 'failed';
   error: string | null;
 }
@@ -53,8 +58,21 @@ export const snippetsSlice = createSlice({
     deleteSnippetSuccess: (state, action: PayloadAction<string>) => {
       state.snippets = state.snippets.filter(s => s.name !== action.payload);
     },
-    setRegenerationStatus: (state, action: PayloadAction<{ name: string; status: 'in_progress' | 'error' | 'success' }>) => {
-      state.regenerationStatus[action.payload.name] = action.payload.status;
+    regenerateSnippet: (state, action: PayloadAction<{ oldName: string; snippet: Snippet }>) => {
+      const name = action.payload.oldName;
+      state.regenerationStatus[name] = { status: 'in_progress' };
+    },
+    regenerateSnippetSuccess: (state, action: PayloadAction<{ name: string; content: string }>) => {
+        const { name, content } = action.payload;
+        const snippet = state.snippets.find(s => s.name === name);
+        if (snippet) {
+            snippet.content = content;
+        }
+        state.regenerationStatus[name] = { status: 'success' };
+    },
+    regenerateSnippetFailure: (state, action: PayloadAction<{ name: string; error: string }>) => {
+        const { name, error } = action.payload;
+        state.regenerationStatus[name] = { status: 'error', error };
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
         delete state.regenerationStatus[action.payload];
@@ -78,7 +96,9 @@ export const {
   updateSnippetSuccess,
   deleteSnippet,
   deleteSnippetSuccess,
-  setRegenerationStatus,
+  regenerateSnippet,
+  regenerateSnippetSuccess,
+  regenerateSnippetFailure,
   clearRegenerationStatus,
   updateSnippetContent,
 } = snippetsSlice.actions;

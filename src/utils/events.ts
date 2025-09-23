@@ -2,6 +2,7 @@
 // This allows for strong typing of event dispatching and listening.
 interface AppEvents {
     'app_initialized': CustomEvent<void>;
+    'app:models_loaded': CustomEvent<{ success: boolean; count: number }>;
     'snippet_regeneration_started': CustomEvent<void>;
     'snippet_regeneration_completed': CustomEvent<void>;
     'snippet_regeneration_update': SnippetRegenerationUpdateEvent;

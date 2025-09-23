@@ -8,7 +8,12 @@ import Markdown from './Markdown';
 import { selectModels } from '@/store/features/models/modelsSlice';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
-import { selectSnippets, updateSnippet, deleteSnippet, setRegenerationStatus } from '@/store/features/snippets/snippetsSlice';
+import {
+  selectSnippets,
+  updateSnippet,
+  deleteSnippet,
+  regenerateSnippet,
+} from '@/store/features/snippets/snippetsSlice';
 import { assertUnreachable } from '@/utils/assert';
 
 interface SnippetItemProps {
@@ -48,6 +53,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       display_text: model.name,
     }));
   }, [cachedModels]);
+
+  useEffect(() => {
+    // When the snippet content prop changes (e.g., after a regeneration),
+    // update the local editing state to reflect it.
+    setEditingContent(snippet.content);
+  }, [snippet.content]);
 
   useEffect(() => {
     if (isEditing) {
@@ -138,7 +149,15 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const generateAndSetContent = (): void => {
-    dispatch(setRegenerationStatus({ name: snippet.name, status: 'in_progress' }));
+    const snippetForRegeneration: Snippet = {
+      ...snippet,
+      name: editingName.trim(),
+      content: editingContent, // This is a placeholder, the saga will replace it
+      isGenerated: editingIsGenerated,
+      prompt: editingPrompt,
+      model: editingModel,
+    };
+    dispatch(regenerateSnippet({ oldName: snippet.name, snippet: snippetForRegeneration }));
   };
 
   const handleCancelEditing = (): void => {
@@ -265,12 +284,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   }
 
   return (
-    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
+    <div className="system-prompt-item-view" data-testid={`snippet-item-${editingName}`}>
       <div className="system-prompt-header">
         <span className="system-prompt-name">{snippet.name}</span>
         <div className="system-prompt-actions">
           {(() => {
-            const status = regenerationStatus[snippet.name] || 'idle';
+            const status = regenerationStatus[snippet.name]?.status || 'idle';
             switch (status) {
               case 'idle':
               case 'success':
@@ -301,7 +320,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           })()}
         </div>
       </div>
-      <span className="system-prompt-text">{snippet.content}</span>
+      <span className="system-prompt-text">{editingContent}</span>
+      {regenerationStatus[snippet.name]?.status === 'error' && (
+          <div className="error-message" data-testid="generation-error-message">
+              {`Generation failed: ${regenerationStatus[snippet.name]?.error ?? 'Unknown error'}`}
+          </div>
+      )}
       {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{`Generation failed: ${snippet.generationError}`}</div>}
     </div>
   );

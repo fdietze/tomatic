@@ -1,12 +1,15 @@
-import { call, put, takeLatest } from "redux-saga/effects";
+import { call, put, takeLatest, select, take } from "redux-saga/effects";
 import { SagaIterator } from "redux-saga";
 import { initialize, initializationComplete } from "./appSlice";
 import { getMostRecentSessionId } from "@/services/db/chat-sessions";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
 import { migrationPromise } from "@/services/persistence";
+import { dispatchEvent } from "@/utils/events";
+import { selectModels, fetchModels, fetchModelsSuccess, fetchModelsFailure } from "../models/modelsSlice";
 
 function* handleInitialize(): SagaIterator {
+  // First, handle DB migration.
   const migrated: boolean = yield call(() => migrationPromise);
   if (migrated) {
     const mostRecentSessionId: string | null = yield call(
@@ -21,6 +24,22 @@ function* handleInitialize(): SagaIterator {
       );
     }
   }
+
+  // Then, handle loading the models.
+  const { models: cachedModels } = yield select(selectModels);
+  if (cachedModels.length === 0) {
+    yield put(fetchModels());
+    const result = yield take([fetchModelsSuccess.type, fetchModelsFailure.type]);
+    
+    if (result.type === fetchModelsSuccess.type) {
+        dispatchEvent('app:models_loaded', { success: true, count: result.payload.length });
+    } else {
+        dispatchEvent('app:models_loaded', { success: false, count: 0 });
+    }
+  } else {
+    dispatchEvent('app:models_loaded', { success: true, count: cachedModels.length });
+  }
+
   yield put(initializationComplete());
 }
 

@@ -55,25 +55,15 @@ export const sessionSlice = createSlice({
       state.loading = "loading";
       state.error = null;
     },
-    initializeNewSession: (
-      state,
-      action: PayloadAction<{ lastSessionId: string | null }>,
-    ) => {
-      state.messages = [];
-      state.currentSessionId = null;
-      state.prevSessionId = action.payload.lastSessionId;
-      state.nextSessionId = null;
-      state.error = null;
-    },
-    setHasSessions: (state, action: PayloadAction<boolean>) => {
-      state.hasSessions = action.payload;
-    },
     startNewSession: (state) => {
       state.messages = [];
       state.currentSessionId = null;
       state.prevSessionId = null;
       state.nextSessionId = null;
       state.error = null;
+    },
+    setHasSessions: (state, action: PayloadAction<boolean>) => {
+      state.hasSessions = action.payload;
     },
     submitUserMessage: (
       state,
@@ -157,7 +147,6 @@ export const {
   loadSessionSuccess,
   loadSessionFailure,
   loadInitialSessionSaga,
-  initializeNewSession,
   startNewSession,
   setHasSessions,
   submitUserMessage,

@@ -25,7 +25,6 @@ import {
   selectSession,
   setHasSessions,
   loadInitialSessionSaga as loadInitialSessionSagaAction,
-  initializeNewSession,
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
@@ -95,11 +94,6 @@ function* loadSessionSaga(action: PayloadAction<string>) {
       error instanceof Error ? error.message : "An unknown error occurred";
     yield put(loadSessionFailure(message));
   }
-}
-
-function* initializeNewSessionSaga() {
-  const lastSessionId: string | null = yield call(db.getMostRecentSessionId);
-  yield put(initializeNewSession({ lastSessionId }));
 }
 
 function* loadInitialSessionSaga(): SagaIterator {
@@ -240,7 +234,6 @@ export function* sessionSaga() {
       loadInitialSessionSagaAction.type,
       loadInitialSessionSaga,
     ),
-    takeLatest(startNewSession.type, loadInitialSessionSaga),
     takeLatest(goToPrevSession.type, goToPrevSessionSaga),
     takeLatest(goToNextSession.type, goToNextSessionSaga),
     takeLatest(submitUserMessage.type, submitUserMessageSaga),

@@ -28,10 +28,9 @@ test.describe('Generated Snippets (Error Handling)', () => {
   });
 
   test('shows an error if snippet generation fails', async ({ expectedConsoleErrors }) => {
+    // Purpose: This test verifies that if the API call for generating a snippet's content fails,
+    // an appropriate error message is displayed to the user within the snippet editor.
     expectedConsoleErrors.push(/Internal Server Error/);
-    // Purpose: This test verifies that if the API call for generating a snippet's content fails
-    // (e.g., returns a 500 error), an appropriate error message is displayed to the user within
-    // the snippet editor.
     const chatMocker = new ChatCompletionMocker(settingsPage.page);
     await chatMocker.setup();
     chatMocker.mock({

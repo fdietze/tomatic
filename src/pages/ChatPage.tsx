@@ -40,8 +40,6 @@ const ChatPage: React.FC = () => {
     return entity?.data;
   }, [systemPromptsMap, selectedPromptName]);
 
-  const session = useSelector(selectSession);
-
   useEffect(() => {
     dispatch(loadSession(sessionIdFromUrl ?? "new"));
   }, [sessionIdFromUrl, dispatch]);
