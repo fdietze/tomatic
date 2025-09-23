@@ -212,6 +212,21 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
   }
 }
 
+export async function updateSnippetProperty(
+  name: string,
+  properties: Partial<Snippet>,
+): Promise<void> {
+  const db = await dbPromise;
+  const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
+  const store = tx.objectStore(SNIPPETS_STORE_NAME);
+  const snippet = await store.get(name);
+  if (snippet) {
+    const updatedSnippet = { ...snippet, ...properties };
+    await store.put(updatedSnippet);
+  }
+  await tx.done;
+}
+
 // --- System Prompt Functions ---
 
 export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {

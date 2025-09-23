@@ -29,6 +29,13 @@ import {
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
 import { SessionState } from "./sessionSlice";
+import { findSnippetReferences } from "@/utils/snippetUtils";
+import { Snippet } from "@/types/storage";
+import {
+  awaitableRegenerateRequest,
+  regenerateSnippetFailure,
+  regenerateSnippetSuccess,
+} from "@/store/features/snippets/snippetsSlice";
 
 // --- Worker Sagas ---
 
@@ -142,6 +149,11 @@ function createChatStreamChannel(
   });
 }
 
+type SnippetCompletionAction = {
+  type: string;
+  payload: { name: string; error?: string };
+};
+
 function* submitUserMessageSaga(
   action: PayloadAction<{
     prompt: string;
@@ -150,7 +162,49 @@ function* submitUserMessageSaga(
   }>,
 ) {
   try {
-    const { isRegeneration } = action.payload;
+    const { isRegeneration, prompt } = action.payload;
+
+    // --- Await Dirty Snippets ---
+    const { snippets: allSnippets }: { snippets: Snippet[] } = yield select(
+      (state: RootState) => state.snippets,
+    );
+    const snippetReferences = findSnippetReferences(prompt);
+    if (snippetReferences.length > 0) {
+      const referencedSnippets = allSnippets.filter((s) =>
+        snippetReferences.includes(s.name),
+      );
+      const dirtySnippets = referencedSnippets.filter((s) => s.isDirty);
+
+      if (dirtySnippets.length > 0) {
+        yield all(
+          dirtySnippets.map((s) =>
+            put(awaitableRegenerateRequest({ name: s.name })),
+          ),
+        );
+        const results: SnippetCompletionAction[] = yield all(
+          dirtySnippets.map((snippet) =>
+            take(
+              (action: any): action is SnippetCompletionAction =>
+                (action.type === regenerateSnippetSuccess.type ||
+                  action.type === regenerateSnippetFailure.type) &&
+                action.payload.name === snippet.name,
+            ),
+          ),
+        );
+
+        const failedSnippet = results.find(
+          (r) => r.type === regenerateSnippetFailure.type,
+        );
+        if (failedSnippet) {
+          throw new Error(
+            `Snippet '@${failedSnippet.payload.name}' failed to regenerate: ${
+              failedSnippet.payload.error ?? "Unknown error"
+            }`,
+          );
+        }
+      }
+    }
+
     // --- 1. Get state and prepare for API call ---
     const { settings, session, prompts }: RootState = yield select(
       (state: RootState) => state,
