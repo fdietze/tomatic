@@ -31,10 +31,9 @@ test.describe("System Prompt Interaction", () => {
     context,
     page,
   }) => {
-    // Purpose: This test verifies that when regenerating an assistant's response, the system
-    // uses the most up-to-date version of the active system prompt. The test simulates a user
-    // editing a prompt in settings and then returning to a chat to regenerate a response.
-
+    // Purpose: This test verifies that when regenerating a response, the system uses the
+    // most up-to-date version of the active system prompt.
+    
     // 1. Define Mock Data
     const MOCK_PROMPTS: SystemPrompt[] = [
       { name: "Chef", prompt: "You are a master chef." },

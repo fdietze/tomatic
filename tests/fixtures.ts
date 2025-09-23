@@ -1,4 +1,4 @@
-import { test as base, mergeTests } from '@playwright/test';
+import { test as base, mergeTests, type TestInfo } from '@playwright/test';
 import { testWithLogging } from './logging-fixture';
 import { networkSecurityTest } from './network-security-fixture';
 
@@ -45,7 +45,7 @@ export const testWithConsoleErrors = base.extend<ConsoleErrorOptions>({
 });
 
 export const test = mergeTests(testWithConsoleErrors, testWithLogging, networkSecurityTest).extend({
-	context: async ({ context }, use) => {
+	context: async ({ context }, use, testInfo: TestInfo) => {
 		await context.addInitScript(() => {
 			window.__IS_TESTING__ = true;
 			

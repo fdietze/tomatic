@@ -1,5 +1,5 @@
 # User requests
-- for every user request, decide if we can develop it in a test-driven way. which tests would be appropriate? vitest unit tests and/or playwright e2e tests?
+- for every user request (feature request, bug report, etc), see if we can develop it in a test-driven way. What exactly needs to be tested? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests?
 
 # Validating Changes
 
@@ -37,11 +37,39 @@
 - We want a composable test setup with low abstraction levels and no builder patterns. 
 - each test must be as explicit and self-contained as possible.
 - each test must have a comment inside its test block stating its purpose
+- Every `test()` block must begin with a "Purpose:" comment explaining what behavior it verifies.
 - make the test's setup completely explicit and easy to understand without needing to look up a fixture's definition.
 - Keep simple fixtures for boilerplate that is truly generic and shared by all tests.
 - for test setup, prefer direct data seeding (e.g., of IndexedDB or localStorage) over UI interactions to keep tests fast and focused
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
 - when testing loading states, use manual mock triggers to assert that spinners appear before the mock is resolved and disappear after.
+- Use a hierarchical, scenario-based architecture for test files. Group tests into `describe` blocks based on the feature and specific scenarios. Scope data seeding to the narrowest possible `beforeEach` block to ensure tests are perfectly isolated and self-contained.
+
+```typescript
+// good example
+describe('Feature: Snippet Editing', () => {
+  // Common setup for all tests in this file (e.g., initialize Page Objects)
+  test.beforeEach(() => { /* ... */ });
+
+  describe('Scenario: When snippets are valid', () => {
+    // Specific data seeding for this scenario
+    test.beforeEach(() => { 
+      seedIndexedDB({ snippets: [/* valid snippets */] }); 
+    });
+
+    test('it should resolve a snippet', () => { /* ... */ });
+  });
+
+  describe('Scenario: When a snippet does not exist', () => {
+    // A different, clean state for this scenario
+    test.beforeEach(() => { 
+      seedIndexedDB({ snippets: [] }); 
+    });
+
+    test('it should show a "not found" error', () => { /* ... */ });
+  });
+});
+```
 
 # Big tasks
 - bigger tasks always have specification gaps. note, which decisions you have taken to fill those gaps. be conservative and don't do anything the user didn't ask for.

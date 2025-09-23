@@ -11,182 +11,88 @@ import {
 import { ROUTES } from "@/utils/routes";
 
 test.describe("Chat Session Navigation", () => {
-  test.beforeEach(async ({ context }) => {
+  let chatPage: ChatPage;
+
+  test.beforeEach(async ({ context, page }) => {
     await mockGlobalApis(context);
+    chatPage = new ChatPage(page);
   });
-  test("navigates between sessions and disables buttons at boundaries", async ({
-    context,
-    page,
-  }) => {
-    // Purpose: This test verifies the chat session navigation functionality. It checks that a user
-    // can move between previous and next sessions, that the correct session content is displayed,
-    // and that the navigation buttons are correctly disabled when at the beginning or end of
-    // the session history.
-    // 1. Define Mock Data
+  
+  test.describe("when multiple sessions exist", () => {
     const sessions: DBV3_ChatSession[] = [
-      {
-        session_id: "session-old",
-        name: null,
-        messages: [
-          {
-            id: "msg1",
-            role: "user",
-            content: "Old message",
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-            raw_content: undefined,
+        {
+          session_id: "session-old",
+          name: null,
+          messages: [{ id: "msg1", role: "user", content: "Old message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
+          created_at_ms: 1000, updated_at_ms: 1000,
+        },
+        {
+          session_id: "session-middle",
+          name: null,
+          messages: [{ id: "msg2", role: "user", content: "Middle message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
+          created_at_ms: 2000, updated_at_ms: 2000,
+        },
+        {
+          session_id: "session-new",
+          name: null,
+          messages: [{ id: "msg3", role: "user", content: "New message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
+          created_at_ms: 3000, updated_at_ms: 3000,
+        },
+      ];
+    
+    test.beforeEach(async ({ context }) => {
+        await seedLocalStorage(context, {
+          state: {
+            apiKey: OPENROUTER_API_KEY,
+            modelName: "google/gemini-2.5-pro",
+            autoScrollEnabled: false,
           },
-        ],
-        created_at_ms: 1000,
-        updated_at_ms: 1000,
-      },
-      {
-        session_id: "session-middle",
-        name: null,
-        messages: [
-          {
-            id: "msg2",
-            role: "user",
-            content: "Middle message",
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-            raw_content: undefined,
-          },
-        ],
-        created_at_ms: 2000,
-        updated_at_ms: 2000,
-      },
-      {
-        session_id: "session-new",
-        name: null,
-        messages: [
-          {
-            id: "msg3",
-            role: "user",
-            content: "New message",
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-            raw_content: undefined,
-          },
-        ],
-        created_at_ms: 3000,
-        updated_at_ms: 3000,
-      },
-    ];
-
-    // 2. Setup Test State
-    await seedLocalStorage(context, {
-      state: {
-        apiKey: OPENROUTER_API_KEY,
-        modelName: "google/gemini-2.5-pro",
-        cachedModels: [],
-        input: "",
-        selectedPromptName: null,
-        autoScrollEnabled: false,
-      },
-      version: 1,
+          version: 1,
+        });
+        await seedIndexedDB(context, { chat_sessions: sessions });
     });
-    await seedIndexedDB(context, { chat_sessions: sessions });
 
-    const chatPage = new ChatPage(page);
-    await chatPage.goto("session-new");
+    test("navigates between sessions and disables buttons at boundaries", async ({
+      page,
+    }) => {
+      // Purpose: This test verifies that a user can navigate between previous and next sessions
+      // and that the navigation buttons are correctly disabled at the boundaries.
+      await chatPage.goto("session-new");
 
-    // 3. Assert initial state: Next button disabled, Prev button enabled
-    await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
-    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
-    await chatPage.expectMessage(0, "user", /New message/);
+      await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
+      await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+      await chatPage.expectMessage(0, "user", /New message/);
 
-    // 4. Navigate to the middle session
-    await chatPage.navigation.goToPrevSession();
-    await page.waitForURL(ROUTES.chat.session("session-middle"));
-    await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
-    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
-    await chatPage.expectMessage(0, "user", /Middle message/);
+      await chatPage.navigation.goToPrevSession();
+      await page.waitForURL(ROUTES.chat.session("session-middle"));
+      await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
+      await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+      await chatPage.expectMessage(0, "user", /Middle message/);
 
-    // 5. Navigate to the oldest session
-    await chatPage.navigation.goToPrevSession();
-    await page.waitForURL(ROUTES.chat.session("session-old"));
-    await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
-    await expect(chatPage.navigation.prevSessionButton).toBeDisabled();
-    await chatPage.expectMessage(0, "user", /Old message/);
+      await chatPage.navigation.goToPrevSession();
+      await page.waitForURL(ROUTES.chat.session("session-old"));
+      await expect(chatPage.navigation.nextSessionButton).toBeEnabled();
+      await expect(chatPage.navigation.prevSessionButton).toBeDisabled();
+      await chatPage.expectMessage(0, "user", /Old message/);
 
-    // 6. Navigate back to the middle session
-    await chatPage.navigation.goToNextSession();
-    await page.waitForURL(ROUTES.chat.session("session-middle"));
-    await chatPage.expectMessage(0, "user", /Middle message/);
-  });
-
-  test("shows a new, empty session when visiting /chat/new", async ({
-    context,
-    page,
-  }) => {
-    // Purpose: This test verifies that when a user navigates to the generic 'new chat' page
-    // while having existing sessions, the app shows a new empty session.
-    // 1. Define Mock Data (similar to the other test, order is important)
-    const sessions: DBV3_ChatSession[] = [
-      {
-        session_id: "session-old",
-        name: null,
-        messages: [
-          {
-            id: "msg1",
-            role: "user",
-            content: "Old message",
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-            raw_content: undefined,
-          },
-        ],
-        created_at_ms: 1000,
-        updated_at_ms: 1000,
-      },
-      {
-        session_id: "session-new",
-        name: null,
-        messages: [
-          {
-            id: "msg3",
-            role: "user",
-            content: "New message",
-            prompt_name: null,
-            model_name: null,
-            cost: null,
-            raw_content: undefined,
-          },
-        ],
-        created_at_ms: 3000,
-        updated_at_ms: 3000,
-      },
-    ];
-
-    // 2. Setup Test State
-    await seedLocalStorage(context, {
-      state: {
-        apiKey: OPENROUTER_API_KEY,
-        modelName: "google/gemini-2.5-pro",
-        autoScrollEnabled: false,
-      },
-      version: 1,
+      await chatPage.navigation.goToNextSession();
+      await page.waitForURL(ROUTES.chat.session("session-middle"));
+      await chatPage.expectMessage(0, "user", /Middle message/);
     });
-    await seedIndexedDB(context, { chat_sessions: sessions });
 
-    const chatPage = new ChatPage(page);
-    // Navigate to /chat/new
-    await chatPage.goto();
+    test("shows a new, empty session when visiting /chat/new", async ({
+      page,
+    }) => {
+      // Purpose: This test verifies that visiting /chat/new shows an empty session
+      // instead of redirecting to the latest session.
+      await chatPage.goto();
 
-    // 3. Assert no redirection and URL is /chat/new
-    await page.waitForURL(ROUTES.chat.new);
-    expect(page.url()).toContain(ROUTES.chat.new);
+      await page.waitForURL(ROUTES.chat.new);
+      expect(page.url()).toContain(ROUTES.chat.new);
 
-    // 4. Assert button states
-    await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
-    await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
-
-    // 5. Assert that there are no messages
-    await expect(chatPage.chatMessages).toHaveCount(0);
+      await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
+      await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
+      await expect(chatPage.chatMessages).toHaveCount(0);
+    });
   });
 });

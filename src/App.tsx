@@ -31,7 +31,7 @@ const Header: React.FC = () => {
   }, [dispatch]);
 
   const isRegenerating = Object.values(regenerationStatus).some(
-    (s) => s === "in_progress",
+    (s) => s.status === "in_progress",
   );
 
   const lastChatUrl = currentSessionId
