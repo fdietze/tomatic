@@ -13,6 +13,7 @@ import {
   updateSnippet,
   deleteSnippet,
   regenerateSnippet,
+  addSnippet,
 } from '@/store/features/snippets/snippetsSlice';
 import { assertUnreachable } from '@/utils/assert';
 
@@ -131,18 +132,23 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         return;
     }
 
-    const finalContent = editingContent;
-
     const snippetForSave: Snippet = {
       ...snippet,
       name: trimmedName,
-      content: finalContent,
+      // The content will be updated by the generation process if needed
+      content: editingContent,
       isGenerated: editingIsGenerated,
       prompt: editingPrompt,
       model: editingModel,
     };
 
-    dispatch(updateSnippet({ oldName: snippet.name, snippet: snippetForSave }));
+    if (snippet.name === "") {
+      console.log("[DEBUG] SnippetItem: dispatching addSnippet", snippetForSave);
+      dispatch(addSnippet(snippetForSave));
+    } else {
+      console.log("[DEBUG] SnippetItem: dispatching updateSnippet", { oldName: snippet.name, snippet: snippetForSave });
+      dispatch(updateSnippet({ oldName: snippet.name, snippet: snippetForSave }));
+    }
 
     setIsEditing(false);
     setNameError(null);
@@ -284,7 +290,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   }
 
   return (
-    <div className="system-prompt-item-view" data-testid={`snippet-item-${editingName}`}>
+    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
       <div className="system-prompt-header">
         <span className="system-prompt-name">{snippet.name}</span>
         <div className="system-prompt-actions">
@@ -320,7 +326,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           })()}
         </div>
       </div>
-      <span className="system-prompt-text">{editingContent}</span>
+      <span className="system-prompt-text">{snippet.content}</span>
       {regenerationStatus[snippet.name]?.status === 'error' && (
           <div className="error-message" data-testid="generation-error-message">
               {`Generation failed: ${regenerationStatus[snippet.name]?.error ?? 'Unknown error'}`}

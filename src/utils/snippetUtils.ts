@@ -37,6 +37,21 @@ export function resolveSnippets(
   });
 }
 
+/**
+ * Finds all snippet references (e.g., "@name") in a given text.
+ * @param text The text to search.
+ * @returns An array of snippet names, without the "@" prefix.
+ */
+export function findSnippetReferences(text: string): string[] {
+  if (!text) return [];
+  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
+  const matches = text.match(snippetRegex);
+  if (!matches) {
+    return [];
+  }
+  return matches.map((match) => match.substring(1));
+}
+
 
 /**
  * Validates snippet dependencies for cycles, throwing an error if one is found.
@@ -245,4 +260,59 @@ export function topologicalSort(allSnippets: Snippet[]): { sorted: Snippet[], cy
   }
 
   return { sorted, cyclic };
+}
+
+/**
+ * Groups a topologically sorted list of snippets into batches that can be run in parallel.
+ * A batch consists of snippets that do not depend on each other.
+ * @param sortedSnippets A list of snippets, already topologically sorted.
+ * @param allSnippets The complete list of all snippets, for dependency lookup.
+ * @returns An array of arrays, where each inner array is a batch of snippets.
+ */
+export function groupSnippetsIntoBatches(
+  sortedSnippets: Snippet[],
+  allSnippets: Snippet[]
+): Snippet[][] {
+  const batches: Snippet[][] = [];
+  let processedSnippets = new Set<string>();
+
+  for (const snippet of sortedSnippets) {
+    let batchFound = false;
+    const dependencies = getReferencedSnippetNames(
+      snippet.isGenerated ? snippet.prompt || "" : snippet.content
+    );
+
+    for (const batch of batches) {
+      const batchDependencies = new Set<string>();
+      for (const s of batch) {
+        const s_deps = getReferencedSnippetNames(
+          s.isGenerated ? s.prompt || "" : s.content
+        );
+        s_deps.forEach((dep) => batchDependencies.add(dep));
+      }
+
+      // Check if this snippet depends on anything in the current batch
+      const dependsOnBatch = [...dependencies].some((dep) =>
+        batch.some((s) => s.name === dep)
+      );
+
+      // Check if anything in the batch depends on this snippet
+      const batchDependsOnSnippet = [...batchDependencies].some(
+        (dep) => dep === snippet.name
+      );
+
+      if (!dependsOnBatch && !batchDependsOnSnippet) {
+        batch.push(snippet);
+        batchFound = true;
+        break;
+      }
+    }
+
+    if (!batchFound) {
+      batches.push([snippet]);
+    }
+    processedSnippets.add(snippet.name);
+  }
+
+  return batches;
 }

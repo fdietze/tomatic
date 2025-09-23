@@ -15,11 +15,15 @@ import {
   regenerateSnippet,
   regenerateSnippetSuccess,
   regenerateSnippetFailure,
+  setSnippetDirtyState,
+  batchRegenerateRequest,
+  awaitableRegenerateRequest,
 } from "./snippetsSlice";
 import { RootState } from "../../store";
 import {
   buildReverseDependencyGraph,
   findTransitiveDependents,
+  groupSnippetsIntoBatches,
   resolveSnippets,
   topologicalSort,
 } from "@/utils/snippetUtils";
@@ -150,44 +154,107 @@ function* handleRegenerateSnippetSaga(
   }
 }
 
-function* regenerationOrchestrationSaga(
-  action: PayloadAction<{ oldName: string; snippet: Snippet }>,
+function* markDependentsDirtySaga(
+  action: PayloadAction<{ oldName: string; snippet: Snippet } | Snippet>,
 ) {
+  console.log("[DEBUG] markDependentsDirtySaga: triggered", action.payload);
   const allSnippets: Snippet[] = yield select(
     (state: RootState) => state.snippets.snippets,
   );
   const reverseGraph = buildReverseDependencyGraph(allSnippets);
+  const changedSnippetName =
+    "oldName" in action.payload
+      ? action.payload.oldName
+      : action.payload.name;
+
   const dependentNames = findTransitiveDependents(
-    action.payload.snippet.name,
+    changedSnippetName,
     reverseGraph,
   );
+  console.log(`[DEBUG] markDependentsDirtySaga: found dependents for ${changedSnippetName}:`, Array.from(dependentNames));
 
   if (dependentNames.size === 0) {
     return;
   }
 
-  const dependentSnippets = allSnippets.filter((s) =>
-    dependentNames.has(s.name),
-  );
-  const { sorted: sortedDependents, cyclic } =
-    topologicalSort(dependentSnippets);
-
-  if (cyclic.length > 0) {
-    // TODO: Dispatch an error to the UI to inform the user about the cycle
-    // console.error("Cyclic dependency detected in snippets:", cyclic);
+  const dependentsToUpdate: Snippet[] = [];
+  for (const name of dependentNames) {
+    const dependentSnippet = allSnippets.find((s) => s.name === name);
+    if (dependentSnippet && dependentSnippet.isGenerated) {
+      dependentsToUpdate.push(dependentSnippet);
+      yield put(setSnippetDirtyState({ name, isDirty: true }));
+      yield call([db, db.updateSnippetProperty], name, { isDirty: true });
+    }
   }
 
-  try {
-    // Use a simple for...of loop for sequential execution with `call`
-    for (const dependentSnippet of sortedDependents) {
-      if (dependentSnippet.isGenerated) {
-        yield put(regenerateSnippet({ oldName: dependentSnippet.name, snippet: dependentSnippet }));
-      }
+  if (dependentsToUpdate.length > 0) {
+    yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
+  }
+}
+
+function* resumeDirtySnippetGenerationSaga() {
+  console.log("[DEBUG] resumeDirtySnippetGenerationSaga: triggered");
+  const allSnippets: Snippet[] = yield select(
+    (state: RootState) => state.snippets.snippets,
+  );
+  const dirtySnippets = allSnippets.filter((s) => s.isDirty);
+  if (dirtySnippets.length > 0) {
+    console.log("[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets", dirtySnippets.map(s => s.name));
+    yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
+  }
+}
+
+function* batchRegenerationOrchestratorSaga(
+  action: PayloadAction<{ snippets: Snippet[] }>,
+) {
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with snippets", action.payload.snippets.map(s => s.name));
+  const { snippets } = action.payload;
+  const allSnippets: Snippet[] = yield select(
+    (state: RootState) => state.snippets.snippets,
+  );
+
+  const { sorted, cyclic } = topologicalSort(snippets);
+
+  if (cyclic.length > 0) {
+    console.error("Cyclic dependency detected in snippets:", cyclic);
+    return;
+  }
+
+  const batches = groupSnippetsIntoBatches(sorted, allSnippets);
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
+
+  for (const batch of batches) {
+    try {
+      yield all(
+        batch.map((snippet: Snippet) =>
+          call(handleRegenerateSnippetSaga, {
+            payload: { oldName: snippet.name, snippet },
+            type: "handleRegenerateSnippetSaga",
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error("Batch regeneration failed.", error);
+      break;
     }
-  } finally {
-    window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:batch:complete"),
-    );
+  }
+  window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
+}
+
+function* handleAwaitableRegeneration(
+  action: PayloadAction<{ name: string }>,
+) {
+  const snippetName = action.payload.name;
+  const allSnippets: Snippet[] = yield select(
+    (state: RootState) => state.snippets.snippets,
+  );
+  const snippet = allSnippets.find((s) => s.name === snippetName);
+
+  if (snippet) {
+    yield call(handleRegenerateSnippetSaga, {
+      payload: { oldName: snippet.name, snippet },
+      type: "handleRegenerateSnippetSaga",
+    });
   }
 }
 
@@ -197,7 +264,13 @@ export function* snippetsSaga() {
     takeLatest(addSnippet.type, addSnippetSaga),
     takeLatest(updateSnippet.type, updateSnippetSaga),
     takeLatest(deleteSnippet.type, deleteSnippetSaga),
-    takeLatest(updateSnippetSuccess.type, regenerationOrchestrationSaga),
+    takeLatest(
+      [updateSnippetSuccess.type, addSnippetSuccess.type],
+      markDependentsDirtySaga,
+    ),
+    takeLatest(loadSnippetsSuccess.type, resumeDirtySnippetGenerationSaga),
+    takeEvery(batchRegenerateRequest.type, batchRegenerationOrchestratorSaga),
     takeEvery(regenerateSnippet.type, handleRegenerateSnippetSaga),
+    takeEvery(awaitableRegenerateRequest.type, handleAwaitableRegeneration),
   ]);
 }

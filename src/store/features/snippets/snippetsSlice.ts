@@ -60,18 +60,27 @@ export const snippetsSlice = createSlice({
     },
     regenerateSnippet: (state, action: PayloadAction<{ oldName: string; snippet: Snippet }>) => {
       const name = action.payload.oldName;
+      console.log("[DEBUG] snippetsSlice: regenerateSnippet", { name });
       state.regenerationStatus[name] = { status: 'in_progress' };
     },
     regenerateSnippetSuccess: (state, action: PayloadAction<{ name: string; content: string }>) => {
         const { name, content } = action.payload;
+        console.log("[DEBUG] snippetsSlice: regenerateSnippetSuccess", { name, content: content.slice(0, 20) + '...' });
         const snippet = state.snippets.find(s => s.name === name);
         if (snippet) {
             snippet.content = content;
+            snippet.isDirty = false;
+            snippet.generationError = null;
         }
         state.regenerationStatus[name] = { status: 'success' };
     },
     regenerateSnippetFailure: (state, action: PayloadAction<{ name: string; error: string }>) => {
         const { name, error } = action.payload;
+        console.log("[DEBUG] snippetsSlice: regenerateSnippetFailure", { name, error });
+        const snippet = state.snippets.find(s => s.name === name);
+        if (snippet) {
+          snippet.generationError = error;
+        }
         state.regenerationStatus[name] = { status: 'error', error };
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
@@ -82,7 +91,19 @@ export const snippetsSlice = createSlice({
         if (snippet) {
             snippet.content = action.payload.content;
         }
-    }
+    },
+    setSnippetDirtyState: (state, action: PayloadAction<{ name: string; isDirty: boolean }>) => {
+      const snippet = state.snippets.find(s => s.name === action.payload.name);
+      if (snippet) {
+        snippet.isDirty = action.payload.isDirty;
+      }
+    },
+    awaitableRegenerateRequest: (_state, _action: PayloadAction<{ name: string }>) => {
+      // Saga watcher will handle this.
+    },
+    batchRegenerateRequest: (_state, _action: PayloadAction<{ snippets: Snippet[] }>) => {
+      // Saga watcher will handle this.
+    },
   },
 });
 
@@ -101,6 +122,9 @@ export const {
   regenerateSnippetFailure,
   clearRegenerationStatus,
   updateSnippetContent,
+  setSnippetDirtyState,
+  awaitableRegenerateRequest,
+  batchRegenerateRequest,
 } = snippetsSlice.actions;
 
 export const selectSnippets = (state: RootState) => state.snippets;
