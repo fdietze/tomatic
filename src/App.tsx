@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -54,7 +54,9 @@ const Header: React.FC = () => {
   return (
     <header>
       <div className="nav-buttons">
-        <button onClick={onChat} data-active={isChatActive}>
+        <button onClick={onChat} data-active={isChatActive}
+          data-testid="chat-button"
+        >
           Chat
         </button>
         <button

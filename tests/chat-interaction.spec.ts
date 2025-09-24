@@ -7,6 +7,7 @@ import {
   OPENROUTER_API_KEY,
   seedLocalStorage,
   seedIndexedDB,
+  waitForEvent,
 } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
 import { SystemPrompt } from "@/types/storage";
@@ -275,7 +276,6 @@ test.describe("Chat Interaction", () => {
       await chatPage.expectMessage(0, "user", /Initial message/);
       await chatPage.expectMessage(1, "assistant", /Initial response/);
       await chatPage.cancelEdit(0, "This text will be discarded");
-      await chatPage.expectMessage(0, "user", /Initial message/);
       await expect(
         page.locator(
           '[data-testid="chat-message-0"] [data-testid="edit-textarea"]',

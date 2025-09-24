@@ -212,7 +212,10 @@ function* resumeDirtySnippetGenerationSaga() {
   );
   const dirtySnippets = allSnippets.filter((s) => s.isDirty);
   if (dirtySnippets.length > 0) {
-    console.log("[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets", dirtySnippets.map(s => s.name));
+    console.log(
+      "[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets",
+      dirtySnippets.map((s) => s.name),
+    );
     yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
   }
 }
