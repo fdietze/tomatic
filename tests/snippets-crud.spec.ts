@@ -6,6 +6,7 @@ import {
   OPENROUTER_API_KEY,
   seedLocalStorage,
   seedIndexedDB,
+  waitForEvent,
 } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
 
@@ -24,13 +25,15 @@ test.describe("Snippet Management (CRUD)", () => {
     });
     settingsPage = new SettingsPage(page);
     await page.goto(ROUTES.settings);
+    await waitForEvent(page, "app_initialized");
   });
 
   test.describe("when creating a new snippet", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       // Start with no snippets for this test group
       await seedIndexedDB(context, { snippets: [] });
-      await settingsPage.page.reload();
+      await page.goto(ROUTES.settings);
+      await waitForEvent(page, "app_initialized");
     });
 
     test("creates a new standard snippet", async () => {
@@ -55,7 +58,7 @@ test.describe("Snippet Management (CRUD)", () => {
   });
 
   test.describe("with a pre-existing snippet", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, {
         snippets: [
           {
@@ -70,7 +73,8 @@ test.describe("Snippet Management (CRUD)", () => {
           },
         ],
       });
-      await settingsPage.page.reload(); // Reload to apply seeded data
+      await page.goto(ROUTES.settings);
+      await waitForEvent(page, "app_initialized");
     });
 
     test("updates an existing snippet", async () => {
@@ -100,7 +104,7 @@ test.describe("Snippet Management (CRUD)", () => {
   });
   
   test.describe("with name validation", () => {
-      test.beforeEach(async ({ context }) => {
+      test.beforeEach(async ({ context, page }) => {
           await seedIndexedDB(context, {
             snippets: [
               {
@@ -115,7 +119,8 @@ test.describe("Snippet Management (CRUD)", () => {
               },
             ],
           });
-          await settingsPage.page.reload();
+          await page.goto(ROUTES.settings);
+          await waitForEvent(page, "app_initialized");
       });
 
       test("prevents saving a new snippet with an empty name", async () => {
