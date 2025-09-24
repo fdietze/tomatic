@@ -181,16 +181,21 @@ function* submitUserMessageSaga(
             put(awaitableRegenerateRequest({ name: s.name })),
           ),
         );
-        const results: SnippetCompletionAction[] = yield all(
-          dirtySnippets.map((snippet) =>
-            take(
-              (action: any): action is SnippetCompletionAction =>
-                (action.type === regenerateSnippetSuccess.type ||
-                  action.type === regenerateSnippetFailure.type) &&
-                action.payload.name === snippet.name,
-            ),
-          ),
-        );
+
+        const results: SnippetCompletionAction[] = [];
+        const remainingSnippets = new Set(dirtySnippets.map(s => s.name));
+
+        while (remainingSnippets.size > 0) {
+          const result: SnippetCompletionAction = yield take([
+            regenerateSnippetSuccess.type,
+            regenerateSnippetFailure.type,
+          ]);
+
+          if (remainingSnippets.has(result.payload.name)) {
+            remainingSnippets.delete(result.payload.name);
+            results.push(result);
+          }
+        }
 
         const failedSnippet = results.find(
           (r) => r.type === regenerateSnippetFailure.type,

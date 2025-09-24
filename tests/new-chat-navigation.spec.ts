@@ -19,7 +19,7 @@ test.describe("New Chat Page Navigation", () => {
   });
 
   test.describe("when on /chat/new with existing sessions", () => {
-    test.beforeEach(async ({ context, page }) => {
+    test.beforeEach(async ({ context }) => {
       const sessions: DBV3_ChatSession[] = [
         {
           session_id: "session-old",

@@ -31,6 +31,7 @@ export const systemPromptSchema = z.object({
 });
 
 export const snippetSchema = z.object({
+  id: z.string(),
   name: z.string(),
   content: z.string(),
   isGenerated: z.boolean(),

@@ -11,6 +11,7 @@ export interface DisplayModelInfo {
 }
 
 export interface Snippet {
+  id: string;
   name: string;
   content: string;
   isGenerated: boolean; // Must be a required boolean
@@ -167,6 +168,7 @@ export interface DBV3_SystemPrompt {
 }
 
 export interface DBV3_Snippet {
+  id: string;
   name: string;
   content: string;
   isGenerated: boolean;

@@ -19,6 +19,7 @@ test.describe("Chat Regeneration with Snippets", () => {
     await mockGlobalApis(context);
 
     const MOCK_SNIPPET: DBV3_Snippet = {
+      id: "greet-id",
       name: "greet",
       content: "Hello",
       isGenerated: false,

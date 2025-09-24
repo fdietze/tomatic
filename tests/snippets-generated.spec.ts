@@ -173,6 +173,7 @@ test.describe("Generated Snippets", () => {
       await seedIndexedDB(context, {
         snippets: [
           {
+            id: "topic-id",
             name: "topic",
             content: "space exploration",
             isGenerated: false,
@@ -271,9 +272,9 @@ test.describe("Generated Snippets", () => {
       test.beforeEach(async ({ context, page }) => {
         await seedIndexedDB(context, {
           snippets: [
-            { name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: "B", content: "Content of B from v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
-            { name: "C", content: "Content of C from B_v1", isGenerated: true, prompt: "Prompt for C using @B", model: "mock-model/mock-model", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
+            { id: "a", name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "b", name: "B", content: "Content of B from v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+            { id: "c", name: "C", content: "Content of C from B_v1", isGenerated: true, prompt: "Prompt for C using @B", model: "mock-model/mock-model", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
           ],
         });
         await page.goto(ROUTES.settings);
@@ -302,8 +303,8 @@ test.describe("Generated Snippets", () => {
         await settingsPage.fillSnippetForm("A", "v2");
         await settingsPage.saveSnippet();
 
-        const snippetB = settingsPage.getSnippetItem("B");
-        const snippetC = settingsPage.getSnippetItem("C");
+        const snippetB = settingsPage.getSnippetItemView("B");
+        const snippetC = settingsPage.getSnippetItemView("C");
 
         await expect(settingsPage.navigation.settingsTabSpinner).toBeVisible();
         await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
@@ -328,8 +329,8 @@ test.describe("Generated Snippets", () => {
       test.beforeEach(async ({ context, page }) => {
         await seedIndexedDB(context, {
           snippets: [
-            { name: "A", content: "Initial Text", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: "B", content: "Initial content for B", isGenerated: true, prompt: "@A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+            { id: "a", name: "A", content: "Initial Text", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "b", name: "B", content: "Initial content for B", isGenerated: true, prompt: "@A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
           ],
         });
         await page.goto(ROUTES.settings);

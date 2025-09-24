@@ -43,23 +43,35 @@ export const snippetsSlice = createSlice({
     addSnippetSuccess: (state, action: PayloadAction<Snippet>) => {
       state.snippets.push(action.payload);
     },
-    updateSnippet: (_state, _action: PayloadAction<{ oldName: string; snippet: Snippet }>) => {
+    addSnippetFailure: (state, action: PayloadAction<{ name: string, error: string }>) => {
+      // In the future, we might want to show this error in the UI.
+      // For now, we'll just log it.
+      console.error(`Failed to add snippet '${action.payload.name}': ${action.payload.error}`);
+    },
+    updateSnippet: (_state, _action: PayloadAction<Snippet>) => {
       // saga will handle the logic
     },
     updateSnippetSuccess: (state, action: PayloadAction<{ oldName: string; snippet: Snippet }>) => {
-      const index = state.snippets.findIndex(s => s.name === action.payload.oldName);
+      const index = state.snippets.findIndex(s => s.id === action.payload.snippet.id);
       if (index !== -1) {
         state.snippets[index] = action.payload.snippet;
+      }
+    },
+    updateSnippetFailure: (state, action: PayloadAction<{ id: string, error: string }>) => {
+      // In the future, we might want to show this error in the UI.
+      const snippet = state.snippets.find(s => s.id === action.payload.id);
+      if (snippet) {
+        snippet.generationError = `Failed to save: ${action.payload.error}`;
       }
     },
     deleteSnippet: (_state, _action: PayloadAction<string>) => {
       // saga will handle the logic
     },
     deleteSnippetSuccess: (state, action: PayloadAction<string>) => {
-      state.snippets = state.snippets.filter(s => s.name !== action.payload);
+      state.snippets = state.snippets.filter(s => s.id !== action.payload);
     },
-    regenerateSnippet: (state, action: PayloadAction<{ oldName: string; snippet: Snippet }>) => {
-      const name = action.payload.oldName;
+    regenerateSnippet: (state, action: PayloadAction<Snippet>) => {
+      const name = action.payload.name;
       console.log("[DEBUG] snippetsSlice: regenerateSnippet", { name });
       state.regenerationStatus[name] = { status: 'in_progress' };
     },
@@ -80,14 +92,15 @@ export const snippetsSlice = createSlice({
         const snippet = state.snippets.find(s => s.name === name);
         if (snippet) {
           snippet.generationError = error;
+          snippet.isDirty = false;
         }
         state.regenerationStatus[name] = { status: 'error', error };
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
         delete state.regenerationStatus[action.payload];
     },
-    updateSnippetContent: (state, action: PayloadAction<{ name: string; content: string }>) => {
-        const snippet = state.snippets.find(s => s.name === action.payload.name);
+    updateSnippetContent: (state, action: PayloadAction<{ id: string; content: string }>) => {
+        const snippet = state.snippets.find(s => s.id === action.payload.id);
         if (snippet) {
             snippet.content = action.payload.content;
         }
@@ -113,8 +126,10 @@ export const {
   loadSnippetsFailure,
   addSnippet,
   addSnippetSuccess,
+  addSnippetFailure,
   updateSnippet,
   updateSnippetSuccess,
+  updateSnippetFailure,
   deleteSnippet,
   deleteSnippetSuccess,
   regenerateSnippet,

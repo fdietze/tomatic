@@ -266,12 +266,10 @@ export function topologicalSort(allSnippets: Snippet[]): { sorted: Snippet[], cy
  * Groups a topologically sorted list of snippets into batches that can be run in parallel.
  * A batch consists of snippets that do not depend on each other.
  * @param sortedSnippets A list of snippets, already topologically sorted.
- * @param allSnippets The complete list of all snippets, for dependency lookup.
  * @returns An array of arrays, where each inner array is a batch of snippets.
  */
 export function groupSnippetsIntoBatches(
   sortedSnippets: Snippet[],
-  allSnippets: Snippet[]
 ): Snippet[][] {
   const batches: Snippet[][] = [];
   let processedSnippets = new Set<string>();

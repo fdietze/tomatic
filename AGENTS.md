@@ -80,10 +80,8 @@ Strictly follow this process by creating a plan for it:
 State that you are "Entering the debugging protocol."
 run the tests (fix type-errors if necessary) and see them failing. after each run of `just check` you must ask the following quesions:
 - what are the current hypotheses of the tests failing? Explain the hypotheses with log traces.
-- are we able to catch those problems with more future-proof unit tests?
 - where and which logging must we add to confirm or refute these hypotheses
 - add logging to trace the whole flow from start to finish (always use console.log).
-- if applicable add a simple unit test.
 - which logs should we remove to reduce noise?
 - run the tests again
 - don't fix anything yet

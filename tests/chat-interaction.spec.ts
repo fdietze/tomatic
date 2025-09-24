@@ -9,7 +9,6 @@ import {
   seedIndexedDB,
 } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
-import { NavigationComponent } from "./pom/NavigationComponent";
 import { SystemPrompt } from "@/types/storage";
 
 test.describe("Chat Interaction", () => {
@@ -32,7 +31,7 @@ test.describe("Chat Interaction", () => {
   });
 
   test.describe("when sending messages", () => {
-    test.beforeEach(async ({}) => {
+    test.beforeEach(async () => {
       // No specific DB seeding needed for these tests, start fresh.
       await chatPage.goto();
     });
@@ -241,9 +240,7 @@ test.describe("Chat Interaction", () => {
         await page.goto(ROUTES.settings);
     });
 
-    test("shows system prompt immediately in a new chat", async ({
-      page,
-    }) => {
+    test("shows system prompt immediately in a new chat", async () => {
       // Purpose: This test ensures that when a system prompt is selected, it appears
       // as the first message immediately upon navigating to a new chat.
       await chatPage.navigation.goToNewChat();

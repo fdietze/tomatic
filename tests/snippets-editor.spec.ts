@@ -28,11 +28,11 @@ test.describe('Snippet Editor Validation', () => {
     test.beforeEach(async ({ context, page }) => {
         await seedIndexedDB(context, {
           snippets: [
-            { name: 'a', content: 'alpha', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: 'b', content: '', isGenerated: true, prompt: 'no cycle here', createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: 'c', content: 'charlie', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: 'd', content: 'Standard snippet referencing @b', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: 'empty', content: '   ', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: 'a', name: 'a', content: 'alpha', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: 'b', name: 'b', content: '', isGenerated: true, prompt: 'no cycle here', createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: 'c', name: 'c', content: 'charlie', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: 'd', name: 'd', content: 'Standard snippet referencing @b', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: 'e', name: 'empty', content: '   ', isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
           ],
         });
         await page.goto(ROUTES.settings);
@@ -148,7 +148,7 @@ test.describe('Snippet Editor Validation', () => {
     
         await settingsPage.expectSnippetToBeVisible('b');
         await expect(editContainer).not.toBeVisible();
-        await expect(settingsPage.getSnippetItem('b').locator('.system-prompt-text')).toHaveText('');
+        await expect(settingsPage.getSnippetItemView('b').locator('.system-prompt-text')).toHaveText('');
     
         await settingsPage.startEditingSnippet('b');
         await expect(editContainer.getByTestId('prompt-error-message')).toHaveText("Warning: Snippet '@nope' not found.");

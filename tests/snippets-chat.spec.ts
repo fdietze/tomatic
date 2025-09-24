@@ -38,9 +38,9 @@ test.describe("Snippet Usage in Chat", () => {
       test.beforeEach(async ({ context, page }) => {
           await seedIndexedDB(context, {
             snippets: [
-              { name: "greet_simple", content: "Hello, world!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { name: "greet_nested", content: "Hello, @name!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { name: "name", content: "World", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "1", name: "greet_simple", content: "Hello, world!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "2", name: "greet_nested", content: "Hello, @name!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "3", name: "name", content: "World", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
             ],
           });
           await page.goto(ROUTES.chat.new);
@@ -128,7 +128,7 @@ test.describe("Snippet Usage in Chat", () => {
       test.beforeEach(async ({ context, page }) => {
           await seedIndexedDB(context, {
             snippets: [
-              { name: "cycle_self", content: "This is a @cycle_self", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "1", name: "cycle_self", content: "This is a @cycle_self", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
             ],
           });
           await page.goto(ROUTES.chat.new);
@@ -153,8 +153,8 @@ test.describe("Snippet Usage in Chat", () => {
       test.beforeEach(async ({ context, page }) => {
           await seedIndexedDB(context, {
             snippets: [
-              { name: "cycle_a", content: "This is a @cycle_b", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { name: "cycle_b", content: "which contains @cycle_a", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "1", name: "cycle_a", content: "This is a @cycle_b", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+              { id: "2", name: "cycle_b", content: "which contains @cycle_a", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
             ],
           });
           await page.goto(ROUTES.chat.new);

@@ -26,6 +26,7 @@ test.describe("Chat Editing with Snippets", () => {
     test.beforeEach(async ({ context }) => {
         const MOCK_SNIPPETS: DBV3_Snippet[] = [
           {
+            id: "greet-id",
             name: "greet",
             content: "Hello",
             isGenerated: false,
@@ -35,6 +36,7 @@ test.describe("Chat Editing with Snippets", () => {
             isDirty: false,
           },
           {
+            id: "farewell-id",
             name: "farewell",
             content: "Goodbye",
             isGenerated: false,

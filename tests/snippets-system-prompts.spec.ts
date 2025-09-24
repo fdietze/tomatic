@@ -42,6 +42,7 @@ test.describe("Snippet Usage in System Prompts", () => {
         ],
         snippets: [
           {
+            id: "char-id",
             name: "character",
             content: "helpful assistant",
             isGenerated: false,
@@ -236,6 +237,7 @@ test.describe("Snippet Usage in System Prompts", () => {
         ],
         snippets: [
           {
+            id: "base-id",
             name: "base_snippet",
             content: "v1",
             isGenerated: false,
@@ -245,6 +247,7 @@ test.describe("Snippet Usage in System Prompts", () => {
             isDirty: false,
           },
           {
+            id: "gen-id",
             name: "generated_snippet",
             content: "generated from v1",
             isGenerated: true,
