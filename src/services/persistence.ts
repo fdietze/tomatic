@@ -14,7 +14,7 @@ type V1Message = Omit<Message, "id" | "prompt_name"> & {
 // For DB version < 3
 type V2Snippet = Omit<
   Snippet,
-  "createdAt_ms" | "updatedAt_ms" | "generationError" | "isDirty"
+  "id" | "createdAt_ms" | "updatedAt_ms" | "generationError" | "isDirty"
 >;
 
 // --- IndexedDB Constants ---
@@ -26,6 +26,7 @@ export const SNIPPETS_STORE_NAME = "snippets";
 export const SESSION_ID_KEY_PATH = "session_id";
 export const NAME_KEY_PATH = "name";
 export const UPDATED_AT_INDEX = "updated_at_ms";
+export const SNIPPET_NAME_INDEX = "name_idx";
 
 // --- IDB Schema Definition ---
 interface TomaticDB extends DBSchema {
@@ -43,6 +44,9 @@ interface TomaticDB extends DBSchema {
   [SNIPPETS_STORE_NAME]: {
     key: string;
     value: Snippet;
+    indexes: {
+      [SNIPPET_NAME_INDEX]: string;
+    };
   };
 }
 
@@ -112,35 +116,41 @@ function openTomaticDB(): Promise<{
           });
       }
       if (oldVersion < 3) {
-        // Create snippets store
-        if (!db.objectStoreNames.contains(SNIPPETS_STORE_NAME)) {
-          db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: NAME_KEY_PATH });
-        }
-
-        // Migrate existing snippets to include new fields for regeneration tracking
-        void tx
-          .objectStore(SNIPPETS_STORE_NAME)
-          .openCursor()
-          .then(function migrateSnippets(cursor) {
-            if (!cursor) {
-              dispatchEvent("db_migration_complete", { from: 2, to: 3 });
-              return;
-            }
-
-            const oldSnippet = cursor.value as V2Snippet;
+        // V3 introduces snippets. If the store exists from a pre-release version keyed by name,
+        // we need to rebuild it to be keyed by a new `id` field.
+        const storeExists = db.objectStoreNames.contains(SNIPPETS_STORE_NAME);
+        
+        const migrationLogic = async () => {
+          if (storeExists) {
+            const oldSnippets = await tx.objectStore(SNIPPETS_STORE_NAME).getAll() as V2Snippet[];
+            db.deleteObjectStore(SNIPPETS_STORE_NAME);
+            const newStore = db.createObjectStore(SNIPPETS_STORE_NAME, {
+              keyPath: "id",
+            });
+            newStore.createIndex(SNIPPET_NAME_INDEX, "name", { unique: true });
             const now = Date.now();
+            oldSnippets.forEach((oldSnippet) => {
+              const newSnippet: Snippet = {
+                id: crypto.randomUUID(),
+                ...oldSnippet,
+                createdAt_ms: now,
+                updatedAt_ms: now,
+                generationError: null,
+                isDirty: false,
+              };
+              void newStore.put(newSnippet);
+            });
+          } else {
+            const newStore = db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: "id" });
+            newStore.createIndex(SNIPPET_NAME_INDEX, "name", { unique: true });
+          }
+        };
 
-            const newSnippet: Snippet = {
-              ...oldSnippet,
-              createdAt_ms: now,
-              updatedAt_ms: now,
-              generationError: null,
-              isDirty: false,
-            };
-
-            void cursor.update(newSnippet);
-            void cursor.continue().then(migrateSnippets);
-          });
+        // The migration logic is now wrapped in a promise to ensure it completes
+        // before the transaction is automatically committed.
+        void migrationLogic().then(() => {
+          dispatchEvent("db_migration_complete", { from: 2, to: 3 });
+        });
       }
     },
   }).then((db) => ({ db, migrated }));
@@ -157,6 +167,7 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
   const now = Date.now();
   const snippetToSave: Snippet = {
     ...snippet,
+    id: snippet.id || crypto.randomUUID(),
     createdAt_ms: snippet.createdAt_ms || now,
     updatedAt_ms: now,
   };
@@ -186,11 +197,11 @@ export async function loadAllSnippets(): Promise<Snippet[]> {
   }
 }
 
-export async function deleteSnippet(name: string): Promise<void> {
+export async function deleteSnippet(id: string): Promise<void> {
   const db = await dbPromise;
   try {
     const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
-    await tx.store.delete(name);
+    await tx.store.delete(id);
     await tx.done;
   } catch (e) {
     console.error("[DB|deleteSnippet] Failed to delete snippet:", e);
@@ -203,7 +214,11 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
   const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
   try {
     const putPromises = snippets.map((s) => {
-      return tx.store.put(s);
+      const snippetToSave: Snippet = {
+        ...s,
+        id: s.id || crypto.randomUUID(),
+      };
+      return tx.store.put(snippetToSave);
     });
     await Promise.all(putPromises);
     await tx.done;
@@ -213,13 +228,13 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
 }
 
 export async function updateSnippetProperty(
-  name: string,
+  id: string,
   properties: Partial<Snippet>,
 ): Promise<void> {
   const db = await dbPromise;
   const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
   const store = tx.objectStore(SNIPPETS_STORE_NAME);
-  const snippet = await store.get(name);
+  const snippet = await store.get(id);
   if (snippet) {
     const updatedSnippet = { ...snippet, ...properties };
     await store.put(updatedSnippet);

@@ -38,9 +38,9 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
     test.beforeEach(async ({ context }) => {
         await seedIndexedDB(context, {
           snippets: [
-            { name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: "B", content: "Content from A_v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true },
-            { name: "Z", content: "Independent", isGenerated: true, prompt: "Independent", model: "mock/z", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: true },
+            { id: "a", name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "b", name: "B", content: "Content from A_v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true },
+            { id: "z", name: "Z", content: "Independent", isGenerated: true, prompt: "Independent", model: "mock/z", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: true },
           ],
         });
     });
@@ -79,7 +79,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await chatPage.goto();
       await waitForEvent(page, "app:snippet:regeneration:start");
       await page.goto(ROUTES.settings);
-      const snippetB = settingsPage.getSnippetItem("B");
+      const snippetB = settingsPage.getSnippetItemView("B");
       await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
       await settingsPage.navigation.goBackToChat();
       const responsePromise = page.waitForResponse(
@@ -138,8 +138,8 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
     test.beforeEach(async ({ context }) => {
         await seedIndexedDB(context, {
           snippets: [
-            { name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            { name: "B", content: "Content from A_v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true },
+            { id: "a", name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "b", name: "B", content: "Content from A_v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true },
           ],
         });
     });

@@ -48,7 +48,7 @@ test.describe("Snippet Management (CRUD)", () => {
       await expect(editContainer).not.toBeVisible();
 
       await settingsPage.expectSnippetToBeVisible("greet");
-      await expect(settingsPage.getSnippetItem("greet")).toHaveText(
+      await expect(settingsPage.getSnippetItemView("greet")).toHaveText(
         /Hello, world!/,
       );
     });
@@ -59,6 +59,7 @@ test.describe("Snippet Management (CRUD)", () => {
       await seedIndexedDB(context, {
         snippets: [
           {
+            id: "snippet-1",
             name: "my_snippet",
             content: "Initial content",
             isGenerated: false,
@@ -85,7 +86,7 @@ test.describe("Snippet Management (CRUD)", () => {
       await settingsPage.expectSnippetToNotExist("my_snippet");
       await settingsPage.expectSnippetToBeVisible("my_renamed_snippet");
       await expect(
-        settingsPage.getSnippetItem("my_renamed_snippet"),
+        settingsPage.getSnippetItemView("my_renamed_snippet"),
       ).toHaveText(/Updated content/);
     });
 
@@ -103,6 +104,7 @@ test.describe("Snippet Management (CRUD)", () => {
           await seedIndexedDB(context, {
             snippets: [
               {
+                id: "existing-snippet-id",
                 name: "existing_snippet",
                 content: "some content",
                 isGenerated: false,

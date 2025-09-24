@@ -47,6 +47,7 @@ describe("snippetsSaga", () => {
 
   test("should regenerate a snippet and update its content", async () => {
     const snippetA: Snippet = {
+      id: "snippet-a-id",
       name: "A",
       content: "Initial content",
       isGenerated: true,
@@ -62,7 +63,7 @@ describe("snippetsSaga", () => {
 
     (requestMessageContent as Mock).mockResolvedValueOnce("New content");
 
-    store.dispatch(regenerateSnippet({ oldName: "A", snippet: snippetA }));
+    store.dispatch(regenerateSnippet(snippetA));
 
     // Allow the saga to run
     await new Promise((resolve) => setTimeout(resolve, 0));

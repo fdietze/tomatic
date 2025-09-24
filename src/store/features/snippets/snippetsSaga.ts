@@ -8,8 +8,10 @@ import {
   loadSnippetsFailure,
   addSnippet,
   addSnippetSuccess,
+  addSnippetFailure,
   updateSnippet,
   updateSnippetSuccess,
+  updateSnippetFailure,
   deleteSnippet,
   deleteSnippetSuccess,
   regenerateSnippet,
@@ -43,21 +45,30 @@ function* addSnippetSaga(action: PayloadAction<Snippet>) {
     yield call(db.saveSnippet, action.payload);
     yield put(addSnippetSuccess(action.payload));
   } catch (error) {
+    const message = error instanceof Error ? error.message : "An unknown error occurred.";
+    yield put(addSnippetFailure({ name: action.payload.name, error: message }));
     console.error("Failed to add snippet", error);
   }
 }
 
 function* updateSnippetSaga(
-  action: PayloadAction<{ oldName: string; snippet: Snippet }>,
+  action: PayloadAction<Snippet>,
 ) {
   try {
-    const { oldName, snippet } = action.payload;
-    if (oldName !== snippet.name) {
-      yield call(db.deleteSnippet, oldName);
+    const updatedSnippet = action.payload;
+    const oldSnippet: Snippet | undefined = yield select(
+      (state: RootState) => state.snippets.snippets.find(s => s.id === updatedSnippet.id)
+    );
+
+    if (!oldSnippet) {
+      throw new Error(`Snippet with id ${updatedSnippet.id} not found in state.`);
     }
-    yield call(db.saveSnippet, snippet);
-    yield put(updateSnippetSuccess({ oldName, snippet }));
+    
+    yield call(db.saveSnippet, updatedSnippet);
+    yield put(updateSnippetSuccess({ oldName: oldSnippet.name, snippet: updatedSnippet }));
   } catch (error) {
+    const message = error instanceof Error ? error.message : "An unknown error occurred.";
+    yield put(updateSnippetFailure({ id: action.payload.id, error: message }));
     console.error("Failed to update snippet", error);
   }
 }
@@ -72,9 +83,9 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
 }
 
 function* handleRegenerateSnippetSaga(
-  action: PayloadAction<{ oldName: string; snippet: Snippet }>,
+  action: PayloadAction<Snippet>,
 ) {
-  const { snippet: snippetToRegenerate } = action.payload;
+  const snippetToRegenerate = action.payload;
   const snippetName = snippetToRegenerate.name;
   try {
     const {
@@ -209,9 +220,9 @@ function* batchRegenerationOrchestratorSaga(
 ) {
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with snippets", action.payload.snippets.map(s => s.name));
   const { snippets } = action.payload;
-  const allSnippets: Snippet[] = yield select(
+  /*const allSnippets: Snippet[] = yield select(
     (state: RootState) => state.snippets.snippets,
-  );
+  );*/
 
   const { sorted, cyclic } = topologicalSort(snippets);
 
@@ -220,7 +231,7 @@ function* batchRegenerationOrchestratorSaga(
     return;
   }
 
-  const batches = groupSnippetsIntoBatches(sorted, allSnippets);
+  const batches = groupSnippetsIntoBatches(sorted);
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
 
   for (const batch of batches) {
@@ -228,7 +239,7 @@ function* batchRegenerationOrchestratorSaga(
       yield all(
         batch.map((snippet: Snippet) =>
           call(handleRegenerateSnippetSaga, {
-            payload: { oldName: snippet.name, snippet },
+            payload: snippet,
             type: "handleRegenerateSnippetSaga",
           }),
         ),
@@ -252,7 +263,7 @@ function* handleAwaitableRegeneration(
 
   if (snippet) {
     yield call(handleRegenerateSnippetSaga, {
-      payload: { oldName: snippet.name, snippet },
+      payload: snippet,
       type: "handleRegenerateSnippetSaga",
     });
   }

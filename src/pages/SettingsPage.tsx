@@ -106,14 +106,13 @@ const SettingsPage: React.FC = () => {
     return Promise.resolve();
   };
   const handleUpdateSnippet = (
-    oldName: string,
     updatedSnippet: Snippet,
   ): Promise<void> => {
-    dispatch(updateSnippet({ oldName, snippet: updatedSnippet }));
+    dispatch(updateSnippet(updatedSnippet));
     return Promise.resolve();
   };
-  const handleRemoveSnippet = (name: string): Promise<void> => {
-    dispatch(deleteSnippet(name));
+  const handleRemoveSnippet = (id: string): Promise<void> => {
+    dispatch(deleteSnippet(id));
     return Promise.resolve();
   };
 
@@ -229,6 +228,7 @@ const SettingsPage: React.FC = () => {
           {isCreatingNewSnippet && (
             <SnippetItem
               snippet={{
+                id: "", // ID will be generated in the component
                 name: "",
                 content: "",
                 isGenerated: false,
@@ -238,7 +238,7 @@ const SettingsPage: React.FC = () => {
                 isDirty: false,
               }}
               isInitiallyEditing={true}
-              onUpdate={(_oldName, updatedSnippet) =>
+              onUpdate={(updatedSnippet) =>
                 handleCreateSnippet(updatedSnippet)
               }
               onRemove={() => {
@@ -250,13 +250,13 @@ const SettingsPage: React.FC = () => {
           )}
           {sortedSnippets.map((snippet: Snippet) => (
             <SnippetItem
-              key={snippet.name}
+              key={snippet.id}
               snippet={snippet}
               isInitiallyEditing={false}
-              onUpdate={(_oldName, updatedSnippet) =>
-                handleUpdateSnippet(snippet.name, updatedSnippet)
+              onUpdate={(updatedSnippet) =>
+                handleUpdateSnippet(updatedSnippet)
               }
-              onRemove={() => handleRemoveSnippet(snippet.name)}
+              onRemove={() => handleRemoveSnippet(snippet.id)}
             />
           ))}
         </div>

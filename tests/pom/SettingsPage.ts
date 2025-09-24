@@ -104,17 +104,17 @@ export class SettingsPage {
     await editContainer.getByTestId("snippet-content-input").fill(content);
     await editContainer.getByTestId("snippet-save-button").click();
     await expect(editContainer).not.toBeVisible();
-    await expect(this.getSnippetItem(name)).toBeVisible();
+    await expect(this.getSnippetItemView(name)).toBeVisible();
   }
 
   async deleteSnippet(name: string) {
-    await this.getSnippetItem(name)
+    await this.getSnippetItemView(name)
       .getByTestId("snippet-delete-button")
       .click();
   }
 
   async startEditingSnippet(name: string) {
-    await this.getSnippetItem(name).getByTestId("snippet-edit-button").click();
+    await this.getSnippetItemView(name).getByTestId("snippet-edit-button").click();
   }
 
   async fillSnippetForm(name: string, content: string) {
@@ -172,17 +172,17 @@ export class SettingsPage {
 
     // Wait for the save operation (which includes generation) to complete.
     await expect(editContainer).not.toBeVisible();
-    await expect(this.getSnippetItem(name)).toBeVisible();
+    await expect(this.getSnippetItemView(name)).toBeVisible();
     // Also wait for the spinner to disappear to ensure generation is complete
     await expect(
-      this.getSnippetItem(name).getByTestId("regenerating-spinner"),
+      this.getSnippetItemView(name).getByTestId("regenerating-spinner"),
     ).not.toBeVisible({ timeout: 10000 });
   }
 
   // --- Snippet Helpers ---
 
-  getSnippetItem(name: string): Locator {
-    return this.page.getByTestId(`snippet-item-${name}`);
+  getSnippetItemView(name: string): Locator {
+    return this.page.locator(".system-prompt-item-view", { hasText: name });
   }
 
   getSnippetEditContainer(name: string): Locator {
@@ -226,7 +226,7 @@ export class SettingsPage {
   }
 
   async expectSnippetToBeVisible(name: string) {
-    await expect(this.getSnippetItem(name)).toBeVisible();
+    await expect(this.getSnippetItemView(name)).toBeVisible();
   }
 
   /**
@@ -238,7 +238,7 @@ export class SettingsPage {
   }
 
   async expectSnippetToNotExist(name: string) {
-    await expect(this.getSnippetItem(name)).not.toBeVisible();
+    await expect(this.getSnippetItemView(name)).not.toBeVisible();
   }
 
   async expectGeneratedSnippetContent(
@@ -246,7 +246,7 @@ export class SettingsPage {
     expectedContent: string | RegExp,
   ) {
     // In view mode, the content is in a different element
-    const contentLocator = this.getSnippetItem(name).locator(
+    const contentLocator = this.getSnippetItemView(name).locator(
       ".system-prompt-text",
     );
     await expect(contentLocator).toHaveText(expectedContent);

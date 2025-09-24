@@ -10,8 +10,6 @@ import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
 import {
   selectSnippets,
-  updateSnippet,
-  deleteSnippet,
   regenerateSnippet,
   addSnippet,
 } from '@/store/features/snippets/snippetsSlice';
@@ -20,8 +18,8 @@ import { assertUnreachable } from '@/utils/assert';
 interface SnippetItemProps {
   snippet: Snippet;
   isInitiallyEditing: boolean;
-  onUpdate: (oldName: string, updatedSnippet: Snippet) => Promise<void>;
-  onRemove: () => Promise<void>;
+  onUpdate: (updatedSnippet: Snippet) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
   onCancel?: () => void;
 }
 
@@ -30,6 +28,8 @@ const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const SnippetItem: React.FC<SnippetItemProps> = ({
   snippet,
   isInitiallyEditing,
+  onUpdate,
+  onRemove,
   onCancel,
 }) => {
     const dispatch = useDispatch();
@@ -71,7 +71,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     const errors: string[] = [];
     const textToScan = editingIsGenerated ? editingPrompt : editingContent;
 
-    const otherSnippets = allSnippets.filter(s => s.name !== snippet.name);
+    const otherSnippets = allSnippets.filter(s => s.id !== snippet.id);
     const currentSnippetForValidation = {
       ...snippet,
       name: editingName.trim() || snippet.name,
@@ -113,9 +113,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       return;
     }
 
-    const originalName = snippet.name;
     const isDuplicate = allSnippets.some(
-      (s) => s.name.trim().toLowerCase() === newName.trim().toLowerCase() && s.name.trim().toLowerCase() !== originalName.trim().toLowerCase()
+      (s) => s.name.trim().toLowerCase() === newName.trim().toLowerCase() && s.id !== snippet.id
     );
 
     if (isDuplicate) {
@@ -134,6 +133,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
     const snippetForSave: Snippet = {
       ...snippet,
+      id: snippet.id || crypto.randomUUID(),
       name: trimmedName,
       // The content will be updated by the generation process if needed
       content: editingContent,
@@ -142,12 +142,10 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       model: editingModel,
     };
 
-    if (snippet.name === "") {
-      console.log("[DEBUG] SnippetItem: dispatching addSnippet", snippetForSave);
+    if (!snippet.id) {
       dispatch(addSnippet(snippetForSave));
     } else {
-      console.log("[DEBUG] SnippetItem: dispatching updateSnippet", { oldName: snippet.name, snippet: snippetForSave });
-      dispatch(updateSnippet({ oldName: snippet.name, snippet: snippetForSave }));
+      void onUpdate(snippetForSave);
     }
 
     setIsEditing(false);
@@ -157,13 +155,14 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const generateAndSetContent = (): void => {
     const snippetForRegeneration: Snippet = {
       ...snippet,
+      id: snippet.id || crypto.randomUUID(),
       name: editingName.trim(),
       content: editingContent, // This is a placeholder, the saga will replace it
       isGenerated: editingIsGenerated,
       prompt: editingPrompt,
       model: editingModel,
     };
-    dispatch(regenerateSnippet({ oldName: snippet.name, snippet: snippetForRegeneration }));
+    dispatch(regenerateSnippet(snippetForRegeneration));
   };
 
   const handleCancelEditing = (): void => {
@@ -182,7 +181,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
   if (isEditing) {
     return (
-      <div className="system-prompt-item-edit" data-testid={`snippet-item-edit-${snippet.name || 'new'}`}>
+      <div className="system-prompt-item-edit" data-testid={`snippet-item-edit-${snippet.id || 'new'}`}>
         <div className="system-prompt-inputs">
           <input
             ref={nameInputRef}
@@ -195,10 +194,10 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           {nameError && <div className="error-message" data-testid="error-message">{nameError}</div>}
 
           <div className="settings-item">
-            <label htmlFor={`generated-checkbox-${snippet.name}`} className="checkbox-label">
+            <label htmlFor={`generated-checkbox-${snippet.id}`} className="checkbox-label">
               <input
                 type="checkbox"
-                id={`generated-checkbox-${snippet.name}`}
+                id={`generated-checkbox-${snippet.id}`}
                 checked={editingIsGenerated}
                 onChange={(e) => { setEditingIsGenerated(e.target.checked); }}
                 data-testid="snippet-generated-checkbox"
@@ -284,13 +283,15 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
             Cancel
           </button>
         </div>
-        <div className="error-message" data-testid="generation-error-message"></div>
+        <div className="error-message" data-testid="generation-error-message">
+          {snippet.generationError}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.name}`}>
+    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
       <div className="system-prompt-header">
         <span className="system-prompt-name">{snippet.name}</span>
         <div className="system-prompt-actions">
@@ -310,7 +311,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
                       Edit
                     </button>
                     <button
-                      onClick={() => { dispatch(deleteSnippet(snippet.name)); }}
+                      onClick={() => { void onRemove(snippet.id); }}
                       data-size="compact"
                       data-testid="snippet-delete-button"
                     >
@@ -332,7 +333,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
               {`Generation failed: ${regenerationStatus[snippet.name]?.error ?? 'Unknown error'}`}
           </div>
       )}
-      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{`Generation failed: ${snippet.generationError}`}</div>}
+      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{snippet.generationError}</div>}
     </div>
   );
 };
