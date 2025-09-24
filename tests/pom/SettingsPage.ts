@@ -182,7 +182,11 @@ export class SettingsPage {
   // --- Snippet Helpers ---
 
   getSnippetItemView(name: string): Locator {
-    return this.page.locator(".system-prompt-item-view", { hasText: name });
+    return this.page
+      .locator(".system-prompt-item-view")
+      .filter({
+        has: this.page.locator(`span.system-prompt-name:text-is("${name}")`),
+      });
   }
 
   getSnippetEditContainer(name: string): Locator {

@@ -9,16 +9,19 @@ export type RegenerationStatus = {
 
 export interface SnippetsState {
   snippets: Snippet[];
-  regenerationStatus: Record<string, RegenerationStatus>;
   loading: 'idle' | 'loading' | 'failed';
   error: string | null;
+  regenerationStatus: Record<
+    string,
+    { status: "idle" | "in_progress" | "success" | "error"; error?: string }
+  >;
 }
 
 const initialState: SnippetsState = {
   snippets: [],
-  regenerationStatus: {},
   loading: 'idle',
   error: null,
+  regenerationStatus: {},
 };
 
 export const snippetsSlice = createSlice({
@@ -70,31 +73,35 @@ export const snippetsSlice = createSlice({
     deleteSnippetSuccess: (state, action: PayloadAction<string>) => {
       state.snippets = state.snippets.filter(s => s.id !== action.payload);
     },
-    regenerateSnippet: (state, action: PayloadAction<Snippet>) => {
-      const name = action.payload.name;
-      console.log("[DEBUG] snippetsSlice: regenerateSnippet", { name });
-      state.regenerationStatus[name] = { status: 'in_progress' };
+    regenerateSnippet(state, action: PayloadAction<Snippet>) {
+      const snippet = state.snippets.find(s => s.id === action.payload.id);
+      if (snippet) {
+        state.regenerationStatus[snippet.id] = { status: "in_progress" };
+      }
     },
-    regenerateSnippetSuccess: (state, action: PayloadAction<{ name: string; content: string }>) => {
-        const { name, content } = action.payload;
-        console.log("[DEBUG] snippetsSlice: regenerateSnippetSuccess", { name, content: content.slice(0, 20) + '...' });
-        const snippet = state.snippets.find(s => s.name === name);
-        if (snippet) {
-            snippet.content = content;
-            snippet.isDirty = false;
-            snippet.generationError = null;
-        }
-        state.regenerationStatus[name] = { status: 'success' };
+    regenerateSnippetSuccess(
+      state,
+      action: PayloadAction<{ id: string; content: string }>,
+    ) {
+      const { id, content } = action.payload;
+      const snippet = state.snippets.find((s) => s.id === id);
+      if (snippet) {
+        snippet.content = content;
+        snippet.generationError = null;
+        snippet.isDirty = false;
+        state.regenerationStatus[snippet.id] = { status: "success" };
+      }
     },
-    regenerateSnippetFailure: (state, action: PayloadAction<{ name: string; error: string }>) => {
-        const { name, error } = action.payload;
-        console.log("[DEBUG] snippetsSlice: regenerateSnippetFailure", { name, error });
-        const snippet = state.snippets.find(s => s.name === name);
-        if (snippet) {
-          snippet.generationError = error;
-          snippet.isDirty = false;
-        }
-        state.regenerationStatus[name] = { status: 'error', error };
+    regenerateSnippetFailure(
+      state,
+      action: PayloadAction<{ id: string; error: string }>,
+    ) {
+      const { id, error } = action.payload;
+      const snippet = state.snippets.find((s) => s.id === id);
+      if (snippet) {
+        snippet.generationError = error;
+        state.regenerationStatus[snippet.id] = { status: "error", error };
+      }
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
         delete state.regenerationStatus[action.payload];
@@ -109,6 +116,10 @@ export const snippetsSlice = createSlice({
       const snippet = state.snippets.find(s => s.name === action.payload.name);
       if (snippet) {
         snippet.isDirty = action.payload.isDirty;
+        // Also reset regeneration status when a snippet becomes dirty
+        if (action.payload.isDirty) {
+          state.regenerationStatus[snippet.id] = { status: "idle" };
+        }
       }
     },
     awaitableRegenerateRequest: (_state, _action: PayloadAction<{ name: string }>) => {

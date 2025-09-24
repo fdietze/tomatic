@@ -74,7 +74,7 @@ describe("snippetsSaga", () => {
     );
     expect(finalSnippet?.content).toBe("New content");
     expect(
-      finalState.snippets.regenerationStatus["A"]?.status,
+      finalState.snippets.regenerationStatus[snippetA.id]?.status,
     ).toBe("success");
     expect(requestMessageContent).toHaveBeenCalledTimes(1);
     expect(requestMessageContent).toHaveBeenCalledWith(
