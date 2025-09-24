@@ -238,6 +238,18 @@ test.describe("Generated Snippets", () => {
       await waitForEvent(page, "app:models_loaded");
 
       await settingsPage.createNewSnippet("A", "World");
+
+      chatMocker.mock({
+        request: {
+          model: "mock-model/mock-model",
+          messages: [{ role: "user", content: "Hello World" }],
+          stream: false,
+        },
+        response: {
+          role: "assistant",
+          content: "Initial content for B",
+        },
+      });
       await settingsPage.createGeneratedSnippet(
         "B",
         "Hello @A",

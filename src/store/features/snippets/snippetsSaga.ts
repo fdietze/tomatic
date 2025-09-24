@@ -41,19 +41,27 @@ function* loadSnippetsSaga() {
 }
 
 function* addSnippetSaga(action: PayloadAction<Snippet>) {
+  console.log("[DEBUG] addSnippetSaga: triggered", action.payload);
   try {
-    yield call(db.saveSnippet, action.payload);
-    yield put(addSnippetSuccess(action.payload));
+    const newSnippet = action.payload;
+    yield call(db.saveSnippet, newSnippet);
+    yield put(addSnippetSuccess(newSnippet));
+    if (newSnippet.isGenerated) {
+      yield put(regenerateSnippet(newSnippet));
+    }
+    console.log("[DEBUG] addSnippetSaga: success", newSnippet);
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred.";
     yield put(addSnippetFailure({ name: action.payload.name, error: message }));
     console.error("Failed to add snippet", error);
+    console.log("[DEBUG] addSnippetSaga: failure", error);
   }
 }
 
 function* updateSnippetSaga(
   action: PayloadAction<Snippet>,
 ) {
+  console.log("[DEBUG] updateSnippetSaga: triggered", action.payload);
   try {
     const updatedSnippet = action.payload;
     const oldSnippet: Snippet | undefined = yield select(
@@ -66,10 +74,12 @@ function* updateSnippetSaga(
     
     yield call(db.saveSnippet, updatedSnippet);
     yield put(updateSnippetSuccess({ oldName: oldSnippet.name, snippet: updatedSnippet }));
+    console.log("[DEBUG] updateSnippetSaga: success", updatedSnippet);
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred.";
     yield put(updateSnippetFailure({ id: action.payload.id, error: message }));
     console.error("Failed to update snippet", error);
+    console.log("[DEBUG] updateSnippetSaga: failure", error);
   }
 }
 
@@ -86,7 +96,8 @@ function* handleRegenerateSnippetSaga(
   action: PayloadAction<Snippet>,
 ) {
   const snippetToRegenerate = action.payload;
-  const snippetName = snippetToRegenerate.name;
+  const snippetId = snippetToRegenerate.id;
+  console.log(`[DEBUG] handleRegenerateSnippetSaga: triggered for ${snippetToRegenerate.name}`);
   try {
     const {
       settings,
@@ -105,7 +116,7 @@ function* handleRegenerateSnippetSaga(
       const error = "Invalid snippet for regeneration.";
       yield put(
         regenerateSnippetFailure({
-          name: snippetName,
+          id: snippetId,
           error,
         }),
       );
@@ -122,20 +133,16 @@ function* handleRegenerateSnippetSaga(
 
     // If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
-      yield put(regenerateSnippetSuccess({ name: snippetName, content: "" }));
+      yield put(regenerateSnippetSuccess({ id: snippetId, content: "" }));
       window.dispatchEvent(
         new CustomEvent("app:snippet:regeneration:complete", {
-          detail: { name: snippetName },
+          detail: { id: snippetId },
         }),
       );
       return;
     }
 
-    window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:start", {
-        detail: { name: snippetName },
-      }),
-    );
+    yield put({ type: "app/setBatchRegenerating", payload: true });
 
     const assistantResponse: string = yield call(() =>
       requestMessageContent(
@@ -146,22 +153,17 @@ function* handleRegenerateSnippetSaga(
     );
 
     yield put(
-      regenerateSnippetSuccess({ name: snippetName, content: assistantResponse }),
+      regenerateSnippetSuccess({ id: snippetId, content: assistantResponse }),
     );
     window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:complete", {
-        detail: { name: snippetName },
-      }),
+      new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:error", {
-        detail: { name: snippetName, error: errorMessage },
-      }),
-    );
-    yield put(regenerateSnippetFailure({ name: snippetName, error: errorMessage }));
-    console.error(`Failed to regenerate snippet ${snippetName}`, error);
+    yield put(regenerateSnippetFailure({ id: snippetId, error: errorMessage }));
+    console.error(`Failed to regenerate snippet ${snippetToRegenerate.name}`, error);
+  } finally {
+    yield put({ type: "app/setBatchRegenerating", payload: false });
   }
 }
 
@@ -235,19 +237,23 @@ function* batchRegenerationOrchestratorSaga(
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
 
   for (const batch of batches) {
-    try {
-      yield all(
-        batch.map((snippet: Snippet) =>
-          call(handleRegenerateSnippetSaga, {
-            payload: snippet,
-            type: "handleRegenerateSnippetSaga",
-          }),
-        ),
-      );
-    } catch (error) {
-      console.error("Batch regeneration failed.", error);
-      break;
-    }
+    const regenerationPromises = batch.map((snippet: Snippet) => {
+      const promise = new Promise<void>((resolve) => {
+        const eventName = `app:snippet:regeneration:complete:${snippet.id}`;
+        const handleCompletion = () => {
+          window.removeEventListener(eventName, handleCompletion);
+          resolve();
+        };
+        window.addEventListener(eventName, handleCompletion);
+      });
+      return { promise, snippet };
+    });
+
+    yield all(
+      regenerationPromises.map(({ snippet }) => put(regenerateSnippet(snippet))),
+    );
+
+    yield all(regenerationPromises.map(({ promise }) => call(() => promise)));
   }
   window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
 }

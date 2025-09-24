@@ -11,7 +11,6 @@ import { selectPrompts } from '@/store/features/prompts/promptsSlice';
 import {
   selectSnippets,
   regenerateSnippet,
-  addSnippet,
 } from '@/store/features/snippets/snippetsSlice';
 import { assertUnreachable } from '@/utils/assert';
 
@@ -142,11 +141,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       model: editingModel,
     };
 
-    if (!snippet.id) {
-      dispatch(addSnippet(snippetForSave));
-    } else {
-      void onUpdate(snippetForSave);
-    }
+    await onUpdate(snippetForSave);
 
     setIsEditing(false);
     setNameError(null);
@@ -296,7 +291,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         <span className="system-prompt-name">{snippet.name}</span>
         <div className="system-prompt-actions">
           {(() => {
-            const status = regenerationStatus[snippet.name]?.status || 'idle';
+            const status = regenerationStatus[snippet.id]?.status || 'idle';
             switch (status) {
               case 'idle':
               case 'success':
@@ -328,9 +323,9 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         </div>
       </div>
       <span className="system-prompt-text">{snippet.content}</span>
-      {regenerationStatus[snippet.name]?.status === 'error' && (
+      {regenerationStatus[snippet.id]?.status === 'error' && (
           <div className="error-message" data-testid="generation-error-message">
-              {`Generation failed: ${regenerationStatus[snippet.name]?.error ?? 'Unknown error'}`}
+              {`Generation failed: ${regenerationStatus[snippet.id]?.error ?? 'Unknown error'}`}
           </div>
       )}
       {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{snippet.generationError}</div>}

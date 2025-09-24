@@ -43,6 +43,14 @@ function* handleInitialize(): SagaIterator {
   yield put(initializationComplete());
 }
 
+function* batchRegenerationStartSaga() {
+  yield put({ type: "app/setBatchRegenerating", payload: true });
+}
+
+function* batchRegenerationCompleteSaga() {
+  yield put({ type: "app/setBatchRegenerating", payload: false });
+}
+
 export function* appSaga() {
   yield takeLatest(initialize.type, handleInitialize);
 }
