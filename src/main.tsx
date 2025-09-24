@@ -17,5 +17,3 @@ if (container) {
     </React.StrictMode>,
   );
 }
-
-store.dispatch(initialize());

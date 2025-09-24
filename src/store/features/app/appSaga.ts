@@ -41,6 +41,7 @@ function* handleInitialize(): SagaIterator {
   }
 
   yield put(initializationComplete());
+  dispatchEvent("app_initialized");
 }
 
 function* batchRegenerationStartSaga() {

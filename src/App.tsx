@@ -17,7 +17,7 @@ import {
 } from "@/store/features/session/sessionSlice";
 import { selectSnippets } from "@/store/features/snippets/snippetsSlice";
 import { NavigationProvider } from "@/services/NavigationProvider";
-import { selectApp } from "@/store/features/app/appSlice";
+import { selectApp, initialize } from "@/store/features/app/appSlice";
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -73,6 +73,12 @@ const Header: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(initialize());
+  }, [dispatch]);
+
   return (
     <Router>
       <NavigationProvider>
