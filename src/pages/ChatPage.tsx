@@ -19,7 +19,7 @@ import {
 
 const ChatPage: React.FC = () => {
   const dispatch = useDispatch();
-  const { id: sessionIdFromUrl } = useParams<{ id: string }>();
+  const { sessionId: sessionIdFromUrl } = useParams<{ sessionId: string }>();
 
   // --- Redux State ---
   const { selectedPromptName } = useSelector(selectSettings);

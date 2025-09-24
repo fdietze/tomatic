@@ -6,7 +6,7 @@ import { store } from './store/store';
 import './styles/style.css'
 import { initialize } from "./store/features/app/appSlice";
 
-const container = document.getElementById('root');
+const container = document.getElementById("root");
 if (container) {
   const root = createRoot(container);
   root.render(
