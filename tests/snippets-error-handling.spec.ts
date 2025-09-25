@@ -1,33 +1,22 @@
-import { test } from './fixtures';
-import { ROUTES } from '../src/utils/routes';
+import { testWithAutoInit as test } from './fixtures';
 import { SettingsPage } from './pom/SettingsPage';
-import { expect, mockGlobalApis, OPENROUTER_API_KEY, seedLocalStorage, ChatCompletionMocker, seedIndexedDB } from './test-helpers';
+import { expect, ChatCompletionMocker } from './test-helpers';
 
 test.describe('Generated Snippets (Error Handling)', () => {
   let settingsPage: SettingsPage;
 
-  test.beforeEach(async ({ context, page }) => {
-    await mockGlobalApis(context);
-    await seedLocalStorage(context, {
-      state: {
-        apiKey: OPENROUTER_API_KEY,
-        modelName: 'google/gemini-2.5-pro',
-        cachedModels: [],
-        input: '',
-        selectedPromptName: null,
-        autoScrollEnabled: false,
-      },
-      version: 1,
-    });
-    await seedIndexedDB(context, { snippets: [] });
-
+  test.beforeEach(async ({ page }) => {
     settingsPage = new SettingsPage(page);
     const chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
-    await page.goto(ROUTES.settings);
+
+    // Navigate to settings using UI navigation instead of page.goto
+    await settingsPage.navigation.goToSettings();
   });
 
-  test('shows an error if snippet generation fails', async () => {
+  test('shows an error if snippet generation fails', async ({ expectedConsoleErrors }) => {
+    expectedConsoleErrors.push(/Failed to load resource.*500/);
+    expectedConsoleErrors.push(/Internal Server Error/);
     // Purpose: This test verifies that if the API call for generating a snippet's content fails,
     // an appropriate error message is displayed to the user within the snippet editor.
     const chatMocker = new ChatCompletionMocker(settingsPage.page);

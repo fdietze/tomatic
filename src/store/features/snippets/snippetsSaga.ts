@@ -2,7 +2,7 @@ import { call, put, takeLatest, all, select, takeEvery, take } from "redux-saga/
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
-import { createAppError, toAppError, getErrorMessage } from "@/types/errors";
+import { createAppError, toAppError, getErrorMessage, AppError } from "@/types/errors";
 import {
   loadSnippets,
   loadSnippetsSuccess,
@@ -183,8 +183,22 @@ function* handleRegenerateSnippetSaga(
       new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
     );
   } catch (error) {
-    const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, error instanceof Error ? error.message : String(error));
     console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: error type:`, typeof error);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: error has type property:`, error && typeof error === 'object' && 'type' in error);
+    
+    // If it's already an AppError, use its message directly
+    let errorMessage: string;
+    if (error && typeof error === 'object' && 'type' in error) {
+      errorMessage = getErrorMessage(error as AppError);
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = String(error);
+    }
+    
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: converted error message:`, errorMessage);
+    const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, errorMessage);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, getErrorMessage(appError));
     yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: appError }));
   } finally {
@@ -327,10 +341,12 @@ export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, R
              (typedAction.type === regenerateSnippetFailure.type && typedAction.payload.name === snippet.name);
     });
     
-    const typedResult = result as { type: string; payload: { name: string; error?: string } };
+    const typedResult = result as { type: string; payload: { name: string; error?: AppError } };
     if (typedResult.type === regenerateSnippetFailure.type) {
-      console.log(`[DEBUG] regenerateSnippetWorker: regeneration failed for ${snippet.name}: ${typedResult.payload.error}`);
-      return { success: false, error: typedResult.payload.error || 'Unknown error' };
+      console.log(`[DEBUG] regenerateSnippetWorker: regeneration failed for ${snippet.name}:`, typedResult.payload.error);
+      const errorMessage = typedResult.payload.error ? getErrorMessage(typedResult.payload.error) : 'Unknown error';
+      console.log(`[DEBUG] regenerateSnippetWorker: converted error to string:`, errorMessage);
+      return { success: false, error: errorMessage };
     }
     
     // Get the updated snippet from the store

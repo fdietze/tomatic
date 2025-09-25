@@ -1,24 +1,21 @@
-import { test } from "./fixtures";
+import { testWithAutoInit as test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import {
   expect,
-  mockGlobalApis,
-  OPENROUTER_API_KEY,
-  seedLocalStorage,
   ChatCompletionMocker,
-  seedIndexedDB,
   waitForEvent,
+  seedLocalStorage,
+  seedIndexedDB,
+  OPENROUTER_API_KEY,
 } from "./test-helpers";
 import { SettingsPage } from "./pom/SettingsPage";
-import { ROUTES } from "@/utils/routes";
 
 test.describe("Snippet Usage in System Prompts", () => {
   let chatPage: ChatPage;
   let settingsPage: SettingsPage;
   let chatMocker: ChatCompletionMocker;
 
-  test.beforeEach(async ({ context, page }) => {
-    await mockGlobalApis(context);
+  test.beforeEach(async ({ page }) => {
     chatPage = new ChatPage(page);
     settingsPage = new SettingsPage(page);
     chatMocker = new ChatCompletionMocker(page);
@@ -71,7 +68,7 @@ test.describe("Snippet Usage in System Prompts", () => {
         response: { role: "assistant", content: "Response." },
       });
 
-      await chatPage.goto();
+      // Already at /chat/new from fixture
       const responsePromise = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",
       );
@@ -100,7 +97,7 @@ test.describe("Snippet Usage in System Prompts", () => {
         },
         version: 1,
       });
-      await page.goto(ROUTES.chat.new); // Use a blank page to start for UI-driven setup
+      // Already at /chat/new from fixture
     });
 
     test("uses updated snippet content when regenerating a response", async ({
@@ -143,7 +140,7 @@ test.describe("Snippet Usage in System Prompts", () => {
       });
 
       // 3. Initial chat
-      await chatPage.goto();
+      // Already at /chat/new from fixture
       await page.getByTestId("system-prompt-button-TestPrompt").click();
 
       const responsePromise1 = page.waitForResponse(
@@ -161,7 +158,8 @@ test.describe("Snippet Usage in System Prompts", () => {
       await settingsPage.saveSnippet();
 
       // 5. Regenerate and assert
-      await chatPage.goto(chatUrl); // Go back to the chat
+      // Navigate back to chat using UI navigation
+      await settingsPage.navigation.goBackToChat();
 
       const regenerateButton = chatPage
         .getMessageLocator(2)
@@ -205,7 +203,7 @@ test.describe("Snippet Usage in System Prompts", () => {
         ],
         snippets: [], // Ensure no snippets exist
       });
-      await page.goto(ROUTES.chat.new);
+      // Already at /chat/new from fixture
     });
 
     test("shows an error if a system prompt snippet is not found", async () => {
@@ -260,7 +258,7 @@ test.describe("Snippet Usage in System Prompts", () => {
           },
         ],
       });
-      await page.goto(ROUTES.chat.new);
+      // Already at /chat/new from fixture
     });
     test("uses updated, transitively dependent snippet content when regenerating a response", async ({
       page,
@@ -315,7 +313,8 @@ test.describe("Snippet Usage in System Prompts", () => {
 
       await waitForEvent(page, "app:snippet:regeneration:batch:complete");
 
-      await chatPage.goto(chatUrl);
+      // Navigate back to chat using UI navigation
+      await settingsPage.navigation.goBackToChat();
 
       const responsePromise2 = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",

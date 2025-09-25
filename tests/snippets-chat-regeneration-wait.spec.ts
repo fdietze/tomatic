@@ -49,43 +49,29 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
     }) => {
       // Purpose: This test ensures that if a user tries to send a message containing a snippet
       // that is currently being regenerated, the chat submission will wait for the regeneration to complete.
+      
+      // 1. Background B regeneration (manual trigger so we can see spinner)
       chatMocker.mock({
         request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: { role: "assistant", content: "Content from A_v1_regenerated" },
         manualTrigger: true,
       });
+      
+      // 2. Background Z regeneration (manual trigger)
       chatMocker.mock({
         request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
         response: { role: "assistant", content: "Independent_regenerated" },
         manualTrigger: true,
       });
+      
+      // 3. User-triggered B regeneration (when user sends message while B is still dirty)
       chatMocker.mock({
         request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: { role: "assistant", content: "Content from A_v1_regenerated" },
         manualTrigger: true,
       });
-      chatMocker.mock({
-        request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
-        response: { role: "assistant", content: "Independent_regenerated" },
-        manualTrigger: true,
-      });
-      // Third regeneration cycle (when returning to chat)
-      chatMocker.mock({
-        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
-        response: { role: "assistant", content: "Content from A_v1_regenerated" },
-        manualTrigger: true,
-      });
-      chatMocker.mock({
-        request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
-        response: { role: "assistant", content: "Independent_regenerated" },
-        manualTrigger: true,
-      });
-      // Fourth regeneration cycle (when submitting message with @B)
-      chatMocker.mock({
-        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
-        response: { role: "assistant", content: "Content from A_v1_regenerated" },
-        manualTrigger: true,
-      });
+      
+      // 4. Final chat message (auto-resolved)
       chatMocker.mock({
         request: {
           model: "google/gemini-2.5-pro",
@@ -104,14 +90,18 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       const snippetB = settingsPage.getSnippetItemView("B");
       await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
       await settingsPage.navigation.goBackToChat();
+      
+      // Start the message submission - this should wait for B to complete regeneration
       const responsePromise = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",
       );
       await chatPage.sendMessage("Hello @B");
-      await chatMocker.resolveNextCompletion();
-      await chatMocker.resolveNextCompletion();
-      await chatMocker.resolveNextCompletion();
-      await chatMocker.resolveNextCompletion();
+      
+      // Now resolve the background regenerations that the message is waiting for
+      await chatMocker.resolveNextCompletion(); // B background (which the message was waiting for)
+      await chatMocker.resolveNextCompletion(); // Z background (also completes)
+      
+      // Final chat call is auto-resolved (stream: true)
       await responsePromise;
       await chatPage.expectMessage(0, "user", /Hello @B/);
       await chatPage.expectMessage(1, "assistant", /Final response/);
@@ -123,6 +113,8 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
     }) => {
       // Purpose: This test ensures that the waiting logic is fine-grained and only waits for the
       // specific snippets referenced in the message.
+      
+      // Background mocks for dirty snippets that will regenerate on app load
       chatMocker.mock({
         request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: { role: "assistant", content: "From A_v1_regenerated" },
@@ -130,8 +122,9 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       chatMocker.mock({
         request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
         response: { role: "assistant", content: "Independent_regenerated" },
-        manualTrigger: true,
       });
+      
+      // Final chat call
       chatMocker.mock({
         request: {
           model: "google/gemini-2.5-pro",
@@ -142,7 +135,6 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         },
         response: { role: "assistant", content: "Final Chat Response." },
       });
-
       await chatPage.goto();
       await waitForEvent(page, "app_initialized");
       await waitForEvent(page, "app:snippet:regeneration:start");
@@ -153,7 +145,6 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await responsePromise;
       await chatPage.expectMessage(0, "user", /Message @B/);
       await chatPage.expectMessage(1, "assistant", /Final Chat Response/);
-      await chatMocker.resolveNextCompletion();
       chatMocker.verifyComplete();
     });
   });
@@ -210,7 +201,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await expect(chatPage.errorMessage).toBeVisible();
       await expect(
         chatPage.page.getByTestId("error-message").locator("p"),
-      ).toHaveText(/Snippet regeneration failed: 500 Internal Server Error/);
+      ).toHaveText(/Snippet '@multiple' failed: Snippet '@B' failed: API Error: 500 Internal Server Error/);
       // Assert that the UI did not add the user's message optimistically
       await chatPage.expectMessageCount(0);
       chatMocker.verifyComplete();

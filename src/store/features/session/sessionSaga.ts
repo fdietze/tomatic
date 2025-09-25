@@ -485,8 +485,12 @@ function* sendMessageSaga(action: PayloadAction<{ prompt: string }>): SagaIterat
     }));
   } catch (error) {
     console.log(`[DEBUG] sendMessageSaga: caught error:`, error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    console.log(`[DEBUG] sendMessageSaga: error type:`, typeof error);
+    console.log(`[DEBUG] sendMessageSaga: error instanceof Error:`, error instanceof Error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`[DEBUG] sendMessageSaga: errorMessage:`, errorMessage);
     const appError = createAppError.snippetRegeneration('multiple', errorMessage);
+    console.log(`[DEBUG] sendMessageSaga: appError:`, appError);
     console.log(`[DEBUG] sendMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${getErrorMessage(appError)}"`);
     // Dispatch the dedicated action to set a UI-facing error message
     yield put(setSessionError(appError));
