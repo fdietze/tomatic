@@ -53,7 +53,7 @@ test.describe("Snippet Usage in Chat", () => {
         chatMocker.mock({
           request: {
             model: "google/gemini-2.5-pro",
-            messages: [{ role: "user", content: "Hello, world!" }],
+            messages: [{ role: "user", content: "Hello, World!" }],
             stream: true,
           },
           response: { role: "assistant", content: "Resolved snippet response." },

@@ -7,7 +7,6 @@ import {
   OPENROUTER_API_KEY,
   seedLocalStorage,
   seedIndexedDB,
-  waitForEvent,
 } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
 import { SystemPrompt } from "@/types/storage";
@@ -146,7 +145,10 @@ test.describe("Chat Interaction", () => {
       chatMocker.mock({
         request: {
           model: "google/gemini-2.5-pro",
-          messages: [{ role: "user" as const, content: "Initial message" }],
+          messages: [
+            { role: "user" as const, content: "Initial message" },
+            { role: "assistant" as const, content: "Hello!" }
+          ],
           stream: true,
         },
         response: {

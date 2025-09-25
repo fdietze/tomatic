@@ -10,7 +10,6 @@ import {
   waitForEvent,
 } from "./test-helpers";
 import { DBV3_Snippet, DBV3_ChatSession } from "@/types/storage";
-import { ROUTES } from "@/utils/routes";
 
 test.describe("Chat Editing with Snippets", () => {
   let chatPage: ChatPage;

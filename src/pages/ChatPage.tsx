@@ -15,8 +15,9 @@ import {
   goToPrevSession,
   goToNextSession,
   loadSession,
+  setSessionError,
+  setSystemPromptRequested,
 } from "@/store/features/session/sessionSlice";
-import { loadSnippets } from "@/store/features/snippets/snippetsSlice";
 
 const ChatPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -43,8 +44,14 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     dispatch(loadSession(sessionIdFromUrl ?? "new"));
-    dispatch(loadSnippets());
   }, [sessionIdFromUrl, dispatch]);
+
+  // Set initial system prompt if one is selected
+  useEffect(() => {
+    if (selectedPromptName && activeSystemPrompt) {
+      dispatch(setSystemPromptRequested(activeSystemPrompt));
+    }
+  }, [selectedPromptName, activeSystemPrompt, dispatch]);
 
   const onPrev = (): void => {
     if (prevSessionId) {
@@ -67,7 +74,7 @@ const ChatPage: React.FC = () => {
   );
 
   const handleErrorClear = (): void => {
-    // This will be handled by the session slice later
+    dispatch(setSessionError(null));
   };
 
   return (
@@ -81,7 +88,15 @@ const ChatPage: React.FC = () => {
         <SystemPromptBar
           systemPrompts={systemPromptEntities}
           selectedPromptName={selectedPromptName}
-          onSelectPrompt={(name) => dispatch(setSelectedPromptName(name))}
+          onSelectPrompt={(name) => {
+            dispatch(setSelectedPromptName(name));
+            const selectedPromptEntity = systemPromptEntities.find(
+              (entity) => entity.data.name === name,
+            );
+            if (selectedPromptEntity) {
+              dispatch(setSystemPromptRequested(selectedPromptEntity.data));
+            }
+          }}
         />
       </ChatHeader>
       {error && (

@@ -4,7 +4,7 @@ import ChatInterfaceContents from "./ChatInterfaceContents";
 import { SystemPrompt } from "@/types/storage";
 import {
   selectSession,
-  submitUserMessage,
+  sendMessageRequested,
 } from "@/store/features/session/sessionSlice";
 
 interface ChatInterfaceProps {
@@ -16,7 +16,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ systemPrompt }) => {
   const session = useSelector(selectSession);
 
   const handleNewMessage = (content: string) => {
-    dispatch(submitUserMessage({ prompt: content, isRegeneration: false }));
+    dispatch(sendMessageRequested({ prompt: content }));
   };
 
   return (

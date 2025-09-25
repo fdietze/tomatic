@@ -1,4 +1,4 @@
-import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
+import { all, call, put, select, take, takeLatest, fork, join } from "redux-saga/effects";
 import { END, eventChannel, EventChannel } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";
@@ -6,6 +6,7 @@ import type { Stream } from "openai/streaming";
 import { SagaIterator } from "redux-saga";
 
 import { ChatSession, Message } from "@/types/chat";
+import { SystemPrompt } from "@/types/storage";
 import * as db from "@/services/db/chat-sessions";
 import { streamChat, StreamChatInput } from "@/services/chatService";
 import { RootState } from "../../store";
@@ -19,6 +20,13 @@ import {
   loadSessionFailure,
   loadSessionSuccess,
   startNewSession,
+  // New command actions
+  sendMessageRequested,
+  editMessageRequested,
+  regenerateResponseRequested,
+  setSystemPromptRequested,
+  setSystemPrompt,
+  // Deprecated
   submitUserMessage,
   submitUserMessageFailure,
   submitUserMessageSuccess,
@@ -28,6 +36,7 @@ import {
   SessionState,
   cancelSubmission,
   updateUserMessage,
+  setSessionError,
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
@@ -35,11 +44,54 @@ import { findSnippetReferences, resolveSnippets } from "@/utils/snippetUtils";
 import { Snippet } from "@/types/storage";
 import {
   awaitableRegenerateRequest,
+  loadSnippetsSuccess,
+  loadSnippetsFailure,
   regenerateSnippetFailure,
   regenerateSnippetSuccess,
+  selectSnippets,
 } from "@/store/features/snippets/snippetsSlice";
+import { regenerateSnippetWorker } from "@/store/features/snippets/snippetsSaga";
 
 // --- Worker Sagas ---
+
+// Saga to handle system prompt setting with snippet resolution
+function* setSystemPromptRequestedSaga(action: PayloadAction<SystemPrompt>): SagaIterator {
+  try {
+    const { name, prompt } = action.payload;
+    console.log(`[DEBUG] setSystemPromptSaga: setting system prompt "${name}" with content: "${prompt}"`);
+    
+    // Wait for snippets to be loaded if they haven't been loaded yet
+    let snippetsState: ReturnType<typeof selectSnippets> = yield select(
+      (state: RootState) => state.snippets,
+    );
+    
+    if (snippetsState.loading === "loading" || snippetsState.snippets.length === 0) {
+      console.log(`[DEBUG] setSystemPromptSaga: waiting for snippets to load`);
+      // Wait for snippets to be loaded
+      yield take([loadSnippetsSuccess.type, loadSnippetsFailure.type]);
+      // Re-select to get the updated state
+      snippetsState = yield select((state: RootState) => state.snippets);
+    }
+    
+    // Resolve snippets in the system prompt
+    const resolvedPrompt: string = yield call(resolveSnippets, prompt, snippetsState.snippets);
+    console.log(`[DEBUG] setSystemPromptSaga: resolved system prompt to: "${resolvedPrompt}"`);
+    
+    // Create the system prompt with both raw and resolved content
+    const systemPromptData = {
+      name,
+      rawPrompt: prompt,
+      resolvedPrompt: resolvedPrompt,
+    };
+    
+    // Dispatch the action with both raw and resolved content
+    yield put(setSystemPrompt(systemPromptData));
+  } catch (error) {
+    console.log(`[DEBUG] setSystemPromptSaga: failed to resolve system prompt:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    yield put(setSessionError(`Failed to resolve system prompt: ${errorMessage}`));
+  }
+}
 
 function* goToPrevSessionSaga(): SagaIterator {
   const session: SessionState = yield select(selectSession);
@@ -83,6 +135,7 @@ function* loadSessionSaga(action: PayloadAction<string>) {
       action.payload,
     );
     if (session) {
+      console.log(`[DEBUG] loadSessionSaga: loaded session with ${session.messages.length} messages:`, session.messages.map(m => ({ role: m.role, content: m.content })));
       const { prevId, nextId } = yield call(
         db.findNeighbourSessionIds,
         session,
@@ -95,6 +148,7 @@ function* loadSessionSaga(action: PayloadAction<string>) {
           nextId,
         }),
       );
+      console.log(`[DEBUG] loadSessionSaga: dispatched loadSessionSuccess with ${session.messages.length} messages`);
     } else {
       yield put(loadSessionFailure("Session not found."));
     }
@@ -178,7 +232,9 @@ function* submitUserMessageSaga(
       );
       const dirtySnippets = referencedSnippets.filter((s) => s.isDirty);
 
+      console.log(`[DEBUG] submitUserMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map(s => s.name));
       if (dirtySnippets.length > 0) {
+        console.log(`[DEBUG] submitUserMessageSaga: dispatching awaitable regenerate requests`);
         yield all(
           dirtySnippets.map((s) =>
             put(awaitableRegenerateRequest({ name: s.name })),
@@ -187,23 +243,31 @@ function* submitUserMessageSaga(
 
         const results: SnippetCompletionAction[] = [];
         const remainingSnippets = new Set(dirtySnippets.map((s) => s.name));
+        console.log(`[DEBUG] submitUserMessageSaga: waiting for ${remainingSnippets.size} snippets to complete`);
 
         while (remainingSnippets.size > 0) {
+          console.log(`[DEBUG] submitUserMessageSaga: still waiting for ${remainingSnippets.size} snippets:`, Array.from(remainingSnippets));
           const result: SnippetCompletionAction = yield take([
             regenerateSnippetSuccess.type,
             regenerateSnippetFailure.type,
           ]);
+          console.log(`[DEBUG] submitUserMessageSaga: received regeneration result:`, result.type, result.payload);
 
           if (remainingSnippets.has(result.payload.name)) {
+            console.log(`[DEBUG] submitUserMessageSaga: snippet ${result.payload.name} completed, removing from waiting list`);
             remainingSnippets.delete(result.payload.name);
             results.push(result);
+          } else {
+            console.log(`[DEBUG] submitUserMessageSaga: ignoring result for ${result.payload.name}, not in waiting list`);
           }
         }
 
+        console.log(`[DEBUG] submitUserMessageSaga: all snippets completed, checking for failures`);
         const failedSnippet = results.find(
           (r) => r.type === regenerateSnippetFailure.type,
         );
         if (failedSnippet) {
+          console.log(`[DEBUG] submitUserMessageSaga: found failed snippet:`, failedSnippet.payload);
           throw new Error(
             `Snippet '@${
               failedSnippet.payload.name
@@ -212,6 +276,7 @@ function* submitUserMessageSaga(
             }`,
           );
         }
+        console.log(`[DEBUG] submitUserMessageSaga: all snippets regenerated successfully, proceeding with chat`);
       }
     }
 
@@ -224,10 +289,18 @@ function* submitUserMessageSaga(
       const messageToUpdate = session.messages[editMessageIndex];
       if (messageToUpdate) {
         console.log(`[DEBUG] submitUserMessageSaga: resolving prompt "${prompt}" with ${snippets.snippets.length} snippets available`);
-        const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
-        console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
-        const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
-        yield put(updateUserMessage({ index: editMessageIndex, message: updatedMessage }));
+        try {
+          const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
+          console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
+          const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
+          yield put(updateUserMessage({ index: editMessageIndex, message: updatedMessage }));
+        } catch (error) {
+          console.log(`[DEBUG] submitUserMessageSaga: edit message resolution failed:`, error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          yield put(setSessionError(errorMessage));
+          yield put(cancelSubmission());
+          return; // Stop execution - don't proceed with chat API call
+        }
       }
     }
     
@@ -242,15 +315,24 @@ function* submitUserMessageSaga(
       const newMessage = session.messages[newMessageIndex];
       if (newMessage && newMessage.role === 'user') {
         console.log(`[DEBUG] submitUserMessageSaga: resolving new message "${prompt}" with ${snippets.snippets.length} snippets available`);
-        const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
-        console.log(`[DEBUG] submitUserMessageSaga: resolved new message content: "${resolvedContent}"`);
-        const updatedMessage = { ...newMessage, content: resolvedContent, raw_content: prompt };
-        yield put(updateUserMessage({ index: newMessageIndex, message: updatedMessage }));
+        try {
+          const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
+          console.log(`[DEBUG] submitUserMessageSaga: resolved new message content: "${resolvedContent}"`);
+          const updatedMessage = { ...newMessage, content: resolvedContent, raw_content: prompt };
+          yield put(updateUserMessage({ index: newMessageIndex, message: updatedMessage }));
+        } catch (error) {
+          console.log(`[DEBUG] submitUserMessageSaga: new message resolution failed:`, error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          yield put(setSessionError(errorMessage));
+          // Remove the placeholder assistant message if it exists
+          yield put(cancelSubmission());
+          return; // Stop execution - don't proceed with chat API call
+        }
       }
     }
     
     // --- 1. Get state and prepare for API call ---
-    const { settings, session, prompts }: RootState = yield select(
+    const { settings, session }: RootState = yield select(
       (state: RootState) => state,
     );
 
@@ -260,56 +342,54 @@ function* submitUserMessageSaga(
 
     // Base messages are from the current session state.
     let messagesToSubmit: Message[] = [...session.messages];
+    console.log(`[DEBUG] submitUserMessageSaga: initial messages to submit (${messagesToSubmit.length}):`, messagesToSubmit.map(m => ({ role: m.role, content: m.content })));
 
-    // For regenerations, we need to ensure we're using the LATEST system prompt
-    // from the prompts store, not the one that was snapshotted in the message history.
+
+    // For regenerations, resolve snippets in all user messages
     if (isRegeneration) {
       console.log(`[DEBUG] submitUserMessageSaga: handling regeneration, resolving snippets in messages`);
-      const systemMessage = messagesToSubmit.find(
-        (msg) => msg.role === "system",
-      );
-      if (systemMessage?.prompt_name && prompts?.prompts) {
-        const latestPromptEntity = prompts.prompts[systemMessage.prompt_name];
-
-        if (
-          latestPromptEntity &&
-          latestPromptEntity.data.prompt !== systemMessage.content
-        ) {
-          const latestPrompt = latestPromptEntity.data;
-          // Replace the stale system message with an updated one.
-          messagesToSubmit = messagesToSubmit.map((msg) =>
-            msg.id === systemMessage.id
-              ? { ...systemMessage, content: latestPrompt.prompt }
-              : msg,
-          );
-        }
-      }
       
       // Resolve snippets in all user messages for regeneration
-      const snippetsState = yield select(
+      const snippetsState: ReturnType<typeof selectSnippets> = yield select(
         (state: RootState) => state.snippets,
       );
       console.log(`[DEBUG] submitUserMessageSaga: resolving snippets in ${messagesToSubmit.length} messages for regeneration`);
       console.log(`[DEBUG] submitUserMessageSaga: snippets state:`, snippetsState);
       console.log(`[DEBUG] submitUserMessageSaga: snippetsState.snippets:`, snippetsState.snippets);
-      messagesToSubmit = messagesToSubmit.map(msg => {
-        if (msg.role === 'user') {
-          const originalContent = msg.raw_content || msg.content;
-          console.log(`[DEBUG] submitUserMessageSaga: resolving user message "${originalContent}"`);
-          try {
+      try {
+        messagesToSubmit = messagesToSubmit.map(msg => {
+          if (msg.role === 'user') {
+            const originalContent = msg.raw_content || msg.content;
+            console.log(`[DEBUG] submitUserMessageSaga: resolving user message "${originalContent}"`);
             const resolvedContent = resolveSnippets(originalContent, snippetsState.snippets);
             console.log(`[DEBUG] submitUserMessageSaga: resolved to "${resolvedContent}"`);
             return { ...msg, content: resolvedContent };
-          } catch (error) {
-            console.log(`[DEBUG] submitUserMessageSaga: resolution failed:`, error);
-            throw error;
           }
-        }
-        return msg;
-      });
+          return msg;
+        });
+      } catch (error) {
+        console.log(`[DEBUG] submitUserMessageSaga: regeneration resolution failed:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        yield put(setSessionError(errorMessage));
+        // For regeneration, don't call cancelSubmission as there's no placeholder to clean up
+        return; // Stop execution - don't proceed with chat API call
+      }
     }
 
-    yield put(addAssistantMessagePlaceholder());
+    if (isRegeneration && editMessageIndex !== undefined) {
+      // For regeneration, clear the content of the existing assistant message
+      console.log(`[DEBUG] submitUserMessageSaga: clearing assistant message at index ${editMessageIndex} for regeneration`);
+      const currentMessage = session.messages[editMessageIndex];
+      if (currentMessage && currentMessage.role === 'assistant') {
+        yield put(updateUserMessage({ 
+          index: editMessageIndex, 
+          message: { ...currentMessage, content: "" }
+        }));
+      }
+    } else {
+      // For new messages, add a new assistant placeholder
+      yield put(addAssistantMessagePlaceholder());
+    }
 
     // --- 2. Create the event channel ---
     const channel: EventChannel<ChatStreamEvent> = yield call(
@@ -341,9 +421,160 @@ function* submitUserMessageSaga(
       channel.close();
     }
   } catch (error) {
+    console.log(`[DEBUG] submitUserMessageSaga: caught error in main catch block:`, error);
     const message =
       error instanceof Error ? error.message : "An unknown error occurred";
+    console.log(`[DEBUG] submitUserMessageSaga: dispatching submitUserMessageFailure with message:`, message);
     yield put(submitUserMessageFailure(message));
+  }
+}
+
+// --- New Orchestrator Sagas (CQRS Pattern) ---
+
+function* sendMessageSaga(action: PayloadAction<{ prompt: string }>): SagaIterator {
+  try {
+    const { prompt } = action.payload;
+    console.log(`[DEBUG] sendMessageSaga: started with prompt="${prompt}"`);
+
+    // Get current state
+    const { snippets }: RootState = yield select(
+      (state: RootState) => state,
+    );
+
+    // Identify dirty snippets referenced in the prompt
+    const snippetReferences = findSnippetReferences(prompt);
+    const referencedSnippets = snippets.snippets.filter((s: Snippet) =>
+      snippetReferences.includes(s.name),
+    );
+    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
+
+    console.log(`[DEBUG] sendMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
+
+    // Use fork/join pattern for snippet regeneration
+    if (dirtySnippets.length > 0) {
+      console.log(`[DEBUG] sendMessageSaga: forking workers for dirty snippets`);
+      const regenerationTasks = yield all(
+        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
+      );
+
+      console.log(`[DEBUG] sendMessageSaga: waiting for all workers to complete`);
+      const results = yield join(regenerationTasks);
+      console.log(`[DEBUG] sendMessageSaga: all workers completed, checking results:`, results);
+      
+      // Check if any workers failed
+      const failedResults = results.filter((result: unknown) => (result as { success: boolean }).success === false);
+      if (failedResults.length > 0) {
+        const firstError = (failedResults[0] as { error: string }).error;
+        console.log(`[DEBUG] sendMessageSaga: worker(s) failed with error: ${firstError}`);
+        throw new Error(firstError);
+      }
+      
+      console.log(`[DEBUG] sendMessageSaga: all workers completed successfully`);
+    }
+
+    // After snippet regeneration, delegate to the existing saga logic
+    console.log(`[DEBUG] sendMessageSaga: delegating to submitUserMessageSaga via dispatch`);
+    
+    // Dispatch the action to go through the slice logic (which adds the message to state)
+    // instead of calling the saga directly
+    yield put(submitUserMessage({
+      prompt,
+      isRegeneration: false,
+    }));
+  } catch (error) {
+    console.log(`[DEBUG] sendMessageSaga: caught error:`, error);
+    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    console.log(`[DEBUG] sendMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${message}"`);
+    // Dispatch the dedicated action to set a UI-facing error message
+    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
+    console.log(`[DEBUG] sendMessageSaga: setSessionError dispatched successfully`);
+  }
+}
+
+function* editMessageSaga(action: PayloadAction<{ index: number; newPrompt: string }>): SagaIterator {
+  try {
+    const { index, newPrompt } = action.payload;
+    console.log(`[DEBUG] editMessageSaga: started with index=${index}, newPrompt="${newPrompt}"`);
+
+    // Get current snippets state
+    const snippetsState = yield select((state: RootState) => state.snippets);
+
+    // Identify dirty snippets referenced in the new prompt
+    const snippetReferences = findSnippetReferences(newPrompt);
+    const referencedSnippets = snippetsState.snippets.filter((s: Snippet) =>
+      snippetReferences.includes(s.name),
+    );
+    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
+
+    console.log(`[DEBUG] editMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
+
+    // Use fork/join pattern for snippet regeneration
+    if (dirtySnippets.length > 0) {
+      console.log(`[DEBUG] editMessageSaga: forking workers for dirty snippets`);
+      const regenerationTasks = yield all(
+        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
+      );
+
+      console.log(`[DEBUG] editMessageSaga: waiting for all workers to complete`);
+      const _results: Snippet[] = yield join(regenerationTasks);
+      console.log(`[DEBUG] editMessageSaga: all workers completed successfully`);
+    }
+
+    // For now, delegate to the old saga with the resolved logic
+    yield put(submitUserMessage({
+      prompt: newPrompt,
+      isRegeneration: false,
+      editMessageIndex: index,
+    }));
+  } catch (error) {
+    console.log(`[DEBUG] editMessageSaga: caught error:`, error);
+    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    // Dispatch the dedicated action to set a UI-facing error message
+    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
+  }
+}
+
+function* regenerateResponseSaga(action: PayloadAction<{ index: number }>): SagaIterator {
+  try {
+    const { index } = action.payload;
+    console.log(`[DEBUG] regenerateResponseSaga: started with index=${index}`);
+
+    // For regeneration, we need to check if any messages reference dirty snippets
+    const { session, snippets } = yield select((state: RootState) => state);
+    
+    // Find all user messages up to the regeneration point
+    const messagesToCheck = session.messages.slice(0, index + 1).filter((m: Message) => m.role === 'user');
+    const allReferences = messagesToCheck.flatMap((m: Message) => findSnippetReferences(m.raw_content || m.content));
+    const referencedSnippets = snippets.snippets.filter((s: Snippet) =>
+      allReferences.includes(s.name),
+    );
+    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
+
+    console.log(`[DEBUG] regenerateResponseSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
+
+    // Use fork/join pattern for snippet regeneration
+    if (dirtySnippets.length > 0) {
+      console.log(`[DEBUG] regenerateResponseSaga: forking workers for dirty snippets`);
+      const regenerationTasks = yield all(
+        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
+      );
+
+      console.log(`[DEBUG] regenerateResponseSaga: waiting for all workers to complete`);
+      const _results: Snippet[] = yield join(regenerationTasks);
+      console.log(`[DEBUG] regenerateResponseSaga: all workers completed successfully`);
+    }
+
+    // For now, delegate to the old saga with the resolved logic
+    yield put(submitUserMessage({
+      prompt: "",
+      isRegeneration: true,
+      editMessageIndex: index,
+    }));
+  } catch (error) {
+    console.log(`[DEBUG] regenerateResponseSaga: caught error:`, error);
+    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    // Dispatch the dedicated action to set a UI-facing error message
+    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
   }
 }
 
@@ -358,6 +589,12 @@ export function* sessionSaga() {
     ),
     takeLatest(goToPrevSession.type, goToPrevSessionSaga),
     takeLatest(goToNextSession.type, goToNextSessionSaga),
+    // New command action watchers
+    takeLatest(sendMessageRequested.type, sendMessageSaga),
+    takeLatest(editMessageRequested.type, editMessageSaga),
+    takeLatest(regenerateResponseRequested.type, regenerateResponseSaga),
+    takeLatest(setSystemPromptRequested.type, setSystemPromptRequestedSaga),
+    // Deprecated (will be removed in Phase 5)
     takeLatest(submitUserMessage.type, submitUserMessageSaga),
   ]);
 }

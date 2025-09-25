@@ -15,7 +15,8 @@ import { isMobile as checkIsMobile } from "@/utils/isMobile";
 import {
   SessionState,
   cancelSubmission,
-  submitUserMessage,
+  regenerateResponseRequested,
+  editMessageRequested,
 } from "@/store/features/session/sessionSlice";
 
 interface ChatInterfaceContentsProps {
@@ -77,23 +78,11 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
   };
 
   const handleRegenerate = (index: number): void => {
-    dispatch(
-      submitUserMessage({
-        prompt: "", // This is a regeneration, so the prompt is not used.
-        isRegeneration: true,
-        editMessageIndex: index,
-      }),
-    );
+    dispatch(regenerateResponseRequested({ index }));
   };
 
   const handleEditAndResubmit = (index: number, newContent: string): void => {
-    dispatch(
-      submitUserMessage({
-        prompt: newContent,
-        isRegeneration: false,
-        editMessageIndex: index,
-      }),
-    );
+    dispatch(editMessageRequested({ index, newPrompt: newContent }));
   };
 
   const handleCancel = () => {
@@ -134,12 +123,6 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
             isMobile={isMobile}
           />
         ))}
-        {session.error && (
-          <div className="error-box" data-testid="error-message">
-            <div style={{ fontWeight: "bold" }}>error</div>
-            {session.error}
-          </div>
-        )}
       </div>
       <ChatControls
         input={input}
