@@ -16,6 +16,7 @@ import {
   goToNextSession,
   loadSession,
 } from "@/store/features/session/sessionSlice";
+import { loadSnippets } from "@/store/features/snippets/snippetsSlice";
 
 const ChatPage: React.FC = () => {
   const dispatch = useDispatch();
@@ -42,6 +43,7 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     dispatch(loadSession(sessionIdFromUrl ?? "new"));
+    dispatch(loadSnippets());
   }, [sessionIdFromUrl, dispatch]);
 
   const onPrev = (): void => {

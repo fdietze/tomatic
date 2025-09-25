@@ -163,6 +163,7 @@ export const migrationPromise = openTomaticDB().then((result) => result.migrated
 // --- Snippet Functions ---
 
 export async function saveSnippet(snippet: Snippet): Promise<void> {
+  console.log("[DEBUG] saveSnippet: starting save for snippet:", {id: snippet.id, name: snippet.name, content: snippet.content});
   const db = await dbPromise;
   const now = Date.now();
   const snippetToSave: Snippet = {
@@ -171,10 +172,14 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
     createdAt_ms: snippet.createdAt_ms || now,
     updatedAt_ms: now,
   };
+  console.log("[DEBUG] saveSnippet: prepared snippet for save:", {id: snippetToSave.id, name: snippetToSave.name, content: snippetToSave.content});
   try {
     const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
+    console.log("[DEBUG] saveSnippet: transaction created, putting snippet");
     await tx.store.put(snippetToSave);
+    console.log("[DEBUG] saveSnippet: put completed, waiting for transaction");
     await tx.done;
+    console.log("[DEBUG] saveSnippet: transaction completed successfully");
   } catch (e) {
     console.error("[DB|saveSnippet] Failed to save snippet:", e);
     throw new Error("Failed to save snippet.");
@@ -182,9 +187,11 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
 }
 
 export async function loadAllSnippets(): Promise<Snippet[]> {
+  console.log("[DEBUG] loadAllSnippets: starting load from database");
   const db = await dbPromise;
   try {
     const snippets = await db.getAll(SNIPPETS_STORE_NAME);
+    console.log("[DEBUG] loadAllSnippets: loaded raw snippets from DB:", snippets.map(s => ({id: s.id, name: s.name, content: s.content})));
     // Validate each snippet
     const validation = z.array(snippetSchema).safeParse(snippets);
     if (validation.success) {

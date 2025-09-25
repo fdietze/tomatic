@@ -75,7 +75,8 @@ test.describe("Chat Regeneration with Snippets", () => {
     await settingsPage.fillSnippetForm("greet", "UPDATED GREETING");
     await settingsPage.saveSnippet();
 
-    await page.goto(chatUrl);
+    // Use navigation instead of page.goto() to avoid re-seeding the database
+    await settingsPage.navigation.goBackToChat();
 
     chatMocker.mock({
       request: {
