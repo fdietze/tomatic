@@ -1,4 +1,4 @@
-import { call, put, takeLatest, all, select, takeEvery } from "redux-saga/effects";
+import { call, put, takeLatest, all, select, takeEvery, take } from "redux-saga/effects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
@@ -135,6 +135,7 @@ function* handleRegenerateSnippetSaga(
       yield put(
         regenerateSnippetFailure({
           id: snippetId,
+          name: snippetToRegenerate?.name || 'unknown',
           error,
         }),
       );
@@ -154,7 +155,7 @@ function* handleRegenerateSnippetSaga(
 
     // If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
-      yield put(regenerateSnippetSuccess({ id: snippetId, content: "" }));
+      yield put(regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: "" }));
       window.dispatchEvent(
         new CustomEvent("app:snippet:regeneration:complete", {
           detail: { id: snippetId },
@@ -177,14 +178,16 @@ function* handleRegenerateSnippetSaga(
     console.log(`[DEBUG] handleRegenerateSnippetSaga: got response for ${snippetToRegenerate.name}:`, assistantResponse);
 
     yield put(
-      regenerateSnippetSuccess({ id: snippetId, content: assistantResponse }),
+      regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: assistantResponse }),
     );
     window.dispatchEvent(
       new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    yield put(regenerateSnippetFailure({ id: snippetId, error: errorMessage }));
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, errorMessage);
+    yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: errorMessage }));
     console.error(`Failed to regenerate snippet ${snippetToRegenerate.name}`, error);
   } finally {
     yield put({ type: "app/setBatchRegenerating", payload: false });
@@ -235,12 +238,15 @@ function* resumeDirtySnippetGenerationSaga() {
     (state: RootState) => state.snippets.snippets,
   );
   const dirtySnippets = allSnippets.filter((s) => s.isDirty);
+  console.log("[DEBUG] resumeDirtySnippetGenerationSaga: all snippets:", allSnippets.map(s => ({ name: s.name, isDirty: s.isDirty, model: s.model })));
   if (dirtySnippets.length > 0) {
     console.log(
       "[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets",
       dirtySnippets.map((s) => s.name),
     );
     yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
+  } else {
+    console.log("[DEBUG] resumeDirtySnippetGenerationSaga: no dirty snippets found");
   }
 }
 
@@ -299,6 +305,53 @@ function* handleAwaitableRegeneration(
       payload: snippet,
       type: "handleRegenerateSnippetSaga",
     });
+  }
+}
+
+// Result type for the worker saga
+type RegenerateResult = 
+  | { success: true; snippet: Snippet }
+  | { success: false; error: string };
+
+// New worker saga for the fork/join pattern
+export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, RegenerateResult, unknown> {
+  try {
+    console.log(`[DEBUG] regenerateSnippetWorker: starting regeneration for ${snippet.name}`);
+    
+    // Dispatch the regeneration request
+    yield put(regenerateSnippet(snippet));
+    
+    // Wait for either success or failure
+    console.log(`[DEBUG] regenerateSnippetWorker: waiting for completion of ${snippet.name}`);
+    const result = yield take((action: unknown) => {
+      const typedAction = action as { type: string; payload: { name: string; error?: string } };
+      return (typedAction.type === regenerateSnippetSuccess.type && typedAction.payload.name === snippet.name) ||
+             (typedAction.type === regenerateSnippetFailure.type && typedAction.payload.name === snippet.name);
+    });
+    
+    const typedResult = result as { type: string; payload: { name: string; error?: string } };
+    if (typedResult.type === regenerateSnippetFailure.type) {
+      console.log(`[DEBUG] regenerateSnippetWorker: regeneration failed for ${snippet.name}: ${typedResult.payload.error}`);
+      return { success: false, error: typedResult.payload.error || 'Unknown error' };
+    }
+    
+    // Get the updated snippet from the store
+    const updatedSnippets = (yield select(
+      (state: RootState) => state.snippets.snippets
+    )) as Snippet[];
+    const updatedSnippet = updatedSnippets.find(s => s.id === snippet.id);
+    
+    if (!updatedSnippet) {
+      console.log(`[DEBUG] regenerateSnippetWorker: snippet ${snippet.name} not found after regeneration`);
+      return { success: false, error: `Snippet ${snippet.name} not found after regeneration` };
+    }
+    
+    console.log(`[DEBUG] regenerateSnippetWorker: completed regeneration for ${snippet.name}`);
+    return { success: true, snippet: updatedSnippet };
+  } catch (error) {
+    console.log(`[DEBUG] regenerateSnippetWorker: caught unexpected error for ${snippet.name}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return { success: false, error: errorMessage };
   }
 }
 

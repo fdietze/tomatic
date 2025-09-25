@@ -69,7 +69,7 @@ test.describe("Chat Regeneration with Snippets", () => {
     await chatPage.expectMessage(0, "user", /@greet world/);
     await chatPage.expectMessage(1, "assistant", /Initial response/);
 
-    const chatUrl = page.url();
+    const _chatUrl = page.url();
     await chatPage.navigation.goToSettings();
     await settingsPage.startEditingSnippet("greet");
     await settingsPage.fillSnippetForm("greet", "UPDATED GREETING");
@@ -81,7 +81,10 @@ test.describe("Chat Regeneration with Snippets", () => {
     chatMocker.mock({
       request: {
         model: "google/gemini-2.5-pro",
-        messages: [{ role: "user", content: "UPDATED GREETING world" }],
+        messages: [
+          { role: "user", content: "UPDATED GREETING world" },
+          { role: "assistant", content: "Initial response" }
+        ],
         stream: true,
       },
       response: {

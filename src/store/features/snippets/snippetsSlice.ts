@@ -81,7 +81,7 @@ export const snippetsSlice = createSlice({
     },
     regenerateSnippetSuccess(
       state,
-      action: PayloadAction<{ id: string; content: string }>,
+      action: PayloadAction<{ id: string; name: string; content: string }>,
     ) {
       const { id, content } = action.payload;
       const snippet = state.snippets.find((s) => s.id === id);
@@ -94,7 +94,7 @@ export const snippetsSlice = createSlice({
     },
     regenerateSnippetFailure(
       state,
-      action: PayloadAction<{ id: string; error: string }>,
+      action: PayloadAction<{ id: string; name: string; error: string }>,
     ) {
       const { id, error } = action.payload;
       const snippet = state.snippets.find((s) => s.id === id);

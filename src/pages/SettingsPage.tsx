@@ -14,14 +14,12 @@ import {
 } from "@/store/features/settings/settingsSlice";
 import {
   selectPrompts,
-  loadPrompts,
   addPromptRequest,
   updatePromptRequest,
   deletePromptRequest,
 } from "@/store/features/prompts/promptsSlice";
 import {
   selectSnippets,
-  loadSnippets,
   addSnippet,
   updateSnippet,
   deleteSnippet,
@@ -43,8 +41,6 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     dispatch(loadSettings());
-    dispatch(loadPrompts());
-    dispatch(loadSnippets());
   }, [dispatch]);
 
   useEffect(() => {

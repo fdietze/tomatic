@@ -1,4 +1,3 @@
-import { ROUTES } from "@/utils/routes";
 import { test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import { SettingsPage } from "./pom/SettingsPage";
@@ -66,6 +65,28 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         manualTrigger: true,
       });
       chatMocker.mock({
+        request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
+        response: { role: "assistant", content: "Independent_regenerated" },
+        manualTrigger: true,
+      });
+      // Third regeneration cycle (when returning to chat)
+      chatMocker.mock({
+        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
+        response: { role: "assistant", content: "Content from A_v1_regenerated" },
+        manualTrigger: true,
+      });
+      chatMocker.mock({
+        request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
+        response: { role: "assistant", content: "Independent_regenerated" },
+        manualTrigger: true,
+      });
+      // Fourth regeneration cycle (when submitting message with @B)
+      chatMocker.mock({
+        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
+        response: { role: "assistant", content: "Content from A_v1_regenerated" },
+        manualTrigger: true,
+      });
+      chatMocker.mock({
         request: {
           model: "google/gemini-2.5-pro",
           messages: [
@@ -87,6 +108,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         "https://openrouter.ai/api/v1/chat/completions",
       );
       await chatPage.sendMessage("Hello @B");
+      await chatMocker.resolveNextCompletion();
       await chatMocker.resolveNextCompletion();
       await chatMocker.resolveNextCompletion();
       await chatMocker.resolveNextCompletion();
@@ -157,6 +179,18 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         /Internal Server Error/,
       );
       
+      // Mock for the first regeneration (on page load)
+      chatMocker.mock({
+        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
+        response: {
+          role: "assistant",
+          content: "",
+          error: { status: 500, message: "Internal Server Error" },
+        },
+        manualTrigger: true,
+      });
+      
+      // Mock for the second regeneration (when sending message)
       chatMocker.mock({
         request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: {
@@ -171,13 +205,13 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await waitForEvent(page, "app_initialized");
       await waitForEvent(page, "snippet_regeneration_started");
       await chatPage.sendMessage("Hello @B");
+      // Manually trigger the 500 error response for the snippet regeneration
       await chatMocker.resolveNextCompletion();
       await expect(chatPage.errorMessage).toBeVisible();
       await expect(
         chatPage.page.getByTestId("error-message").locator("p"),
-      ).toHaveText(
-        "Snippet '@B' failed to regenerate: 500 Internal Server Error",
-      );
+      ).toHaveText(/Snippet regeneration failed: 500 Internal Server Error/);
+      // Assert that the UI did not add the user's message optimistically
       await chatPage.expectMessageCount(0);
       chatMocker.verifyComplete();
     });

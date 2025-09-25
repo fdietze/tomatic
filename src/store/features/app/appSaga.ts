@@ -1,4 +1,4 @@
-import { call, put, takeLatest, select, take } from "redux-saga/effects";
+import { call, put, takeLatest, select, take, all } from "redux-saga/effects";
 import { SagaIterator } from "redux-saga";
 import { initialize, initializationComplete } from "./appSlice";
 import { getMostRecentSessionId } from "@/services/db/chat-sessions";
@@ -7,6 +7,8 @@ import { ROUTES } from "@/utils/routes";
 import { migrationPromise } from "@/services/persistence";
 import { dispatchEvent } from "@/utils/events";
 import { selectModels, fetchModels, fetchModelsSuccess, fetchModelsFailure } from "../models/modelsSlice";
+import { loadPrompts } from "../prompts/promptsSlice";
+import { loadSnippets } from "../snippets/snippetsSlice";
 
 function* handleInitialize(): SagaIterator {
   // First, handle DB migration.
@@ -24,6 +26,12 @@ function* handleInitialize(): SagaIterator {
       );
     }
   }
+
+  // Load all essential app data in parallel
+  yield all([
+    put(loadPrompts()),
+    put(loadSnippets()),
+  ]);
 
   // Then, handle loading the models.
   const { models: cachedModels } = yield select(selectModels);
@@ -44,13 +52,6 @@ function* handleInitialize(): SagaIterator {
   dispatchEvent("app_initialized");
 }
 
-function* batchRegenerationStartSaga() {
-  yield put({ type: "app/setBatchRegenerating", payload: true });
-}
-
-function* batchRegenerationCompleteSaga() {
-  yield put({ type: "app/setBatchRegenerating", payload: false });
-}
 
 export function* appSaga() {
   yield takeLatest(initialize.type, handleInitialize);
