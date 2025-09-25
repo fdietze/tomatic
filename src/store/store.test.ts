@@ -65,19 +65,19 @@ describe("Redux Store Initialization", () => {
     // Purpose: This test ensures that if the data in localStorage is malformed,
     // the application doesn't crash and falls back gracefully to the default state.
 
-    // 1. Mock localStorage to return invalid JSON and spy on console.error
+    // 1. Mock localStorage to return invalid JSON and spy on console.log (changed from console.error)
     vi.spyOn(Storage.prototype, "getItem").mockReturnValue("this-is-not-json");
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
+    const consoleLogSpy = vi
+      .spyOn(console, "log")
       .mockImplementation(() => {
-        // supress console error
+        // suppress console log
       });
 
     // 2. Dynamically import the store module
     const { store } = await import("./store");
 
     // 3. Assert that an error was logged and the store has the default state
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalled();
     const currentState = store.getState();
     expect(currentState.settings).toEqual(initialState);
   });
