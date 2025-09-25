@@ -25,11 +25,13 @@ import {
   selectSession,
   setHasSessions,
   loadInitialSessionSaga as loadInitialSessionSagaAction,
+  SessionState,
+  cancelSubmission,
+  updateUserMessage,
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
-import { SessionState } from "./sessionSlice";
-import { findSnippetReferences } from "@/utils/snippetUtils";
+import { findSnippetReferences, resolveSnippets } from "@/utils/snippetUtils";
 import { Snippet } from "@/types/storage";
 import {
   awaitableRegenerateRequest,
@@ -162,7 +164,7 @@ function* submitUserMessageSaga(
   }>,
 ) {
   try {
-    const { isRegeneration, prompt } = action.payload;
+    const { isRegeneration, prompt, editMessageIndex } = action.payload;
 
     // --- Await Dirty Snippets ---
     const { snippets: allSnippets }: { snippets: Snippet[] } = yield select(
@@ -183,7 +185,7 @@ function* submitUserMessageSaga(
         );
 
         const results: SnippetCompletionAction[] = [];
-        const remainingSnippets = new Set(dirtySnippets.map(s => s.name));
+        const remainingSnippets = new Set(dirtySnippets.map((s) => s.name));
 
         while (remainingSnippets.size > 0) {
           const result: SnippetCompletionAction = yield take([
@@ -202,7 +204,9 @@ function* submitUserMessageSaga(
         );
         if (failedSnippet) {
           throw new Error(
-            `Snippet '@${failedSnippet.payload.name}' failed to regenerate: ${
+            `Snippet '@${
+              failedSnippet.payload.name
+            }' failed to regenerate: ${
               failedSnippet.payload.error ?? "Unknown error"
             }`,
           );
@@ -210,6 +214,19 @@ function* submitUserMessageSaga(
       }
     }
 
+    // --- Resolve Snippets for Edit ---
+    if (editMessageIndex !== undefined && !isRegeneration) {
+      const { session, snippets }: RootState = yield select(
+        (state: RootState) => state,
+      );
+      const messageToUpdate = session.messages[editMessageIndex];
+      if (messageToUpdate) {
+        const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
+        const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
+        yield put(updateUserMessage({ index: editMessageIndex, message: updatedMessage }));
+      }
+    }
+    
     // --- 1. Get state and prepare for API call ---
     const { settings, session, prompts }: RootState = yield select(
       (state: RootState) => state,
@@ -252,13 +269,13 @@ function* submitUserMessageSaga(
     const channel: EventChannel<ChatStreamEvent> = yield call(
       createChatStreamChannel,
       {
-        messagesToSubmit,
+        messagesToSubmit: messagesToSubmit,
         modelName: settings.modelName,
         apiKey: settings.apiKey,
       },
     );
 
-    // --- 3. Process events in a try/finally to ensure channel is closed ---\
+    // --- 3. Process events in a try/finally to ensure channel is closed ---
     try {
       while (true) {
         const event: ChatStreamEvent = yield take(channel);

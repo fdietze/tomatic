@@ -90,8 +90,14 @@ export const sessionSlice = createSlice({
         state.messages.push({
           id: nanoid(),
           role: "user",
-          content: prompt,
+          content: prompt, // Initially, content is the same as raw_content
+          raw_content: prompt,
         });
+      }
+    },
+    updateUserMessage: (state, action: PayloadAction<{ index: number; message: Message }>) => {
+      if (state.messages[action.payload.index]) {
+        state.messages[action.payload.index] = action.payload.message;
       }
     },
     addAssistantMessagePlaceholder: (state) => {
@@ -150,6 +156,7 @@ export const {
   startNewSession,
   setHasSessions,
   submitUserMessage,
+  updateUserMessage,
   addAssistantMessagePlaceholder,
   appendChunkToLatestMessage,
   submitUserMessageSuccess,

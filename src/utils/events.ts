@@ -23,6 +23,7 @@ export class SnippetRegenerationUpdateEvent extends CustomEvent<SnippetRegenerat
 
 
 export function dispatchEvent<K extends keyof AppEvents>(name: K, detail?: AppEvents[K]['detail']): void {
+  console.log(`[EVENT]: ${name}`, detail);
   window.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
