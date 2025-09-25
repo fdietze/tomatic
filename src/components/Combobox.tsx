@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useId } from 'react';
 import { useOnClickOutside } from 'usehooks-ts';
 import type { DisplayModelInfo } from '@/types/storage';
+import { AppError, getErrorMessage } from '@/types/errors';
 
 export interface ComboboxItem {
   id: string;
@@ -17,7 +18,7 @@ interface ComboboxProps {
   disabled?: boolean;
   loading?: boolean;
   onReload?: () => void;
-  errorMessage?: string | null;
+  errorMessage?: AppError | null;
   label?: string;
 }
 
@@ -187,7 +188,7 @@ const Combobox: React.FC<ComboboxProps> = ({
       
       {loading && <div className="combobox-loading-indicator">Loading...</div>}
       
-      {!loading && errorMessage && <div className="combobox-error-message">{errorMessage}</div>}
+      {!loading && errorMessage && <div className="combobox-error-message">{getErrorMessage(errorMessage)}</div>}
 
       {!loading && !errorMessage && showSuggestions && items.length > 0 && (
         <div className="combobox-suggestions-container">

@@ -163,7 +163,11 @@ describe("sessionSaga", () => {
     expect(finalState.session.messages).toHaveLength(1);
     expect(finalState.session.messages[0]?.content).toBe(userMessageContent);
     expect(finalState.session.submitting).toBe(false);
-    expect(finalState.session.error).toBe(apiError.message);
+    expect(finalState.session.error).toEqual({
+      type: 'UNKNOWN_ERROR',
+      message: apiError.message,
+      originalError: apiError,
+    });
   });
 
   test("should handle editing a message and resubmitting the chat", async () => {

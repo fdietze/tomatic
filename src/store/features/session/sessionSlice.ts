@@ -2,6 +2,16 @@ import { createSlice, PayloadAction, nanoid } from "@reduxjs/toolkit";
 import { Message } from "@/types/chat";
 import { SystemPrompt } from "@/types/storage";
 import { RootState } from "../../store";
+import { AppError } from "@/types/errors";
+import {
+  LoadSessionSuccessPayload,
+  SendMessageRequestPayload,
+  EditMessageRequestPayload,
+  RegenerateResponseRequestPayload,
+  UpdateUserMessagePayload,
+  AppendChunkPayload,
+  SubmitUserMessageSuccessPayload,
+} from "@/types/payloads";
 
 export interface SessionState {
   messages: Message[];
@@ -11,7 +21,7 @@ export interface SessionState {
   hasSessions: boolean;
   loading: "idle" | "loading" | "failed";
   submitting: boolean;
-  error: string | null;
+  error: AppError | null;
 }
 
 const initialState: SessionState = {
@@ -35,12 +45,7 @@ export const sessionSlice = createSlice({
     },
     loadSessionSuccess: (
       state,
-      action: PayloadAction<{
-        messages: Message[];
-        sessionId: string;
-        prevId: string | null;
-        nextId: string | null;
-      }>,
+      action: PayloadAction<LoadSessionSuccessPayload>,
     ) => {
       console.log(`[DEBUG] sessionSlice.loadSessionSuccess: setting ${action.payload.messages.length} messages:`, action.payload.messages.map(m => ({ role: m.role, content: m.content })));
       state.loading = "idle";
@@ -50,7 +55,7 @@ export const sessionSlice = createSlice({
       state.nextSessionId = action.payload.nextId;
       console.log(`[DEBUG] sessionSlice.loadSessionSuccess: state now has ${state.messages.length} messages`);
     },
-    loadSessionFailure: (state, action: PayloadAction<string>) => {
+    loadSessionFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = "failed";
       state.error = action.payload;
     },
@@ -69,16 +74,16 @@ export const sessionSlice = createSlice({
       state.hasSessions = action.payload;
     },
     // New "Command" actions following CQRS pattern
-    sendMessageRequested: (state, _action: PayloadAction<{ prompt: string }>) => {
+    sendMessageRequested: (state, _action: PayloadAction<SendMessageRequestPayload>) => {
       // Saga will intercept this. We can set loading state here.
       state.submitting = true;
       state.error = null;
     },
-    editMessageRequested: (state, _action: PayloadAction<{ index: number; newPrompt: string }>) => {
+    editMessageRequested: (state, _action: PayloadAction<EditMessageRequestPayload>) => {
       state.submitting = true;
       state.error = null;
     },
-    regenerateResponseRequested: (state, _action: PayloadAction<{ index: number }>) => {
+    regenerateResponseRequested: (state, _action: PayloadAction<RegenerateResponseRequestPayload>) => {
       state.submitting = true;
       state.error = null;
     },
@@ -124,7 +129,7 @@ export const sessionSlice = createSlice({
       }
       console.log(`[DEBUG] sessionSlice.submitUserMessage: after - ${state.messages.length} messages`);
     },
-    updateUserMessage: (state, action: PayloadAction<{ index: number; message: Message }>) => {
+    updateUserMessage: (state, action: PayloadAction<UpdateUserMessagePayload>) => {
       if (state.messages[action.payload.index]) {
         state.messages[action.payload.index] = action.payload.message;
       }
@@ -168,7 +173,7 @@ export const sessionSlice = createSlice({
     },
     appendChunkToLatestMessage: (
       state,
-      action: PayloadAction<{ chunk: string }>,
+      action: PayloadAction<AppendChunkPayload>,
     ) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage?.role === "assistant") {
@@ -177,7 +182,7 @@ export const sessionSlice = createSlice({
     },
     submitUserMessageSuccess: (
       state,
-      action: PayloadAction<{ model: string }>,
+      action: PayloadAction<SubmitUserMessageSuccessPayload>,
     ) => {
       state.submitting = false;
       state.error = null;
@@ -186,7 +191,7 @@ export const sessionSlice = createSlice({
         lastMessage.model_name = action.payload.model;
       }
     },
-    submitUserMessageFailure: (state, action: PayloadAction<string>) => {
+    submitUserMessageFailure: (state, action: PayloadAction<AppError>) => {
       state.submitting = false;
       state.error = action.payload;
       // Clean up by removing the empty assistant placeholder if it exists
@@ -198,7 +203,27 @@ export const sessionSlice = createSlice({
       // For snippet regeneration failures, we use setSessionError instead
     },
     cancelSubmission: (state) => {
+      console.log(`[DEBUG] sessionSlice.cancelSubmission: messages before cancellation: ${state.messages.length}`);
       state.submitting = false;
+      
+      // Remove the last message if it was just added but failed to send
+      const lastMessage = state.messages[state.messages.length - 1];
+      console.log(`[DEBUG] sessionSlice.cancelSubmission: last message role: ${lastMessage?.role}, content: "${lastMessage?.content}"`);
+      
+      // Remove user message that failed to send
+      if (lastMessage?.role === "user") {
+        console.log(`[DEBUG] sessionSlice.cancelSubmission: removing failed user message`);
+        state.messages.pop();
+      }
+      
+      // Also remove any empty assistant placeholder
+      const newLastMessage = state.messages[state.messages.length - 1];
+      if (newLastMessage?.role === "assistant" && newLastMessage.content === "") {
+        console.log(`[DEBUG] sessionSlice.cancelSubmission: removing empty assistant placeholder`);
+        state.messages.pop();
+      }
+      
+      console.log(`[DEBUG] sessionSlice.cancelSubmission: messages after cancellation: ${state.messages.length}`);
     },
     goToPrevSession: () => {
       // No state change, this is handled by a saga
@@ -206,12 +231,14 @@ export const sessionSlice = createSlice({
     goToNextSession: () => {
       // No state change, this is handled by a saga
     },
-    setSessionError: (state, action: PayloadAction<string | null>) => {
+    setSessionError: (state, action: PayloadAction<AppError | null>) => {
+      console.log(`[DEBUG] sessionSlice.setSessionError: setting error to`, action.payload);
       state.submitting = false;
       state.error = action.payload;
+      console.log(`[DEBUG] sessionSlice.setSessionError: current messages count: ${state.messages.length}`);
       
       // If this is a snippet regeneration error, clean up the optimistic message
-      if (action.payload && action.payload.includes("Snippet regeneration failed")) {
+      if (action.payload && action.payload.type === 'SNIPPET_REGENERATION_ERROR') {
         // Remove the empty assistant placeholder if it exists
         const lastMessage = state.messages[state.messages.length - 1];
         if (lastMessage?.role === "assistant" && lastMessage.content === "") {

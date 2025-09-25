@@ -27,10 +27,9 @@ test.describe('Generated Snippets (Error Handling)', () => {
     await page.goto(ROUTES.settings);
   });
 
-  test('shows an error if snippet generation fails', async ({ expectedConsoleErrors }) => {
+  test('shows an error if snippet generation fails', async () => {
     // Purpose: This test verifies that if the API call for generating a snippet's content fails,
     // an appropriate error message is displayed to the user within the snippet editor.
-    expectedConsoleErrors.push(/Internal Server Error/);
     const chatMocker = new ChatCompletionMocker(settingsPage.page);
     await chatMocker.setup();
     chatMocker.mock({
@@ -56,6 +55,6 @@ test.describe('Generated Snippets (Error Handling)', () => {
 
     // The edit form should remain open and show an error
     await expect(editContainer).toBeVisible();
-    await settingsPage.expectGenerationErrorMessage(/Generation failed:/);
+    await settingsPage.expectGenerationErrorMessage(/API Error: 500 Internal Server Error/);
   });
 });

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { SystemPrompt } from "@/types/storage";
 import { assertUnreachable } from "@/utils/assert";
+import { AppError, getErrorMessage } from "@/types/errors";
 
 interface SystemPromptItemProps {
   prompt: SystemPrompt;
   status: "idle" | "saving" | "deleting" | "failed";
-  error: string | null;
+  error: AppError | null;
   isInitiallyEditing: boolean;
   allPrompts: SystemPrompt[];
   onUpdate: (updatedPrompt: SystemPrompt) => void;
@@ -170,7 +171,7 @@ const SystemPromptItem: React.FC<SystemPromptItemProps> = ({
         <span className="system-prompt-text">{prompt.prompt}</span>
         {status === "failed" && error && (
           <div className="error-message" data-testid="error-message">
-            {error}
+            {getErrorMessage(error)}
           </div>
         )}
       </div>

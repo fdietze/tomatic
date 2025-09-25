@@ -1,11 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { DisplayModelInfo } from '@/types/storage';
 import { RootState } from '../../store';
+import { AppError } from '@/types/errors';
+import { FetchModelsSuccessPayload } from '@/types/payloads';
 
 export interface ModelsState {
   models: DisplayModelInfo[];
   loading: 'idle' | 'loading' | 'failed';
-  error: string | null;
+  error: AppError | null;
 }
 
 const initialState: ModelsState = {
@@ -22,11 +24,11 @@ export const modelsSlice = createSlice({
       state.loading = 'loading';
       state.error = null;
     },
-    fetchModelsSuccess: (state, action: PayloadAction<DisplayModelInfo[]>) => {
+    fetchModelsSuccess: (state, action: PayloadAction<FetchModelsSuccessPayload>) => {
       state.loading = 'idle';
       state.models = action.payload;
     },
-    fetchModelsFailure: (state, action: PayloadAction<string>) => {
+    fetchModelsFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = 'failed';
       state.error = action.payload;
     },

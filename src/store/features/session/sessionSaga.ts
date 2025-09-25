@@ -5,6 +5,8 @@ import OpenAI from "openai";
 import type { Stream } from "openai/streaming";
 import { SagaIterator } from "redux-saga";
 
+import { createAppError, toAppError, getErrorMessage } from "@/types/errors";
+
 import { ChatSession, Message } from "@/types/chat";
 import { SystemPrompt } from "@/types/storage";
 import * as db from "@/services/db/chat-sessions";
@@ -89,7 +91,7 @@ function* setSystemPromptRequestedSaga(action: PayloadAction<SystemPrompt>): Sag
   } catch (error) {
     console.log(`[DEBUG] setSystemPromptSaga: failed to resolve system prompt:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    yield put(setSessionError(`Failed to resolve system prompt: ${errorMessage}`));
+    yield put(setSessionError(createAppError.unknown(`Failed to resolve system prompt: ${errorMessage}`)));
   }
 }
 
@@ -150,12 +152,10 @@ function* loadSessionSaga(action: PayloadAction<string>) {
       );
       console.log(`[DEBUG] loadSessionSaga: dispatched loadSessionSuccess with ${session.messages.length} messages`);
     } else {
-      yield put(loadSessionFailure("Session not found."));
+      yield put(loadSessionFailure(createAppError.unknown("Session not found.")));
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    yield put(loadSessionFailure(message));
+    yield put(loadSessionFailure(toAppError(error)));
   }
 }
 
@@ -165,7 +165,7 @@ function* loadInitialSessionSaga(): SagaIterator {
     yield put(setHasSessions(hasSessions));
   } catch (error) {
     // Handle potential errors if necessary
-    console.error("Failed to check for sessions:", error);
+    console.log("[DEBUG] checkForExistingSessions: failure", error);
   }
 }
 
@@ -297,7 +297,7 @@ function* submitUserMessageSaga(
         } catch (error) {
           console.log(`[DEBUG] submitUserMessageSaga: edit message resolution failed:`, error);
           const errorMessage = error instanceof Error ? error.message : String(error);
-          yield put(setSessionError(errorMessage));
+          yield put(setSessionError(createAppError.unknown(errorMessage)));
           yield put(cancelSubmission());
           return; // Stop execution - don't proceed with chat API call
         }
@@ -323,9 +323,12 @@ function* submitUserMessageSaga(
         } catch (error) {
           console.log(`[DEBUG] submitUserMessageSaga: new message resolution failed:`, error);
           const errorMessage = error instanceof Error ? error.message : String(error);
-          yield put(setSessionError(errorMessage));
+          console.log(`[DEBUG] submitUserMessageSaga: dispatching setSessionError with message: "${errorMessage}"`);
+          yield put(setSessionError(createAppError.unknown(errorMessage)));
+          console.log(`[DEBUG] submitUserMessageSaga: dispatching cancelSubmission`);
           // Remove the placeholder assistant message if it exists
           yield put(cancelSubmission());
+          console.log(`[DEBUG] submitUserMessageSaga: error handling complete, returning early`);
           return; // Stop execution - don't proceed with chat API call
         }
       }
@@ -370,7 +373,7 @@ function* submitUserMessageSaga(
       } catch (error) {
         console.log(`[DEBUG] submitUserMessageSaga: regeneration resolution failed:`, error);
         const errorMessage = error instanceof Error ? error.message : String(error);
-        yield put(setSessionError(errorMessage));
+        yield put(setSessionError(createAppError.unknown(errorMessage)));
         // For regeneration, don't call cancelSubmission as there's no placeholder to clean up
         return; // Stop execution - don't proceed with chat API call
       }
@@ -422,10 +425,9 @@ function* submitUserMessageSaga(
     }
   } catch (error) {
     console.log(`[DEBUG] submitUserMessageSaga: caught error in main catch block:`, error);
-    const message =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    console.log(`[DEBUG] submitUserMessageSaga: dispatching submitUserMessageFailure with message:`, message);
-    yield put(submitUserMessageFailure(message));
+    const appError = toAppError(error);
+    console.log(`[DEBUG] submitUserMessageSaga: dispatching submitUserMessageFailure with error:`, appError);
+    yield put(submitUserMessageFailure(appError));
   }
 }
 
@@ -483,10 +485,11 @@ function* sendMessageSaga(action: PayloadAction<{ prompt: string }>): SagaIterat
     }));
   } catch (error) {
     console.log(`[DEBUG] sendMessageSaga: caught error:`, error);
-    const message = error instanceof Error ? error.message : "An unknown error occurred";
-    console.log(`[DEBUG] sendMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${message}"`);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    const appError = createAppError.snippetRegeneration('multiple', errorMessage);
+    console.log(`[DEBUG] sendMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${getErrorMessage(appError)}"`);
     // Dispatch the dedicated action to set a UI-facing error message
-    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
+    yield put(setSessionError(appError));
     console.log(`[DEBUG] sendMessageSaga: setSessionError dispatched successfully`);
   }
 }
@@ -528,9 +531,11 @@ function* editMessageSaga(action: PayloadAction<{ index: number; newPrompt: stri
     }));
   } catch (error) {
     console.log(`[DEBUG] editMessageSaga: caught error:`, error);
-    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    const appError = createAppError.snippetRegeneration('edit', errorMessage);
+    console.log(`[DEBUG] editMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${getErrorMessage(appError)}"`);
     // Dispatch the dedicated action to set a UI-facing error message
-    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
+    yield put(setSessionError(appError));
   }
 }
 
@@ -572,9 +577,11 @@ function* regenerateResponseSaga(action: PayloadAction<{ index: number }>): Saga
     }));
   } catch (error) {
     console.log(`[DEBUG] regenerateResponseSaga: caught error:`, error);
-    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    const appError = createAppError.snippetRegeneration('regenerate', errorMessage);
+    console.log(`[DEBUG] regenerateResponseSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${getErrorMessage(appError)}"`);
     // Dispatch the dedicated action to set a UI-facing error message
-    yield put(setSessionError(`Snippet regeneration failed: ${message}`));
+    yield put(setSessionError(appError));
   }
 }
 

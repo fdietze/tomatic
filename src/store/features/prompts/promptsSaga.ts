@@ -2,6 +2,7 @@ import { call, put, takeLatest, all } from "redux-saga/effects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { SystemPrompt } from "@/types/storage";
 import * as db from "@/services/persistence";
+import { createAppError, toAppError } from "@/types/errors";
 import {
   loadPrompts,
   loadPromptsSuccess,
@@ -22,7 +23,7 @@ function* loadPromptsSaga() {
     const prompts: SystemPrompt[] = yield call(db.loadAllSystemPrompts);
     yield put(loadPromptsSuccess(prompts));
   } catch {
-    yield put(loadPromptsFailure("Failed to load prompts."));
+    yield put(loadPromptsFailure(createAppError.persistence("loadPrompts", "Failed to load prompts.")));
   }
 }
 
@@ -31,7 +32,7 @@ function* addPromptSaga(action: PayloadAction<SystemPrompt>) {
     yield call(db.saveSystemPrompt, action.payload);
     yield put(addPromptSuccess(action.payload));
   } catch (e) {
-    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    const error = toAppError(e);
     yield put(addPromptFailure({ name: action.payload.name, error }));
   }
 }
@@ -48,7 +49,7 @@ function* updatePromptSaga(
     yield call(db.saveSystemPrompt, prompt);
     yield put(updatePromptSuccess({ oldName, prompt: prompt }));
   } catch (e) {
-    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    const error = toAppError(e);
     // We pass the oldName so the reducer can find which prompt failed.
     yield put(updatePromptFailure({ name: oldName, error }));
   }
@@ -60,7 +61,7 @@ function* deletePromptSaga(action: PayloadAction<string>) {
     yield call(db.deleteSystemPrompt, name);
     yield put(deletePromptSuccess(name));
   } catch (e) {
-    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    const error = toAppError(e);
     yield put(deletePromptFailure({ name, error }));
   }
 }

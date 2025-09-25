@@ -1,3 +1,5 @@
+import { AppError } from './errors';
+
 export interface SystemPrompt {
   name: string;
   prompt: string;
@@ -19,7 +21,7 @@ export interface Snippet {
   model?: string;
   createdAt_ms: number;
   updatedAt_ms: number;
-  generationError: string | null;
+  generationError: AppError | null;
   isDirty: boolean;
 }
 
@@ -176,7 +178,7 @@ export interface DBV3_Snippet {
   model?: string;
   createdAt_ms: number;
   updatedAt_ms: number;
-  generationError: string | null;
+  generationError: AppError | null;
   isDirty: boolean;
 }
 

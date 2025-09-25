@@ -6,13 +6,14 @@ import {
   fetchModelsSuccess,
   fetchModelsFailure,
 } from "./modelsSlice";
+import { createAppError } from "@/types/errors";
 
 function* fetchModelsSaga() {
   try {
     const models: DisplayModelInfo[] = yield call(listAvailableModels);
     yield put(fetchModelsSuccess(models));
   } catch {
-    yield put(fetchModelsFailure("Failed to fetch models."));
+    yield put(fetchModelsFailure(createAppError.api("Failed to fetch models.")));
   }
 }
 

@@ -13,6 +13,7 @@ import {
   regenerateSnippet,
 } from '@/store/features/snippets/snippetsSlice';
 import { assertUnreachable } from '@/utils/assert';
+import { getErrorMessage } from '@/types/errors';
 
 interface SnippetItemProps {
   snippet: Snippet;
@@ -279,7 +280,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           </button>
         </div>
         <div className="error-message" data-testid="generation-error-message">
-          {snippet.generationError}
+          {snippet.generationError ? getErrorMessage(snippet.generationError) : ''}
         </div>
       </div>
     );
@@ -325,10 +326,10 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       <span className="system-prompt-text">{snippet.content}</span>
       {regenerationStatus[snippet.id]?.status === 'error' && (
           <div className="error-message" data-testid="generation-error-message">
-              {`Generation failed: ${regenerationStatus[snippet.id]?.error ?? 'Unknown error'}`}
+              {`Generation failed: ${regenerationStatus[snippet.id]?.error ? getErrorMessage(regenerationStatus[snippet.id]!.error!) : 'Unknown error'}`}
           </div>
       )}
-      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{snippet.generationError}</div>}
+      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{getErrorMessage(snippet.generationError)}</div>}
     </div>
   );
 };
