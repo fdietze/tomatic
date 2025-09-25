@@ -165,6 +165,7 @@ function* submitUserMessageSaga(
 ) {
   try {
     const { isRegeneration, prompt, editMessageIndex } = action.payload;
+    console.log(`[DEBUG] submitUserMessageSaga: started with prompt="${prompt}", isRegeneration=${isRegeneration}, editMessageIndex=${editMessageIndex}`);
 
     // --- Await Dirty Snippets ---
     const { snippets: allSnippets }: { snippets: Snippet[] } = yield select(
@@ -216,14 +217,35 @@ function* submitUserMessageSaga(
 
     // --- Resolve Snippets for Edit ---
     if (editMessageIndex !== undefined && !isRegeneration) {
+      console.log(`[DEBUG] submitUserMessageSaga: resolving snippets for edit at index ${editMessageIndex}`);
       const { session, snippets }: RootState = yield select(
         (state: RootState) => state,
       );
       const messageToUpdate = session.messages[editMessageIndex];
       if (messageToUpdate) {
+        console.log(`[DEBUG] submitUserMessageSaga: resolving prompt "${prompt}" with ${snippets.snippets.length} snippets available`);
         const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
+        console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
         const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
         yield put(updateUserMessage({ index: editMessageIndex, message: updatedMessage }));
+      }
+    }
+    
+    // --- Resolve Snippets for New Messages ---
+    if (!isRegeneration && editMessageIndex === undefined) {
+      console.log(`[DEBUG] submitUserMessageSaga: resolving snippets for new message`);
+      const { session, snippets }: RootState = yield select(
+        (state: RootState) => state,
+      );
+      // The new message was just added, so it's the last one
+      const newMessageIndex = session.messages.length - 1;
+      const newMessage = session.messages[newMessageIndex];
+      if (newMessage && newMessage.role === 'user') {
+        console.log(`[DEBUG] submitUserMessageSaga: resolving new message "${prompt}" with ${snippets.snippets.length} snippets available`);
+        const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
+        console.log(`[DEBUG] submitUserMessageSaga: resolved new message content: "${resolvedContent}"`);
+        const updatedMessage = { ...newMessage, content: resolvedContent, raw_content: prompt };
+        yield put(updateUserMessage({ index: newMessageIndex, message: updatedMessage }));
       }
     }
     
@@ -242,6 +264,7 @@ function* submitUserMessageSaga(
     // For regenerations, we need to ensure we're using the LATEST system prompt
     // from the prompts store, not the one that was snapshotted in the message history.
     if (isRegeneration) {
+      console.log(`[DEBUG] submitUserMessageSaga: handling regeneration, resolving snippets in messages`);
       const systemMessage = messagesToSubmit.find(
         (msg) => msg.role === "system",
       );
@@ -261,6 +284,29 @@ function* submitUserMessageSaga(
           );
         }
       }
+      
+      // Resolve snippets in all user messages for regeneration
+      const snippetsState = yield select(
+        (state: RootState) => state.snippets,
+      );
+      console.log(`[DEBUG] submitUserMessageSaga: resolving snippets in ${messagesToSubmit.length} messages for regeneration`);
+      console.log(`[DEBUG] submitUserMessageSaga: snippets state:`, snippetsState);
+      console.log(`[DEBUG] submitUserMessageSaga: snippetsState.snippets:`, snippetsState.snippets);
+      messagesToSubmit = messagesToSubmit.map(msg => {
+        if (msg.role === 'user') {
+          const originalContent = msg.raw_content || msg.content;
+          console.log(`[DEBUG] submitUserMessageSaga: resolving user message "${originalContent}"`);
+          try {
+            const resolvedContent = resolveSnippets(originalContent, snippetsState.snippets);
+            console.log(`[DEBUG] submitUserMessageSaga: resolved to "${resolvedContent}"`);
+            return { ...msg, content: resolvedContent };
+          } catch (error) {
+            console.log(`[DEBUG] submitUserMessageSaga: resolution failed:`, error);
+            throw error;
+          }
+        }
+        return msg;
+      });
     }
 
     yield put(addAssistantMessagePlaceholder());

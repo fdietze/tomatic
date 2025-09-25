@@ -32,10 +32,14 @@ import {
 import { requestMessageContent } from "@/api/openrouter";
 
 function* loadSnippetsSaga() {
+  console.log("[DEBUG] loadSnippetsSaga: starting to load snippets");
   try {
     const snippets: Snippet[] = yield call(db.loadAllSnippets);
+    console.log("[DEBUG] loadSnippetsSaga: loaded snippets from DB:", snippets.map(s => ({name: s.name, content: s.content})));
     yield put(loadSnippetsSuccess(snippets));
-  } catch {
+    console.log("[DEBUG] loadSnippetsSaga: dispatched loadSnippetsSuccess");
+  } catch (error) {
+    console.log("[DEBUG] loadSnippetsSaga: failed to load snippets:", error);
     yield put(loadSnippetsFailure("Failed to load snippets."));
   }
 }
@@ -72,9 +76,11 @@ function* updateSnippetSaga(
       throw new Error(`Snippet with id ${updatedSnippet.id} not found in state.`);
     }
     
+    console.log("[DEBUG] updateSnippetSaga: calling db.saveSnippet");
     yield call(db.saveSnippet, updatedSnippet);
+    console.log("[DEBUG] updateSnippetSaga: db.saveSnippet completed, dispatching success");
     yield put(updateSnippetSuccess({ oldName: oldSnippet.name, snippet: updatedSnippet }));
-    console.log("[DEBUG] updateSnippetSaga: success", updatedSnippet);
+    console.log("[DEBUG] updateSnippetSaga: success dispatched", updatedSnippet);
   } catch (error) {
     const message = error instanceof Error ? error.message : "An unknown error occurred.";
     yield put(updateSnippetFailure({ id: action.payload.id, error: message }));
@@ -98,6 +104,18 @@ function* handleRegenerateSnippetSaga(
   const snippetToRegenerate = action.payload;
   const snippetId = snippetToRegenerate.id;
   console.log(`[DEBUG] handleRegenerateSnippetSaga: triggered for ${snippetToRegenerate.name}`);
+  
+  // Dispatch event for test waiting
+  window.dispatchEvent(
+    new CustomEvent("app:snippet:regeneration:start", {
+      detail: { id: snippetId, name: snippetToRegenerate.name },
+    }),
+  );
+  window.dispatchEvent(
+    new CustomEvent("snippet_regeneration_started", {
+      detail: { id: snippetId, name: snippetToRegenerate.name },
+    }),
+  );
   try {
     const {
       settings,
@@ -126,10 +144,13 @@ function* handleRegenerateSnippetSaga(
     const allSnippets: Snippet[] = yield select(
       (state: RootState) => state.snippets.snippets,
     );
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet model for ${snippetToRegenerate.name}:`, snippetToRegenerate.model);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet prompt for ${snippetToRegenerate.name}:`, snippetToRegenerate.prompt);
     const resolvedPrompt = resolveSnippets(
       snippetToRegenerate.prompt,
       allSnippets,
     );
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt for ${snippetToRegenerate.name}:`, resolvedPrompt);
 
     // If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
@@ -144,6 +165,8 @@ function* handleRegenerateSnippetSaga(
 
     yield put({ type: "app/setBatchRegenerating", payload: true });
 
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: about to call API for ${snippetToRegenerate.name} with model:`, snippetToRegenerate.model);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: API request content:`, resolvedPrompt);
     const assistantResponse: string = yield call(() =>
       requestMessageContent(
         [{ id: crypto.randomUUID(), role: "user", content: resolvedPrompt }],
@@ -151,6 +174,7 @@ function* handleRegenerateSnippetSaga(
         settings.apiKey,
       ),
     );
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: got response for ${snippetToRegenerate.name}:`, assistantResponse);
 
     yield put(
       regenerateSnippetSuccess({ id: snippetId, content: assistantResponse }),

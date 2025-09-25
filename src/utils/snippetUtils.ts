@@ -16,6 +16,8 @@ export function resolveSnippets(
   const snippetRegex = /@([a-zA-Z0-9_]+)/g;
 
   return text.replace(snippetRegex, (_match: string, snippetName: string) => {
+    console.log(`[DEBUG] resolveSnippets: resolving snippet '@${snippetName}' with content: "${allSnippets.find(s => s.name === snippetName)?.content || 'NOT FOUND'}"`);
+    
     if (path.includes(snippetName)) {
       const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
       throw new Error(`Snippet cycle detected: ${cyclePath}`);
@@ -24,7 +26,8 @@ export function resolveSnippets(
     const snippet = allSnippets.find((s) => s.name === snippetName);
     if (!snippet) {
       const error = new Error(`Snippet '@${snippetName}' not found.`);
-      console.error('[DEBUG] resolveSnippets:', error);
+      console.log('[DEBUG] resolveSnippets: snippet not found, available snippets:', allSnippets.map(s => s.name));
+      console.log('[DEBUG] resolveSnippets:', error);
       throw error;
     }
 

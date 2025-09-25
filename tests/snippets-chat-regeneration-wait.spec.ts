@@ -56,8 +56,8 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         manualTrigger: true,
       });
       chatMocker.mock({
-        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
-        response: { role: "assistant", content: "Content from A_v1_regenerated" },
+        request: { model: "mock/z", messages: [{ role: "user", content: "Independent" }], stream: false },
+        response: { role: "assistant", content: "Independent_regenerated" },
         manualTrigger: true,
       });
       chatMocker.mock({
@@ -77,8 +77,9 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       });
 
       await chatPage.goto();
+      await waitForEvent(page, "app_initialized");
       await waitForEvent(page, "app:snippet:regeneration:start");
-      await page.goto(ROUTES.settings);
+      await chatPage.navigation.goToSettings();
       const snippetB = settingsPage.getSnippetItemView("B");
       await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
       await settingsPage.navigation.goBackToChat();
@@ -101,7 +102,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       // Purpose: This test ensures that the waiting logic is fine-grained and only waits for the
       // specific snippets referenced in the message.
       chatMocker.mock({
-        request: { model: "mock/b", messages: [{ role: "user", content: "From v1" }], stream: false },
+        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: { role: "assistant", content: "From A_v1_regenerated" },
       });
       chatMocker.mock({
@@ -121,6 +122,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       });
 
       await chatPage.goto();
+      await waitForEvent(page, "app_initialized");
       await waitForEvent(page, "app:snippet:regeneration:start");
       const responsePromise = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -166,6 +168,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       });
 
       await chatPage.goto();
+      await waitForEvent(page, "app_initialized");
       await waitForEvent(page, "snippet_regeneration_started");
       await chatPage.sendMessage("Hello @B");
       await chatMocker.resolveNextCompletion();
