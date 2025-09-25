@@ -1,55 +1,36 @@
-import { test } from "./fixtures";
+import { testWithAutoInit as test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import {
   expect,
-  mockGlobalApis,
-  OPENROUTER_API_KEY,
-  seedLocalStorage,
   ChatCompletionMocker,
-  seedIndexedDB,
 } from "./test-helpers";
-import { ROUTES } from "@/utils/routes";
 
 test.describe("Snippet Usage in Chat", () => {
   let chatPage: ChatPage;
   let chatMocker: ChatCompletionMocker;
 
-  test.beforeEach(async ({ context, page }) => {
-    await mockGlobalApis(context);
-
-    await seedLocalStorage(context, {
-      state: {
-        apiKey: OPENROUTER_API_KEY,
-        modelName: "google/gemini-2.5-pro",
-        cachedModels: [],
-        input: "",
-        selectedPromptName: null,
-        autoScrollEnabled: false,
-      },
-      version: 1,
-    });
-    
+  test.beforeEach(async ({ page }) => {
     chatPage = new ChatPage(page);
     chatMocker = new ChatCompletionMocker(page);
     await chatMocker.setup();
   });
   
   test.describe('Successful Resolution', () => {
-      test.beforeEach(async ({ context, page }) => {
-          await seedIndexedDB(context, {
-            snippets: [
-              { id: "1", name: "greet_simple", content: "Hello, world!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { id: "2", name: "greet_nested", content: "Hello, @name!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { id: "3", name: "name", content: "World", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            ],
-          });
-          await page.goto(ROUTES.chat.new);
+      test.use({ 
+        dbSeed: { 
+          snippets: [
+            { id: "1", name: "greet_simple", content: "Hello, world!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "2", name: "greet_nested", content: "Hello, @name!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "3", name: "name", content: "World", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+          ]
+        } 
       });
 
       test("resolves a standard snippet in the chat input", async () => {
         // Purpose: This test verifies that a simple snippet (e.g., '@greet_simple') used in the
         // chat input is correctly resolved to its content before being sent to the API. It also
         // ensures the user message in the UI displays the original raw input.
+        console.log("[DEBUG] Test setup: mocking chat completion");
         chatMocker.mock({
           request: {
             model: "google/gemini-2.5-pro",
@@ -59,14 +40,18 @@ test.describe("Snippet Usage in Chat", () => {
           response: { role: "assistant", content: "Resolved snippet response." },
         });
 
+        console.log("[DEBUG] Test: waiting for response promise setup");
         const responsePromise = chatPage.page.waitForResponse(
           "https://openrouter.ai/api/v1/chat/completions",
         );
+        console.log("[DEBUG] Test: sending message '@greet_nested'");
         await chatPage.sendMessage("@greet_nested");
+        console.log("[DEBUG] Test: waiting for response promise to resolve");
         await responsePromise;
 
+        console.log("[DEBUG] Test: checking message expectations");
         // The user message should display the raw input, not the resolved content
-        await chatPage.expectMessage(0, "user", /@greet_simple/);
+        await chatPage.expectMessage(0, "user", /@greet_nested/);
         // The assistant response should be visible
         await chatPage.expectMessage(1, "assistant", /Resolved snippet response/);
         // The API mock should have been hit correctly with the resolved content
@@ -104,9 +89,10 @@ test.describe("Snippet Usage in Chat", () => {
 
   test.describe("error handling", () => {
     test.describe("shows an error when a snippet is not found", () => {
-      test.beforeEach(async ({ context, page }) => {
-          await seedIndexedDB(context, { snippets: [] });
-          await page.goto(ROUTES.chat.new);
+      test.use({ 
+        dbSeed: { 
+          snippets: [] 
+        } 
       });
       test("shows an error in the UI", async ({ expectedConsoleErrors }) => {
         expectedConsoleErrors.push(
@@ -125,13 +111,12 @@ test.describe("Snippet Usage in Chat", () => {
     });
 
     test.describe("shows an error when a snippet self-references", () => {
-      test.beforeEach(async ({ context, page }) => {
-          await seedIndexedDB(context, {
-            snippets: [
-              { id: "1", name: "cycle_self", content: "This is a @cycle_self", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            ],
-          });
-          await page.goto(ROUTES.chat.new);
+      test.use({ 
+        dbSeed: { 
+          snippets: [
+            { id: "1", name: "cycle_self", content: "This is a @cycle_self", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+          ]
+        } 
       });
       test("shows an error in the UI", async ({ expectedConsoleErrors }) => {
         expectedConsoleErrors.push(
@@ -150,14 +135,13 @@ test.describe("Snippet Usage in Chat", () => {
     });
 
     test.describe("shows an error when a multi-step snippet cycle is detected", () => {
-      test.beforeEach(async ({ context, page }) => {
-          await seedIndexedDB(context, {
-            snippets: [
-              { id: "1", name: "cycle_a", content: "This is a @cycle_b", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-              { id: "2", name: "cycle_b", content: "which contains @cycle_a", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-            ],
-          });
-          await page.goto(ROUTES.chat.new);
+      test.use({ 
+        dbSeed: { 
+          snippets: [
+            { id: "1", name: "cycle_a", content: "This is a @cycle_b", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+            { id: "2", name: "cycle_b", content: "which contains @cycle_a", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+          ]
+        } 
       });
       test("shows an error in the UI", async ({ expectedConsoleErrors }) => {
         expectedConsoleErrors.push(

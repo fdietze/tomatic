@@ -1,20 +1,13 @@
-import { test } from "./fixtures";
+import { testWithAutoInit as test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import { DBV3_ChatSession } from "@/types/storage";
-import {
-  expect,
-  mockGlobalApis,
-  seedIndexedDB,
-  seedLocalStorage,
-  OPENROUTER_API_KEY,
-} from "./test-helpers";
+import { expect } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
 
 test.describe("Chat Session Navigation", () => {
   let chatPage: ChatPage;
 
-  test.beforeEach(async ({ context, page }) => {
-    await mockGlobalApis(context);
+  test.beforeEach(async ({ page }) => {
     chatPage = new ChatPage(page);
   });
   
@@ -40,16 +33,10 @@ test.describe("Chat Session Navigation", () => {
         },
       ];
     
-    test.beforeEach(async ({ context }) => {
-        await seedLocalStorage(context, {
-          state: {
-            apiKey: OPENROUTER_API_KEY,
-            modelName: "google/gemini-2.5-pro",
-            autoScrollEnabled: false,
-          },
-          version: 1,
-        });
-        await seedIndexedDB(context, { chat_sessions: sessions });
+    test.use({ 
+      dbSeed: { 
+        chat_sessions: sessions 
+      } 
     });
 
     test("navigates between sessions and disables buttons at boundaries", async ({
@@ -57,7 +44,9 @@ test.describe("Chat Session Navigation", () => {
     }) => {
       // Purpose: This test verifies that a user can navigate between previous and next sessions
       // and that the navigation buttons are correctly disabled at the boundaries.
-      await chatPage.goto("session-new");
+      // Navigate to the newest session - since sessions are ordered by created_at_ms,
+      // session-new (created_at_ms: 3000) should be accessible via navigation
+      await chatPage.navigation.goToPrevSession(); // This should take us to session-new
 
       await expect(chatPage.navigation.nextSessionButton).toBeDisabled();
       await expect(chatPage.navigation.prevSessionButton).toBeEnabled();
@@ -85,7 +74,7 @@ test.describe("Chat Session Navigation", () => {
     }) => {
       // Purpose: This test verifies that visiting /chat/new shows an empty session
       // instead of redirecting to the latest session.
-      await chatPage.goto();
+      // We're already at /chat/new from the fixture, no need to navigate
 
       await page.waitForURL(ROUTES.chat.new);
       expect(page.url()).toContain(ROUTES.chat.new);

@@ -1,51 +1,38 @@
-import { test } from "./fixtures";
+import { testWithAutoInit as test } from "./fixtures";
 import { ChatPage } from "./pom/ChatPage";
 import { DBV3_ChatSession } from "@/types/storage";
-import {
-  expect,
-  mockGlobalApis,
-  seedIndexedDB,
-  seedLocalStorage,
-  OPENROUTER_API_KEY,
-} from "./test-helpers";
+import { expect } from "./test-helpers";
 import { ROUTES } from "@/utils/routes";
 
 test.describe("New Chat Page Navigation", () => {
   let chatPage: ChatPage;
 
-  test.beforeEach(async ({ context, page }) => {
-    await mockGlobalApis(context);
+  test.beforeEach(async ({ page }) => {
     chatPage = new ChatPage(page);
   });
 
   test.describe("when on /chat/new with existing sessions", () => {
-    test.beforeEach(async ({ context }) => {
-      const sessions: DBV3_ChatSession[] = [
-        {
-          session_id: "session-old",
-          name: null,
-          messages: [{ id: "msg1", role: "user", content: "Old message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
-          created_at_ms: 1000,
-          updated_at_ms: 1000,
-        },
-        {
-          session_id: "session-newest",
-          name: null,
-          messages: [{ id: "msg3", role: "user", content: "Newest message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
-          created_at_ms: 3000,
-          updated_at_ms: 3000,
-        },
-      ];
-      await seedLocalStorage(context, {
-        state: {
-          apiKey: OPENROUTER_API_KEY,
-          modelName: "google/gemini-2.5-pro",
-          autoScrollEnabled: false,
-        },
-        version: 1,
-      });
-      await seedIndexedDB(context, { chat_sessions: sessions });
-      await chatPage.goto("new");
+    const sessions: DBV3_ChatSession[] = [
+      {
+        session_id: "session-old",
+        name: null,
+        messages: [{ id: "msg1", role: "user", content: "Old message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
+        created_at_ms: 1000,
+        updated_at_ms: 1000,
+      },
+      {
+        session_id: "session-newest",
+        name: null,
+        messages: [{ id: "msg3", role: "user", content: "Newest message", prompt_name: null, model_name: null, cost: null, raw_content: undefined }],
+        created_at_ms: 3000,
+        updated_at_ms: 3000,
+      },
+    ];
+    
+    test.use({ 
+      dbSeed: { 
+        chat_sessions: sessions 
+      } 
     });
     
     test("allows navigation to the previous session", async ({

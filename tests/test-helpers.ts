@@ -393,6 +393,9 @@ export class ChatCompletionMocker {
       .request()
       .postDataJSON()) as ChatCompletionRequestMock;
 
+    console.log("[DEBUG] ChatCompletionMocker: received request:", JSON.stringify(requestBody, null, 2));
+    console.log("[DEBUG] ChatCompletionMocker: available mocks:", this.mocks.length);
+
     // Find a matching mock without removing it yet
     let mockIndex = -1;
     for (let i = 0; i < this.mocks.length; i++) {
@@ -514,9 +517,11 @@ export class ChatCompletionMocker {
    * This is the "trigger" that the test can call.
    */
   async resolveNextCompletion() {
+    console.log("[DEBUG] resolveNextCompletion called, pending triggers:", this.pendingTriggers.length);
     if (this.pendingTriggers.length === 0) {
       // It's possible this is called before the app has had time to make the request.
       // Give it a very short moment to see if a trigger appears.
+      console.log("[DEBUG] No pending triggers, waiting 100ms");
       await this.page.waitForTimeout(100);
     }
     if (this.pendingTriggers.length === 0) {
