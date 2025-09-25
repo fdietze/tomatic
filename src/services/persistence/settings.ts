@@ -1,4 +1,5 @@
 import { SettingsState } from '@/store/features/settings/settingsSlice';
+import { localStorageSchema, PersistedSettingsState } from './schemas';
 
 const STORAGE_KEY = 'tomatic-storage';
 
@@ -8,13 +9,17 @@ export const loadSettings = (): Partial<SettingsState> => {
         if (serializedState === null) {
             return {};
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const stored: { state: Partial<SettingsState> } = JSON.parse(serializedState);
-        // We only care about the 'state' property of the stored object.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        return stored.state || {};
+        
+        // Parse and validate the localStorage data using Zod
+        const parseResult = localStorageSchema.safeParse(JSON.parse(serializedState));
+        if (!parseResult.success) {
+            console.log('[Settings] Invalid localStorage data structure, using defaults:', parseResult.error.format());
+            return {};
+        }
+        
+        return parseResult.data.state;
     } catch (error) {
-        console.error("Error loading settings from localStorage:", error);
+        console.log('[Settings] Error loading settings from localStorage:', error);
         return {};
     }
 };
@@ -28,6 +33,6 @@ export const saveSettings = (state: SettingsState): void => {
         const serializedState = JSON.stringify(stateToSave);
         localStorage.setItem(STORAGE_KEY, serializedState);
     } catch (error) {
-        console.error("Error saving settings to localStorage:", error);
+        console.log("Error saving settings to localStorage:", error);
     }
 };
