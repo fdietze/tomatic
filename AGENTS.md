@@ -43,6 +43,8 @@
 - for test setup, prefer direct data seeding (e.g., of IndexedDB or localStorage) over UI interactions to keep tests fast and focused
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
 - when testing loading states, use manual mock triggers to assert that spinners appear before the mock is resolved and disappear after.
+- is the test waiting if the application is ready? (await waitForEvent(page, "app_initialized");)
+- tests should not use page.goto to navigate between pages (that would trigger reseeding the database state). page.goto is only allowed on initial page load. use clicks instead.
 - Use a hierarchical, scenario-based architecture for test files. Group tests into `describe` blocks based on the feature and specific scenarios. Scope data seeding to the narrowest possible `beforeEach` block to ensure tests are perfectly isolated and self-contained.
 
 ```typescript

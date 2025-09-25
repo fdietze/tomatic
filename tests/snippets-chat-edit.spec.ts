@@ -7,6 +7,7 @@ import {
   seedIndexedDB,
   expect,
   mockGlobalApis,
+  waitForEvent,
 } from "./test-helpers";
 import { DBV3_Snippet, DBV3_ChatSession } from "@/types/storage";
 import { ROUTES } from "@/utils/routes";
@@ -23,7 +24,7 @@ test.describe("Chat Editing with Snippets", () => {
   });
 
   test.describe("when a message with a snippet is edited", () => {
-    test.beforeEach(async ({ context }) => {
+    test.beforeEach(async ({ context, page }) => {
         const MOCK_SNIPPETS: DBV3_Snippet[] = [
           {
             id: "greet-id",
@@ -86,7 +87,8 @@ test.describe("Chat Editing with Snippets", () => {
           snippets: MOCK_SNIPPETS,
           chat_sessions: [SESSION_WITH_SNIPPET],
         });
-        await chatPage.goto(ROUTES.chat.session(SESSION_WITH_SNIPPET.session_id));
+        await chatPage.goto(SESSION_WITH_SNIPPET.session_id);
+        await waitForEvent(page, "app_initialized");
     });
 
     test("preserves raw content and can be updated to use a different snippet", async ({
