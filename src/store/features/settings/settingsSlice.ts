@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { RootState } from "../../store";
+import { LoadSettingsSuccessPayload, SaveSettingsPayload } from "@/types/payloads";
 
 export interface SettingsState {
   apiKey: string;
@@ -30,7 +31,7 @@ export const settingsSlice = createSlice({
     },
     loadSettingsSuccess: (
       state,
-      action: PayloadAction<Partial<SettingsState>>,
+      action: PayloadAction<LoadSettingsSuccessPayload>,
     ) => {
       return {
         ...state,
@@ -41,7 +42,7 @@ export const settingsSlice = createSlice({
     loadSettingsFailure: (state) => {
       state.loading = "failed";
     },
-    saveSettings: (state, action: PayloadAction<Partial<SettingsState>>) => {
+    saveSettings: (state, action: PayloadAction<SaveSettingsPayload>) => {
       state.saving = "saving";
       Object.assign(state, action.payload);
     },

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { DisplayModelInfo } from "@/types/storage";
 import type { Message } from "@/types/chat";
 import type { ModelInfo } from "@/types/openrouter";
+import { createAppError } from "@/types/errors";
 
 // --- Zod Schemas for Runtime Validation ---
 
@@ -58,7 +59,7 @@ const parsePriceToPerMillion = (priceStr: string): number | null => {
 
 const getOpenAIClient = (apiKey: string): OpenAI => {
   if (!apiKey) {
-    throw new Error("OpenRouter API key is missing.");
+    throw createAppError.authentication("OpenRouter API key is missing.");
   }
   const maxRetries = window.__IS_TESTING__ ? 0 : 2;
   return new OpenAI({
@@ -84,8 +85,10 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     const response = await fetch("https://openrouter.ai/api/v1/models");
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch models: ${String(response.status)} ${errorText}`,
+      throw createAppError.api(
+        `Failed to fetch models: ${errorText}`,
+        response.status,
+        "https://openrouter.ai/api/v1/models"
       );
     }
     const jsonResponse = (await response.json()) as unknown;
@@ -97,7 +100,7 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
         "[API] Zod validation failed for model list:",
         validation.error.format(),
       );
-      throw new Error("Received invalid data structure for model list.");
+      throw createAppError.validation("api_response", "Received invalid data structure for model list.");
     }
 
     // Map the full, validated ModelInfo into the simpler DisplayModelInfo for the UI
@@ -108,10 +111,13 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
       completion_cost_usd_pm: parsePriceToPerMillion(model.pricing.completion),
     }));
   } catch (error) {
+    // If it's already an AppError, re-throw it
+    if (error && typeof error === 'object' && 'type' in error) {
+      throw error;
+    }
+    
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[API] listAvailableModels error: ${errorMessage}`);
-    // Re-throw a more specific error to be handled by the caller in the store.
-    throw new Error(`[API] listAvailableModels error: ${errorMessage}`);
+    throw createAppError.api(`listAvailableModels error: ${errorMessage}`);
   }
 }
 
@@ -135,15 +141,9 @@ export async function requestMessageContentStream(
     });
   } catch (e) {
     if (e instanceof APIError) {
-      console.error(
-        `[API|requestMessageContentStream] Caught APIError: ${e.constructor.name}: ${e.message}`,
-      );
-      // Re-throw a simpler error to be handled by the store
-      throw new Error(e.message);
+      throw createAppError.api(e.message, e.status, "chat.completions.create");
     }
-    throw new Error(
-      "An unknown error occurred while fetching the model response.",
-    );
+    throw createAppError.unknown("An unknown error occurred while fetching the model response.", e);
   }
 }
 
@@ -168,14 +168,8 @@ export async function requestMessageContent(
     return completion.choices[0]?.message?.content ?? "";
   } catch (e) {
     if (e instanceof APIError) {
-      console.error(
-        `[API|requestMessageContent] Caught APIError: ${e.constructor.name}: ${e.message}`,
-      );
-      // Re-throw a simpler error to be handled by the store
-      throw new Error(e.message);
+      throw createAppError.api(e.message, e.status, "chat.completions.create");
     }
-    throw new Error(
-      "An unknown error occurred while fetching the model response.",
-    );
+    throw createAppError.unknown("An unknown error occurred while fetching the model response.", e);
   }
 }

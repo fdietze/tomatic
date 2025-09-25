@@ -4,6 +4,7 @@ import Markdown from './Markdown';
 import CopyButton from './CopyButton';
 import { useTextAreaEnterHandler } from '@/hooks/useTextAreaEnterHandler';
 import { assertUnreachable } from '@/utils/assert';
+import { getErrorMessage } from '@/types/errors';
 
 interface CostProps {
   value: number;
@@ -160,7 +161,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       )}
       {message.error && (
         <div className="error-message" data-testid="error-message">
-            <p>{message.error}</p>
+            <p>{getErrorMessage(message.error)}</p>
         </div>
       )}
     </div>

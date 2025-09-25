@@ -11,8 +11,10 @@ import { loadPrompts } from "../prompts/promptsSlice";
 import { loadSnippets } from "../snippets/snippetsSlice";
 
 function* handleInitialize(): SagaIterator {
+  console.log('[DEBUG] handleInitialize: starting app initialization');
   // First, handle DB migration.
   const migrated: boolean = yield call(() => migrationPromise);
+  console.log('[DEBUG] handleInitialize: migration completed:', migrated);
   if (migrated) {
     const mostRecentSessionId: string | null = yield call(
       getMostRecentSessionId,
@@ -48,7 +50,9 @@ function* handleInitialize(): SagaIterator {
     dispatchEvent('app:models_loaded', { success: true, count: cachedModels.length });
   }
 
+  console.log('[DEBUG] handleInitialize: dispatching initializationComplete');
   yield put(initializationComplete());
+  console.log('[DEBUG] handleInitialize: dispatching app_initialized event');
   dispatchEvent("app_initialized");
 }
 

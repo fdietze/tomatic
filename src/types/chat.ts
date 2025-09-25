@@ -1,3 +1,5 @@
+import { AppError } from './errors';
+
 export interface MessageCost {
   prompt: number;
   completion: number;
@@ -13,7 +15,7 @@ export interface Message {
   raw_content?: string;
   model_name?: string | null;
   cost?: MessageCost | null;
-  error?: string | null;
+  error?: AppError | null;
 }
 
 export interface ChatSession {

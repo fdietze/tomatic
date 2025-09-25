@@ -91,7 +91,7 @@ test.describe("Chat Regeneration with Deleted Snippets", () => {
 
       // 3. Assert that an error is shown
       await expect(chatPage.errorMessage).toContainText(
-        "Snippet '@greet' not found.",
+        "Unknown Error: Snippet '@greet' not found.",
       );
 
       // 4. Assert that the chat history has not changed

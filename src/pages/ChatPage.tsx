@@ -5,6 +5,7 @@ import ChatHeader from "@/components/ChatHeader";
 import ChatInterface from "@/components/ChatInterface";
 import SystemPromptBar from "@/components/SystemPromptBar";
 import { SystemPrompt } from "@/types/storage";
+import { getErrorMessage } from "@/types/errors";
 import {
   selectSettings,
   setSelectedPromptName,
@@ -101,7 +102,7 @@ const ChatPage: React.FC = () => {
       </ChatHeader>
       {error && (
         <div className="error-display" data-testid="error-message">
-          <p>{error}</p>
+          <p>{getErrorMessage(error)}</p>
           <button onClick={handleErrorClear} className="close-button">
             &times;
           </button>

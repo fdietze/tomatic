@@ -2,6 +2,7 @@ import { call, put, takeLatest, all, select, takeEvery, take } from "redux-saga/
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
+import { createAppError, toAppError, getErrorMessage } from "@/types/errors";
 import {
   loadSnippets,
   loadSnippetsSuccess,
@@ -40,7 +41,7 @@ function* loadSnippetsSaga() {
     console.log("[DEBUG] loadSnippetsSaga: dispatched loadSnippetsSuccess");
   } catch (error) {
     console.log("[DEBUG] loadSnippetsSaga: failed to load snippets:", error);
-    yield put(loadSnippetsFailure("Failed to load snippets."));
+    yield put(loadSnippetsFailure(createAppError.persistence("loadSnippets", "Failed to load snippets.")));
   }
 }
 
@@ -55,9 +56,8 @@ function* addSnippetSaga(action: PayloadAction<Snippet>) {
     }
     console.log("[DEBUG] addSnippetSaga: success", newSnippet);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "An unknown error occurred.";
-    yield put(addSnippetFailure({ name: action.payload.name, error: message }));
-    console.error("Failed to add snippet", error);
+    const appError = toAppError(error);
+    yield put(addSnippetFailure({ name: action.payload.name, error: appError }));
     console.log("[DEBUG] addSnippetSaga: failure", error);
   }
 }
@@ -82,9 +82,8 @@ function* updateSnippetSaga(
     yield put(updateSnippetSuccess({ oldName: oldSnippet.name, snippet: updatedSnippet }));
     console.log("[DEBUG] updateSnippetSaga: success dispatched", updatedSnippet);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "An unknown error occurred.";
-    yield put(updateSnippetFailure({ id: action.payload.id, error: message }));
-    console.error("Failed to update snippet", error);
+    const appError = toAppError(error);
+    yield put(updateSnippetFailure({ id: action.payload.id, error: appError }));
     console.log("[DEBUG] updateSnippetSaga: failure", error);
   }
 }
@@ -94,7 +93,7 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
     yield call(db.deleteSnippet, action.payload);
     yield put(deleteSnippetSuccess(action.payload));
   } catch (error) {
-    console.error("Failed to delete snippet", error);
+    console.log("[DEBUG] deleteSnippetSaga: failure", error);
   }
 }
 
@@ -131,7 +130,7 @@ function* handleRegenerateSnippetSaga(
       typeof snippetToRegenerate.prompt !== "string" ||
       !snippetToRegenerate.model
     ) {
-      const error = "Invalid snippet for regeneration.";
+      const error = createAppError.validation('snippet', "Invalid snippet for regeneration.");
       yield put(
         regenerateSnippetFailure({
           id: snippetId,
@@ -184,11 +183,10 @@ function* handleRegenerateSnippetSaga(
       new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
     );
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, error instanceof Error ? error.message : String(error));
     console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, errorMessage);
-    yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: errorMessage }));
-    console.error(`Failed to regenerate snippet ${snippetToRegenerate.name}`, error);
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, getErrorMessage(appError));
+    yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: appError }));
   } finally {
     yield put({ type: "app/setBatchRegenerating", payload: false });
   }
@@ -262,7 +260,7 @@ function* batchRegenerationOrchestratorSaga(
   const { sorted, cyclic } = topologicalSort(snippets);
 
   if (cyclic.length > 0) {
-    console.error("Cyclic dependency detected in snippets:", cyclic);
+    console.log("[DEBUG] Cyclic dependency detected in snippets:", cyclic);
     return;
   }
 

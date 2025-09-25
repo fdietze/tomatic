@@ -1,17 +1,25 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { SystemPrompt } from "@/types/storage";
 import { RootState } from "../../store";
+import { AppError } from "@/types/errors";
+import {
+  AddPromptFailurePayload,
+  UpdatePromptRequestPayload,
+  UpdatePromptSuccessPayload,
+  UpdatePromptFailurePayload,
+  DeletePromptFailurePayload,
+} from "@/types/payloads";
 
 export interface PromptEntity {
   data: SystemPrompt;
   status: "idle" | "saving" | "deleting" | "failed";
-  error?: string | null;
+  error?: AppError | null;
 }
 
 export interface PromptsState {
   prompts: { [name: string]: PromptEntity };
   loading: "idle" | "loading" | "failed";
-  error: string | null;
+  error: AppError | null;
 }
 
 export const initialState: PromptsState = {
@@ -42,7 +50,7 @@ export const promptsSlice = createSlice({
         {},
       );
     },
-    loadPromptsFailure: (state, action: PayloadAction<string>) => {
+    loadPromptsFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = "failed";
       state.error = action.payload;
     },
@@ -60,14 +68,14 @@ export const promptsSlice = createSlice({
     },
     addPromptFailure: (
       _state,
-      _action: PayloadAction<{ name: string; error: string }>,
+      _action: PayloadAction<AddPromptFailurePayload>,
     ) => {
       // Optional: Handle failure, e.g., show a global error
     },
     // Update
     updatePromptRequest: (
       state,
-      action: PayloadAction<{ oldName: string; prompt: SystemPrompt }>,
+      action: PayloadAction<UpdatePromptRequestPayload>,
     ) => {
       const { oldName } = action.payload;
       if (state.prompts[oldName]) {
@@ -76,7 +84,7 @@ export const promptsSlice = createSlice({
     },
     updatePromptSuccess: (
       state,
-      action: PayloadAction<{ oldName: string; prompt: SystemPrompt }>,
+      action: PayloadAction<UpdatePromptSuccessPayload>,
     ) => {
       const { oldName, prompt } = action.payload;
       // If name was changed, we need to remove the old entry
@@ -91,7 +99,7 @@ export const promptsSlice = createSlice({
     },
     updatePromptFailure: (
       state,
-      action: PayloadAction<{ name: string; error: string }>,
+      action: PayloadAction<UpdatePromptFailurePayload>,
     ) => {
       const { name, error } = action.payload;
       if (state.prompts[name]) {
@@ -111,7 +119,7 @@ export const promptsSlice = createSlice({
     },
     deletePromptFailure: (
       state,
-      action: PayloadAction<{ name: string; error: string }>,
+      action: PayloadAction<DeletePromptFailurePayload>,
     ) => {
       const { name, error } = action.payload;
       if (state.prompts[name]) {
