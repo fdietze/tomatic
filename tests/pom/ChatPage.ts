@@ -129,6 +129,7 @@ export class ChatPage {
     const messageLocator = this.page.locator(
       `[data-testid="chat-message-${String(messageIndex)}"][data-role="${role}"] .chat-message-content`,
     );
+
     await expect(messageLocator).toHaveText(expectedText);
   }
 

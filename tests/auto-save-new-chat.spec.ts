@@ -89,7 +89,7 @@ test.describe("Auto-Save New Chat Sessions", () => {
 
     // 1. Create a system prompt first
     await chatPage.navigation.goToSettings();
-    await settingsPage.createNewPrompt("TestBot", "You are a helpful test bot.");
+    await settingsPage.createNewPrompt("TestBot", "You are a helpful test bot");
     await settingsPage.navigation.goBackToChat();
 
     // 2. Select the system prompt on the new chat page
@@ -105,17 +105,17 @@ test.describe("Auto-Save New Chat Sessions", () => {
       request: {
         model: "google/gemini-2.5-pro",
         messages: [
-          { role: "system", content: "You are a helpful test bot." },
-          { role: "user", content: "Hi there!" }
+          { role: "system", content: "You are a helpful test bot" },
+          { role: "user", content: "Hi there" }
         ],
         stream: true,
       },
-      response: { role: "assistant", content: "Hello! I'm your test bot." },
+      response: { role: "assistant", content: "Hello from your test bot" },
     });
 
     // 5. Send a message to trigger auto-save
     const responsePromise = page.waitForResponse("https://openrouter.ai/api/v1/chat/completions");
-    await chatPage.sendMessage("Hi there!");
+    await chatPage.sendMessage("Hi there");
     await responsePromise;
 
     // 6. Verify the session was auto-saved and URL changed
@@ -134,8 +134,8 @@ test.describe("Auto-Save New Chat Sessions", () => {
 
     // 8. Verify the system prompt is still active and messages are preserved
     await chatPage.expectMessage(0, "system", /You are a helpful test bot/);
-    await chatPage.expectMessage(1, "user", /Hi there!/);
-    await chatPage.expectMessage(2, "assistant", /Hello! I'm your test bot/);
+    await chatPage.expectMessage(1, "user", /Hi there/);
+    await chatPage.expectMessage(2, "assistant", /Hello from your test bot/);
     await chatPage.expectMessageCount(3);
 
     chatMocker.verifyComplete();
