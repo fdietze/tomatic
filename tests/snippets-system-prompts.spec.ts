@@ -23,17 +23,11 @@ test.describe("Snippet Usage in System Prompts", () => {
   });
 
   test.describe("when a snippet is resolved in a new chat", () => {
-    test.beforeEach(async ({ context }) => {
-      await seedLocalStorage(context, {
-        state: {
-          apiKey: OPENROUTER_API_KEY,
-          selectedPromptName: "TestPrompt",
-          modelName: "google/gemini-2.5-pro",
-          autoScrollEnabled: false,
-        },
-        version: 1,
-      });
-      await seedIndexedDB(context, {
+    test.use({ 
+      localStorageOverrides: {
+        selectedPromptName: "TestPrompt",
+      },
+      dbSeed: {
         system_prompts: [
           { name: "TestPrompt", prompt: "You are a @character." },
         ],
@@ -49,7 +43,7 @@ test.describe("Snippet Usage in System Prompts", () => {
             isDirty: false,
           },
         ],
-      });
+      }
     });
 
     test("resolves snippets in a system prompt for a new chat", async ({
@@ -187,23 +181,16 @@ test.describe("Snippet Usage in System Prompts", () => {
   });
 
   test.describe("when a snippet is not found", () => {
-    test.beforeEach(async ({ context, page }) => {
-      await seedLocalStorage(context, {
-        state: {
-          apiKey: OPENROUTER_API_KEY,
-          selectedPromptName: "TestPrompt",
-          modelName: "google/gemini-2.5-pro",
-          autoScrollEnabled: false,
-        },
-        version: 1,
-      });
-      await seedIndexedDB(context, {
+    test.use({ 
+      localStorageOverrides: {
+        selectedPromptName: "TestPrompt",
+      },
+      dbSeed: {
         system_prompts: [
           { name: "TestPrompt", prompt: "You are a @fake_character." },
         ],
         snippets: [], // Ensure no snippets exist
-      });
-      // Already at /chat/new from fixture
+      }
     });
 
     test("shows an error if a system prompt snippet is not found", async () => {
@@ -219,17 +206,11 @@ test.describe("Snippet Usage in System Prompts", () => {
   });
 
   test.describe("when dealing with transitive dependencies", () => {
-    test.beforeEach(async ({ context, page }) => {
-      await seedLocalStorage(context, {
-        state: {
-          apiKey: OPENROUTER_API_KEY,
-          modelName: "google/gemini-2.5-pro",
-          autoScrollEnabled: false,
-          selectedPromptName: null,
-        },
-        version: 1,
-      });
-      await seedIndexedDB(context, {
+    test.use({ 
+      localStorageOverrides: {
+        selectedPromptName: null, // Will be set in test
+      },
+      dbSeed: {
         system_prompts: [
           { name: "TestPrompt", prompt: "You are a @generated_snippet." },
         ],
@@ -257,8 +238,7 @@ test.describe("Snippet Usage in System Prompts", () => {
             isDirty: false,
           },
         ],
-      });
-      // Already at /chat/new from fixture
+      }
     });
     test("uses updated, transitively dependent snippet content when regenerating a response", async ({
       page,

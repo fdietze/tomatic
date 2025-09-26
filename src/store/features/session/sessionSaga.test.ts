@@ -189,6 +189,7 @@ describe("sessionSaga", () => {
         submitting: false,
         error: null,
         hasSessions: false,
+        selectedPromptName: null,
       },
       settings: {
         apiKey: "test-api-key",

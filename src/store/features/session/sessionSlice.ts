@@ -22,6 +22,7 @@ export interface SessionState {
   loading: "idle" | "loading" | "failed";
   submitting: boolean;
   error: AppError | null;
+  selectedPromptName: string | null;
 }
 
 const initialState: SessionState = {
@@ -33,6 +34,7 @@ const initialState: SessionState = {
   loading: "idle",
   submitting: false,
   error: null,
+  selectedPromptName: null,
 };
 
 export const sessionSlice = createSlice({
@@ -69,6 +71,8 @@ export const sessionSlice = createSlice({
       state.prevSessionId = null;
       state.nextSessionId = null;
       state.error = null;
+      // Keep the selected prompt name when starting a new session
+      // state.selectedPromptName = null; // Commented out to preserve system prompt selection
     },
     setHasSessions: (state, action: PayloadAction<boolean>) => {
       state.hasSessions = action.payload;
@@ -149,17 +153,27 @@ export const sessionSlice = createSlice({
       // This action will be intercepted by the saga for snippet resolution
       // No state changes here - the saga will handle it
     },
+    setSelectedPromptName: (state, action: PayloadAction<string | null>) => {
+      console.log(`[DEBUG] sessionSlice.setSelectedPromptName: setting selectedPromptName to "${action.payload}"`);
+      state.selectedPromptName = action.payload;
+    },
     setSystemPrompt: (state, action: PayloadAction<{ name: string; rawPrompt: string; resolvedPrompt: string }>) => {
       const { name, rawPrompt, resolvedPrompt } = action.payload;
+      console.log(`[DEBUG] sessionSlice.setSystemPrompt: processing system prompt "${name}" with rawPrompt: "${rawPrompt}" and resolvedPrompt: "${resolvedPrompt}"`);
+      
+      // Update the selected prompt name reference
+      state.selectedPromptName = name;
       
       // Check if the first message is already a system message
       const firstMessage = state.messages[0];
       if (firstMessage && firstMessage.role === "system") {
+        console.log(`[DEBUG] sessionSlice.setSystemPrompt: replacing existing system message`);
         // Replace the existing system message
         firstMessage.content = resolvedPrompt; // For API calls
         firstMessage.raw_content = rawPrompt; // For UI display
         firstMessage.prompt_name = name;
       } else {
+        console.log(`[DEBUG] sessionSlice.setSystemPrompt: creating new system message`);
         // Create a new system message and add it to the beginning
         const systemMessage: Message = {
           id: `system-${Date.now()}`,
@@ -170,6 +184,7 @@ export const sessionSlice = createSlice({
         };
         state.messages.unshift(systemMessage);
       }
+      console.log(`[DEBUG] sessionSlice.setSystemPrompt: messages after system prompt update:`, state.messages.length);
     },
     appendChunkToLatestMessage: (
       state,
@@ -271,6 +286,7 @@ export const {
   addAssistantMessagePlaceholder,
   addSystemMessage,
   setSystemPromptRequested,
+  setSelectedPromptName,
   setSystemPrompt,
   appendChunkToLatestMessage,
   submitUserMessageSuccess,

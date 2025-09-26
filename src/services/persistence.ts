@@ -266,11 +266,14 @@ export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
 export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
   const db = await dbPromise;
   try {
+    console.log('[DEBUG] loadAllSystemPrompts: starting load from database');
     const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
+    console.log('[DEBUG] loadAllSystemPrompts: found', prompts.length, 'prompts in database');
     const validation = z.array(systemPromptSchema).safeParse(prompts);
     if (validation.success) {
       return validation.data;
     } else {
+      console.log('[DEBUG] loadAllSystemPrompts: validation failed:', validation.error);
       console.error(
         "[DB] Load: Zod validation failed for system prompts:",
         validation.error,
@@ -278,6 +281,7 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
       return [];
     }
   } catch (error) {
+    console.log('[DEBUG] loadAllSystemPrompts: exception occurred:', error);
     console.error("[DB] Load: Failed to load system prompts:", error);
     throw new Error("Failed to load system prompts.");
   }

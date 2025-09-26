@@ -28,6 +28,7 @@ import {
   regenerateResponseRequested,
   setSystemPromptRequested,
   setSystemPrompt,
+  setSelectedPromptName,
   // Deprecated
   submitUserMessage,
   submitUserMessageFailure,
@@ -52,42 +53,91 @@ import {
   regenerateSnippetSuccess,
   selectSnippets,
 } from "@/store/features/snippets/snippetsSlice";
+import { selectPrompts } from "@/store/features/prompts/promptsSlice";
+import { selectSettings } from "@/store/features/settings/settingsSlice";
 import { regenerateSnippetWorker } from "@/store/features/snippets/snippetsSaga";
+
+// --- Helper Functions ---
+
+// Helper function to resolve the current system prompt from state
+function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
+  const { session, prompts, snippets }: RootState = yield select(
+    (state: RootState) => state,
+  );
+
+  const selectedPromptName = session.selectedPromptName;
+  console.log(`[DEBUG] resolveCurrentSystemPrompt: selectedPromptName from session: "${selectedPromptName}"`);
+  console.log(`[DEBUG] resolveCurrentSystemPrompt: available prompts in state:`, Object.keys(prompts.prompts));
+  
+  if (!selectedPromptName) {
+    console.log(`[DEBUG] resolveCurrentSystemPrompt: no system prompt selected`);
+    return null;
+  }
+
+  const promptEntity = prompts.prompts[selectedPromptName];
+  if (!promptEntity) {
+    console.log(`[DEBUG] resolveCurrentSystemPrompt: system prompt "${selectedPromptName}" not found in prompts state`);
+    console.log(`[DEBUG] resolveCurrentSystemPrompt: available prompt names:`, Object.keys(prompts.prompts));
+    return null;
+  }
+
+  const systemPrompt = promptEntity.data;
+  console.log(`[DEBUG] resolveCurrentSystemPrompt: resolving system prompt "${selectedPromptName}" with content: "${systemPrompt.prompt}"`);
+
+  try {
+    // Resolve snippets in the system prompt
+    const resolvedPrompt: string = yield call(resolveSnippets, systemPrompt.prompt, snippets.snippets);
+    console.log(`[DEBUG] resolveCurrentSystemPrompt: resolved to: "${resolvedPrompt}"`);
+
+    return {
+      id: `system-${selectedPromptName}`,
+      role: "system" as const,
+      content: resolvedPrompt, // For API calls
+      raw_content: systemPrompt.prompt, // For UI display
+      prompt_name: selectedPromptName,
+    };
+  } catch (error) {
+    console.log(`[DEBUG] resolveCurrentSystemPrompt: failed to resolve system prompt:`, error);
+    throw error;
+  }
+}
+
+// Helper function to initialize a new session with the global selected prompt
+function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
+  const { settings }: RootState = yield select((state: RootState) => state);
+  const globalSelectedPromptName = settings.selectedPromptName;
+  
+  if (globalSelectedPromptName) {
+    console.log(`[DEBUG] initializeNewSessionWithGlobalPrompt: initializing new session with global prompt "${globalSelectedPromptName}"`);
+    yield put(setSelectedPromptName(globalSelectedPromptName));
+  } else {
+    console.log(`[DEBUG] initializeNewSessionWithGlobalPrompt: no global prompt selected`);
+  }
+}
 
 // --- Worker Sagas ---
 
 // Saga to handle system prompt setting with snippet resolution
 function* setSystemPromptRequestedSaga(action: PayloadAction<SystemPrompt>): SagaIterator {
   try {
-    const { name, prompt } = action.payload;
-    console.log(`[DEBUG] setSystemPromptSaga: setting system prompt "${name}" with content: "${prompt}"`);
+    const { name } = action.payload;
+    console.log(`[DEBUG] setSystemPromptSaga: setting selected system prompt to "${name}"`);
     
-    // Wait for snippets to be loaded if they haven't been loaded yet
-    let snippetsState: ReturnType<typeof selectSnippets> = yield select(
-      (state: RootState) => state.snippets,
-    );
+    // Simply set the selected prompt name - the actual resolution will happen dynamically when needed
+    yield put(setSelectedPromptName(name));
     
-    if (snippetsState.loading === "loading" || snippetsState.snippets.length === 0) {
-      console.log(`[DEBUG] setSystemPromptSaga: waiting for snippets to load`);
-      // Wait for snippets to be loaded
-      yield take([loadSnippetsSuccess.type, loadSnippetsFailure.type]);
-      // Re-select to get the updated state
-      snippetsState = yield select((state: RootState) => state.snippets);
+    // For backward compatibility, also resolve and set the system message in the messages array
+    // This ensures the UI still displays the system prompt correctly
+    const systemMessage: Message | null = yield call(resolveCurrentSystemPrompt);
+    if (systemMessage) {
+      const systemPromptData = {
+        name: systemMessage.prompt_name!,
+        rawPrompt: systemMessage.raw_content!,
+        resolvedPrompt: systemMessage.content,
+      };
+      console.log(`[DEBUG] setSystemPromptSaga: dispatching setSystemPrompt with data:`, systemPromptData);
+      yield put(setSystemPrompt(systemPromptData));
     }
-    
-    // Resolve snippets in the system prompt
-    const resolvedPrompt: string = yield call(resolveSnippets, prompt, snippetsState.snippets);
-    console.log(`[DEBUG] setSystemPromptSaga: resolved system prompt to: "${resolvedPrompt}"`);
-    
-    // Create the system prompt with both raw and resolved content
-    const systemPromptData = {
-      name,
-      rawPrompt: prompt,
-      resolvedPrompt: resolvedPrompt,
-    };
-    
-    // Dispatch the action with both raw and resolved content
-    yield put(setSystemPrompt(systemPromptData));
   } catch (error) {
     console.log(`[DEBUG] setSystemPromptSaga: failed to resolve system prompt:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -129,6 +179,8 @@ function* goToNextSessionSaga(): SagaIterator {
 function* loadSessionSaga(action: PayloadAction<string>) {
   if (action.payload === "new") {
     yield put(startNewSession());
+    // Initialize new session with global selected prompt
+    yield call(initializeNewSessionWithGlobalPrompt);
     return;
   }
   try {
@@ -343,8 +395,20 @@ function* submitUserMessageSaga(
       throw new Error("OpenRouter API key is not set.");
     }
 
-    // Base messages are from the current session state.
-    let messagesToSubmit: Message[] = [...session.messages];
+    // Build messages to submit with fresh system prompt resolution
+    let messagesToSubmit: Message[] = [];
+    
+    // First, add the current system prompt if one is selected
+    const currentSystemMessage: Message | null = yield call(resolveCurrentSystemPrompt);
+    if (currentSystemMessage) {
+      messagesToSubmit.push(currentSystemMessage);
+      console.log(`[DEBUG] submitUserMessageSaga: added resolved system message: "${currentSystemMessage.content}"`);
+    }
+    
+    // Then add non-system messages from the session
+    const nonSystemMessages = session.messages.filter(msg => msg.role !== 'system');
+    messagesToSubmit.push(...nonSystemMessages);
+    
     console.log(`[DEBUG] submitUserMessageSaga: initial messages to submit (${messagesToSubmit.length}):`, messagesToSubmit.map(m => ({ role: m.role, content: m.content })));
 
 
@@ -394,6 +458,7 @@ function* submitUserMessageSaga(
       yield put(addAssistantMessagePlaceholder());
     }
 
+    console.log(`[DEBUG] submitUserMessageSaga: final messagesToSubmit before API call:`, messagesToSubmit.map(m => ({ role: m.role, content: m.content, id: m.id })));
     // --- 2. Create the event channel ---
     const channel: EventChannel<ChatStreamEvent> = yield call(
       createChatStreamChannel,

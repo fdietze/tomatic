@@ -74,13 +74,39 @@ const Header: React.FC = () => {
   );
 };
 
+const LoadingSpinner: React.FC = () => (
+  <div className="app-loading" data-testid="app-loading">
+    <div className="spinner" />
+    <p>Loading...</p>
+  </div>
+);
+
+const ErrorMessage: React.FC<{ error: string }> = ({ error }) => (
+  <div className="app-error" data-testid="app-error">
+    <h2>Initialization Failed</h2>
+    <p>{error}</p>
+    <button onClick={() => window.location.reload()}>Retry</button>
+  </div>
+);
+
 const App: React.FC = () => {
   const dispatch = useDispatch();
+  const { status, initializationError } = useSelector(selectApp);
 
   useEffect(() => {
     dispatch(initialize());
   }, [dispatch]);
 
+  // Loading gate - prevent UI from rendering until app is ready
+  if (status === "initializing") {
+    return <LoadingSpinner />;
+  }
+
+  if (status === "failed") {
+    return <ErrorMessage error={initializationError || "Unknown error"} />;
+  }
+
+  // Only render main UI when status is "ready"
   return (
     <Router>
       <NavigationProvider>

@@ -46,6 +46,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const [editingModel, setEditingModel] = useState(snippet.model || defaultModelName);
   const [nameError, setNameError] = useState<string | null>(null);
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
+  const [generatedId, setGeneratedId] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const modelItems = useMemo((): ComboboxItem[] => {
@@ -149,15 +150,18 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   };
 
   const generateAndSetContent = (): void => {
+    const id = snippet.id || crypto.randomUUID();
     const snippetForRegeneration: Snippet = {
       ...snippet,
-      id: snippet.id || crypto.randomUUID(),
+      id,
       name: editingName.trim(),
       content: editingContent, // This is a placeholder, the saga will replace it
       isGenerated: editingIsGenerated,
       prompt: editingPrompt,
       model: editingModel,
     };
+    // Store the generated ID so we can look up regeneration status
+    setGeneratedId(id);
     dispatch(regenerateSnippet(snippetForRegeneration));
   };
 
@@ -280,7 +284,22 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           </button>
         </div>
         <div className="error-message" data-testid="generation-error-message">
-          {snippet.generationError ? getErrorMessage(snippet.generationError) : ''}
+          {(() => {
+            // Check both regenerationStatus (for current session errors) and snippet.generationError (for persisted errors)
+            // Use the generated ID if available, otherwise use the snippet ID
+            const idToLookup = generatedId || snippet.id;
+            const regenerationError = regenerationStatus[idToLookup]?.error;
+            const persistedError = snippet.generationError;
+            
+            
+            if (regenerationError) {
+              return getErrorMessage(regenerationError);
+            } else if (persistedError) {
+              return getErrorMessage(persistedError);
+            } else {
+              return '';
+            }
+          })()}
         </div>
       </div>
     );
@@ -324,12 +343,40 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         </div>
       </div>
       <span className="system-prompt-text">{snippet.content}</span>
-      {regenerationStatus[snippet.id]?.status === 'error' && (
-          <div className="error-message" data-testid="generation-error-message">
-              {`Generation failed: ${regenerationStatus[snippet.id]?.error ? getErrorMessage(regenerationStatus[snippet.id]!.error!) : 'Unknown error'}`}
-          </div>
-      )}
-      {snippet.generationError && <div className="error-message" data-testid="generation-error-message">{getErrorMessage(snippet.generationError)}</div>}
+      {(() => {
+        const regenerationError = regenerationStatus[snippet.id]?.error;
+        const persistedError = snippet.generationError;
+        
+        if (regenerationError) {
+          // For snippet regeneration errors, extract just the core error message
+          let errorMessage: string;
+          if (regenerationError.type === 'SNIPPET_REGENERATION_ERROR') {
+            // The reason field might be a formatted error message like "API Error: 500 Internal Server Error"
+            // Extract just the core message for cleaner display
+            const reason = regenerationError.reason;
+            if (reason.startsWith('API Error: ')) {
+              errorMessage = reason.substring('API Error: '.length);
+            } else {
+              errorMessage = reason;
+            }
+          } else {
+            errorMessage = getErrorMessage(regenerationError);
+          }
+          return (
+            <div className="error-message" data-testid="generation-error-message">
+              {`Generation failed: ${errorMessage}`}
+            </div>
+          );
+        } else if (persistedError) {
+          return (
+            <div className="error-message" data-testid="generation-error-message">
+              {getErrorMessage(persistedError)}
+            </div>
+          );
+        } else {
+          return null;
+        }
+      })()}
     </div>
   );
 };

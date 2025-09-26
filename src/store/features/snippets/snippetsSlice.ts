@@ -89,6 +89,9 @@ export const snippetsSlice = createSlice({
       const snippet = state.snippets.find(s => s.id === action.payload.id);
       if (snippet) {
         state.regenerationStatus[snippet.id] = { status: "in_progress" };
+      } else {
+        // For new snippets not yet in the store, still track regeneration status
+        state.regenerationStatus[action.payload.id] = { status: "in_progress" };
       }
     },
     regenerateSnippetSuccess(
@@ -113,6 +116,9 @@ export const snippetsSlice = createSlice({
       if (snippet) {
         snippet.generationError = error;
         state.regenerationStatus[snippet.id] = { status: "error", error };
+      } else {
+        // For new snippets not yet in the store, still track regeneration status
+        state.regenerationStatus[id] = { status: "error", error };
       }
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {

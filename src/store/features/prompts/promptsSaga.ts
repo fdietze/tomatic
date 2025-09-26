@@ -20,9 +20,13 @@ import {
 
 function* loadPromptsSaga() {
   try {
+    console.log('[DEBUG] loadPromptsSaga: starting to load system prompts');
     const prompts: SystemPrompt[] = yield call(db.loadAllSystemPrompts);
+    console.log('[DEBUG] loadPromptsSaga: loaded prompts from DB:', prompts.map(p => ({ name: p.name, prompt: p.prompt })));
     yield put(loadPromptsSuccess(prompts));
-  } catch {
+    console.log('[DEBUG] loadPromptsSaga: dispatched loadPromptsSuccess');
+  } catch (error) {
+    console.log('[DEBUG] loadPromptsSaga: failed to load prompts:', error);
     yield put(loadPromptsFailure(createAppError.persistence("loadPrompts", "Failed to load prompts.")));
   }
 }

@@ -131,6 +131,7 @@ export async function requestMessageContentStream(
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
 
+  console.log('[DEBUG] requestMessageContentStream: API request body:', JSON.stringify(body, null, 2));
   const openai = getOpenAIClient(apiKey);
 
   try {
