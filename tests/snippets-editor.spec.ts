@@ -190,6 +190,46 @@ test.describe('Snippet Editor Validation', () => {
         chatMocker.verifyComplete();
       });
     
+      test('marks snippet as dirty when prompt is edited and saved', async ({ page }) => {
+        // Purpose: This test verifies that pressing the save button on a generated snippet 
+        // marks it as dirty if the prompt input is different from the original (req:save-button-dirty-detection)
+        const chatMocker = new ChatCompletionMocker(page);
+        await chatMocker.setup();
+        chatMocker.mock({
+          request: {
+            model: "google/gemini-2.5-pro",
+            messages: [{ role: "user", content: "A modified prompt" }],
+            stream: false,
+          },
+          response: {
+            role: "assistant",
+            content: "Generated content from modified prompt",
+          },
+          manualTrigger: true,
+        });
+
+        await settingsPage.startEditingSnippet('b');
+        const editContainer = settingsPage.page.locator('[data-testid^="snippet-item-edit-"]');
+        
+        // Change the prompt from the original (empty) to something new
+        await editContainer.getByTestId('snippet-prompt-input').fill('A modified prompt');
+        
+        // Save the snippet
+        await settingsPage.saveSnippet();
+        
+        // The snippet should now be marked as dirty and show a loading spinner
+        const snippetView = settingsPage.getSnippetItemView('b');
+        await expect(snippetView.getByTestId('regenerating-spinner')).toBeVisible();
+        
+        // Now resolve the mock to complete the regeneration
+        await chatMocker.resolveNextCompletion();
+        
+        // Verify the spinner disappears after regeneration completes
+        await expect(snippetView.getByTestId('regenerating-spinner')).not.toBeVisible();
+        
+        chatMocker.verifyComplete();
+      });
+
       test('skips generation if resolved prompt is empty', async ({ page }) => {
         // Purpose: This test verifies that if a generated snippet's prompt resolves to an empty or
         // whitespace-only string, the system skips making an API call and simply clears the

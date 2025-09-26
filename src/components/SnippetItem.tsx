@@ -50,6 +50,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const [nameError, setNameError] = useState<string | null>(null);
   const [promptErrors, setPromptErrors] = useState<string[]>([]);
   const [generatedId, setGeneratedId] = useState<string | null>(null);
+  const [hasManuallyRegenerated, setHasManuallyRegenerated] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const modelItems = useMemo((): ComboboxItem[] => {
@@ -64,6 +65,11 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     // update the local editing state to reflect it.
     setEditingContent(snippet.content);
   }, [snippet.content]);
+
+  useEffect(() => {
+    // Reset manual regeneration flag when prompt changes
+    setHasManuallyRegenerated(false);
+  }, [editingPrompt]);
 
   useEffect(() => {
     if (isEditing) {
@@ -138,6 +144,18 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         return;
     }
 
+    // req:save-button-dirty-detection: Check if prompt has changed for generated snippets
+    const promptChanged = editingIsGenerated && (editingPrompt !== (snippet.prompt || ''));
+    
+    // Only trigger automatic regeneration if:
+    // 1. This is an existing snippet (not being created for the first time)
+    // 2. The prompt has changed 
+    // 3. The user hasn't manually regenerated
+    // 4. There are no prompt errors (like cycles)
+    const isExistingSnippet = Boolean(snippet.id);
+    const hasPromptErrors = promptErrors.length > 0;
+    const shouldAutoRegenerate = isExistingSnippet && promptChanged && !hasManuallyRegenerated && !hasPromptErrors;
+    
     const snippetForSave: Snippet = {
       ...snippet,
       id: snippet.id || crypto.randomUUID(),
@@ -147,9 +165,16 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       isGenerated: editingIsGenerated,
       prompt: editingPrompt,
       model: editingModel,
+      // Mark as dirty if we need to auto-regenerate
+      isDirty: shouldAutoRegenerate || snippet.isDirty,
     };
 
     await onUpdate(snippetForSave);
+
+    // req:save-button-dirty-detection: Trigger regeneration if prompt changed and not manually regenerated
+    if (shouldAutoRegenerate) {
+      dispatch(regenerateSnippet(snippetForSave));
+    }
 
     setIsEditing(false);
     setNameError(null);
@@ -168,6 +193,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     };
     // Store the generated ID so we can look up regeneration status
     setGeneratedId(id);
+    // Mark that user has manually regenerated
+    setHasManuallyRegenerated(true);
     dispatch(regenerateSnippet(snippetForRegeneration));
   };
 
