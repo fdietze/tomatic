@@ -51,26 +51,22 @@ export const sessionSlice = createSlice({
       state,
       action: PayloadAction<LoadSessionSuccessPayload>,
     ) => {
-      console.log(`[DEBUG] sessionSlice.loadSessionSuccess: setting ${action.payload.messages.length} messages:`, action.payload.messages.map(m => ({ role: m.role, content: m.content })));
       state.loading = "idle";
       state.messages = action.payload.messages;
       state.currentSessionId = action.payload.sessionId;
       state.prevSessionId = action.payload.prevId;
       state.nextSessionId = action.payload.nextId;
-      console.log(`[DEBUG] sessionSlice.loadSessionSuccess: state now has ${state.messages.length} messages`);
     },
     sessionCreatedSuccess: (
       state,
       action: PayloadAction<SessionCreatedSuccessPayload>,
     ) => {
-      console.log(`[DEBUG] sessionSlice.sessionCreatedSuccess: setting ${action.payload.messages.length} messages for new session ${action.payload.sessionId}`);
       state.loading = "idle";
       state.currentSessionId = action.payload.sessionId;
       state.messages = action.payload.messages;
       state.prevSessionId = action.payload.prevId;
       state.nextSessionId = action.payload.nextId;
       state.hasSessions = true; // A new session now exists
-      console.log(`[DEBUG] sessionSlice.sessionCreatedSuccess: state now has session ${state.currentSessionId} with ${state.messages.length} messages`);
     },
 
     sessionUpdated: (

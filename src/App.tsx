@@ -55,14 +55,14 @@ const Header: React.FC = () => {
     <header>
       <div className="tabs">
         <button onClick={onChat} data-active={isChatActive}
-          data-testid="chat-button"
+          data-testid="tab-chat"
         >
           Chat
         </button>
         <button
           onClick={onSettings}
           data-active={isSettingsActive}
-          data-testid="settings-button"
+          data-testid="tab-settings"
         >
           Settings{" "}
           {isRegenerating && (
