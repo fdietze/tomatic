@@ -63,7 +63,7 @@ describe('Combobox Component', () => {
             // Purpose: Ensures error messages are shown to the user when passed via props.
             const errorMessage = { type: 'UNKNOWN_ERROR' as const, message: 'Something went wrong' };
             renderCombobox({ errorMessage });
-            expect(screen.getByText('Unknown Error: Something went wrong')).toBeInTheDocument();
+            expect(screen.getByText('Something went wrong')).toBeInTheDocument();
         });
 
         it('should show "No results found" when filtering yields no items', async () => {

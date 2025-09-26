@@ -84,6 +84,7 @@ export const {
   setInitialChatPrompt,
 } = settingsSlice.actions;
 
-export const selectSettings = (state: RootState) => state.settings;
+export const selectSettings = (state: RootState): SettingsState =>
+  state.settings;
 
 export default settingsSlice.reducer;

@@ -1,5 +1,5 @@
 import { SettingsState } from '@/store/features/settings/settingsSlice';
-import { localStorageSchema, PersistedSettingsState } from './schemas';
+import { localStorageSchema } from './schemas';
 
 const STORAGE_KEY = 'tomatic-storage';
 

@@ -27,7 +27,9 @@ export function resolveSnippets(
     if (!snippet) {
       const error = new Error(`Snippet '@${snippetName}' not found.`);
       console.log('[DEBUG] resolveSnippets: snippet not found, available snippets:', allSnippets.map(s => s.name));
-      console.log('[DEBUG] resolveSnippets:', error);
+      console.log('[DEBUG] resolveSnippets: error object:', error);
+      console.log('[DEBUG] resolveSnippets: error message:', error.message);
+      console.log('[DEBUG] resolveSnippets: error type:', typeof error);
       throw error;
     }
 

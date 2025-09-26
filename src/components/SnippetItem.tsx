@@ -342,7 +342,9 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           })()}
         </div>
       </div>
-      <span className="system-prompt-text">{snippet.content}</span>
+      <div className="system-prompt-text">
+        {snippet.content}
+      </div>
       {(() => {
         const regenerationError = regenerationStatus[snippet.id]?.error;
         const persistedError = snippet.generationError;

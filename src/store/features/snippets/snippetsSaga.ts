@@ -262,7 +262,9 @@ function* markDependentsDirtySaga(
     // Check for cycles before starting regeneration
     const { cyclic } = topologicalSort(allSnippets);
     if (cyclic.length > 0) {
-      console.log("[DEBUG] [validateSnippetDependencies] Cycle detected in snippet dependencies:", cyclic.length);
+      console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
+      console.log("[DEBUG] markDependentsDirtySaga: Cyclic snippets:", cyclic);
+      console.log("[DEBUG] markDependentsDirtySaga: All snippets for context:", allSnippets.map(s => ({ name: s.name, content: s.content, prompt: s.prompt })));
       // Don't start regeneration if there's a cycle
       return;
     }
@@ -298,7 +300,8 @@ function* batchRegenerationOrchestratorSaga(
   const { sorted, cyclic } = topologicalSort(snippets);
 
   if (cyclic.length > 0) {
-    console.log("[DEBUG] Cyclic dependency detected in snippets:", cyclic);
+    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected in snippets:", cyclic);
+    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Stopping batch regeneration due to cycles");
     return;
   }
 
