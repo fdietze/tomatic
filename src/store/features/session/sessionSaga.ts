@@ -5,10 +5,8 @@ import OpenAI from "openai";
 import type { Stream } from "openai/streaming";
 import { SagaIterator } from "redux-saga";
 
-import { createAppError, toAppError, getErrorMessage } from "@/types/errors";
-
 import { ChatSession, Message } from "@/types/chat";
-import { SystemPrompt } from "@/types/storage";
+import { SystemPrompt, Snippet } from "@/types/storage";
 import * as db from "@/services/db/chat-sessions";
 import { streamChat, StreamChatInput } from "@/services/chatService";
 import { RootState } from "../../store";
@@ -44,15 +42,21 @@ import {
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
 import { findSnippetReferences, resolveSnippets } from "@/utils/snippetUtils";
-import { Snippet } from "@/types/storage";
 import {
   awaitableRegenerateRequest,
-  loadSnippetsSuccess,
-  loadSnippetsFailure,
   regenerateSnippetFailure,
   regenerateSnippetSuccess,
   selectSnippets,
 } from "@/store/features/snippets/snippetsSlice";
+import {
+  selectModels,
+} from "@/store/features/models/modelsSlice";
+import {
+  toAppError,
+  createAppError,
+  AppError,
+  getErrorMessage,
+} from "@/types/errors";
 import { selectPrompts } from "@/store/features/prompts/promptsSlice";
 import { selectSettings } from "@/store/features/settings/settingsSlice";
 import { regenerateSnippetWorker } from "@/store/features/snippets/snippetsSaga";
@@ -108,10 +112,7 @@ function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
   const globalSelectedPromptName = settings.selectedPromptName;
   
   if (globalSelectedPromptName) {
-    console.log(`[DEBUG] initializeNewSessionWithGlobalPrompt: initializing new session with global prompt "${globalSelectedPromptName}"`);
     yield put(setSelectedPromptName(globalSelectedPromptName));
-  } else {
-    console.log(`[DEBUG] initializeNewSessionWithGlobalPrompt: no global prompt selected`);
   }
 }
 
@@ -139,9 +140,9 @@ function* setSystemPromptRequestedSaga(action: PayloadAction<SystemPrompt>): Sag
       yield put(setSystemPrompt(systemPromptData));
     }
   } catch (error) {
-    console.log(`[DEBUG] setSystemPromptSaga: failed to resolve system prompt:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    yield put(setSessionError(createAppError.unknown(`Failed to resolve system prompt: ${errorMessage}`)));
+    const appError = createAppError.unknown(`Failed to resolve system prompt: ${errorMessage}`);
+    yield put(setSessionError(appError));
   }
 }
 
@@ -437,7 +438,8 @@ function* submitUserMessageSaga(
       } catch (error) {
         console.log(`[DEBUG] submitUserMessageSaga: regeneration resolution failed:`, error);
         const errorMessage = error instanceof Error ? error.message : String(error);
-        yield put(setSessionError(createAppError.unknown(errorMessage)));
+        const appError = createAppError.unknown(errorMessage);
+        yield put(setSessionError(appError));
         // For regeneration, don't call cancelSubmission as there's no placeholder to clean up
         return; // Stop execution - don't proceed with chat API call
       }
@@ -491,7 +493,6 @@ function* submitUserMessageSaga(
   } catch (error) {
     console.log(`[DEBUG] submitUserMessageSaga: caught error in main catch block:`, error);
     const appError = toAppError(error);
-    console.log(`[DEBUG] submitUserMessageSaga: dispatching submitUserMessageFailure with error:`, appError);
     yield put(submitUserMessageFailure(appError));
   }
 }

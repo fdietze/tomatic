@@ -577,3 +577,49 @@ export async function waitForEvent(
   }
   throw new Error(`Timed out waiting for event "${eventName}"`);
 }
+
+/**
+ * A more robust way to wait for snippet regeneration to complete.
+ * It listens for the custom 'app:snippet:regeneration:complete' event.
+ * @param page The Playwright Page object.
+ * @param snippetName The name of the snippet to wait for.
+ * @param timeout The maximum time to wait in milliseconds.
+ */
+export async function waitForSnippetRegeneration(
+  page: Page,
+  snippetName: string,
+  timeout = 10000,
+): Promise<void> {
+  await page.evaluate(
+    ({ name, timeout: t }) => {
+      return new Promise<void>((resolve, reject) => {
+        const handler = (event: Event) => {
+          const customEvent = event as CustomEvent;
+          if (customEvent.detail.name === name) {
+            window.removeEventListener(
+              "app:snippet:regeneration:complete",
+              handler,
+            );
+            clearTimeout(timeoutId);
+            resolve();
+          }
+        };
+
+        const timeoutId = setTimeout(() => {
+          window.removeEventListener(
+            "app:snippet:regeneration:complete",
+            handler,
+          );
+          reject(
+            new Error(
+              `Timed out after ${t}ms waiting for snippet '${name}' to regenerate.`,
+            ),
+          );
+        }, t);
+
+        window.addEventListener("app:snippet:regeneration:complete", handler);
+      });
+    },
+    { name: snippetName, timeout },
+  );
+}

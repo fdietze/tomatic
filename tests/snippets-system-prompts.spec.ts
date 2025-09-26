@@ -3,9 +3,8 @@ import { ChatPage } from "./pom/ChatPage";
 import {
   expect,
   ChatCompletionMocker,
-  waitForEvent,
+  waitForSnippetRegeneration,
   seedLocalStorage,
-  seedIndexedDB,
   OPENROUTER_API_KEY,
 } from "./test-helpers";
 import { SettingsPage } from "./pom/SettingsPage";
@@ -81,7 +80,7 @@ test.describe("Snippet Usage in System Prompts", () => {
   });
 
   test.describe("when regenerating a response with an updated snippet", () => {
-    test.beforeEach(async ({ context, page }) => {
+    test.beforeEach(async ({ context }) => {
       await seedLocalStorage(context, {
         state: {
           apiKey: OPENROUTER_API_KEY,
@@ -105,6 +104,10 @@ test.describe("Snippet Usage in System Prompts", () => {
         "TestPrompt",
         "You are a @character.",
       );
+ 
+      // Go back to chat and ensure the prompt button is visible before clicking
+      await settingsPage.navigation.goBackToChat();
+      await expect(page.getByTestId("system-prompt-button-TestPrompt")).toBeVisible();
 
       // 2. Mock initial and regenerated responses
       chatMocker.mock({
@@ -145,7 +148,6 @@ test.describe("Snippet Usage in System Prompts", () => {
       await chatPage.expectMessage(2, "assistant", /Initial Response/);
 
       // 4. Update snippet via UI
-      const chatUrl = page.url(); // Store the chat URL
       await settingsPage.navigation.goToSettings();
       await settingsPage.startEditingSnippet("character");
       await settingsPage.fillSnippetForm("character", "fearsome pirate");
@@ -285,16 +287,43 @@ test.describe("Snippet Usage in System Prompts", () => {
       await responsePromise1;
       await chatPage.expectMessage(2, "assistant", /Initial Response/);
 
-      const chatUrl = page.url();
       await settingsPage.navigation.goToSettings();
       await settingsPage.startEditingSnippet("base_snippet");
       await settingsPage.fillSnippetForm("base_snippet", "v2");
       await settingsPage.saveSnippet();
 
-      await waitForEvent(page, "app:snippet:regeneration:batch:complete");
+      await waitForSnippetRegeneration(page, 'generated_snippet');
 
       // Navigate back to chat using UI navigation
       await settingsPage.navigation.goBackToChat();
+
+      const regenerateButton = chatPage
+        .getMessageLocator(2)
+        .getByTestId("regenerate-button");
+      await expect(regenerateButton).toBeVisible();
+
+      // The mock for the snippet regeneration (v1 -> v2)
+      chatMocker.mock({
+        request: {
+          model: "mock-model/mock-model",
+          messages: [{ role: "user", content: "generate from v2" }],
+          stream: false,
+        },
+        response: { role: "assistant", content: "generated from v2" },
+      });
+
+      // The mock for the chat regeneration, now expecting the updated content
+      chatMocker.mock({
+        request: {
+          model: "google/gemini-2.5-pro",
+          messages: [
+            { role: "system", content: "You are a generated from v2." },
+            { role: "user", content: "Hello" },
+          ],
+          stream: true,
+        },
+        response: { role: "assistant", content: "Regenerated Response." },
+      });
 
       const responsePromise2 = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",

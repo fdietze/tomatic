@@ -112,7 +112,7 @@ test.describe("System Prompt Interaction", () => {
         messages: [
           {
             role: "system",
-            content: "You are a master chef.", // Historical system prompt (not updated)
+            content: "You are a world-renowned French chef.", // Updated system prompt for regeneration
           },
           { role: "user", content: "Hello chef" },
           { role: "assistant", content: "Hello there!" }, // Historical assistant message
@@ -131,6 +131,9 @@ test.describe("System Prompt Interaction", () => {
     );
     await chatPage.regenerateMessage(2);
     await responsePromise;
+
+    // Add a short wait to allow the UI to process the streamed response
+    await page.waitForTimeout(500);
 
     // 10. Assert the UI now shows the new response
     await chatPage.expectMessage(2, "assistant", /Bonjour!/);

@@ -10,7 +10,7 @@ export type AppError =
   | { type: 'NETWORK_ERROR'; message: string; retryable: boolean }
   | { type: 'PERSISTENCE_ERROR'; operation: string; message: string }
   | { type: 'AUTHENTICATION_ERROR'; message: string }
-  | { type: 'UNKNOWN_ERROR'; message: string; originalError?: unknown };
+  | { type: 'UNKNOWN_ERROR'; message: string };
 
 /**
  * Result type for operations that can succeed or fail.
@@ -60,10 +60,11 @@ export const createAppError = {
     message,
   }),
   
-  unknown: (message: string, originalError?: unknown): AppError => ({
+  unknown: (message: string, _originalError?: unknown): AppError => ({
     type: 'UNKNOWN_ERROR',
     message,
-    originalError,
+    // Don't store the original error to avoid non-serializable values in Redux state
+    // originalError,
   }),
 };
 
@@ -93,7 +94,7 @@ export function getErrorMessage(error: AppError): string {
     case 'AUTHENTICATION_ERROR':
       return `Authentication Error: ${error.message}`;
     case 'UNKNOWN_ERROR':
-      return `Unknown Error: ${error.message}`;
+      return error.message;
     default:
       // This ensures exhaustiveness checking
       const _exhaustive: never = error;

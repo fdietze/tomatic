@@ -166,7 +166,6 @@ describe("sessionSaga", () => {
     expect(finalState.session.error).toEqual({
       type: 'UNKNOWN_ERROR',
       message: apiError.message,
-      originalError: apiError,
     });
   });
 

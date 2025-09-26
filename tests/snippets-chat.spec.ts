@@ -104,7 +104,7 @@ test.describe("Snippet Usage in Chat", () => {
         await chatPage.sendMessage("Hello @fake_snippet");
         await expect(
           chatPage.page.getByTestId("error-message").locator("p"),
-        ).toHaveText("Unknown Error: Snippet '@fake_snippet' not found.");
+        ).toHaveText("Snippet '@fake_snippet' not found.");
         await chatPage.expectMessageCount(0);
         chatMocker.verifyComplete();
       });
@@ -128,7 +128,7 @@ test.describe("Snippet Usage in Chat", () => {
         await chatPage.sendMessage("@cycle_self");
         await expect(
           chatPage.page.getByTestId("error-message").locator("p"),
-        ).toHaveText("Unknown Error: Snippet cycle detected: @cycle_self -> @cycle_self");
+        ).toHaveText("Snippet cycle detected: @cycle_self -> @cycle_self");
         await chatPage.expectMessageCount(0);
         chatMocker.verifyComplete();
       });
@@ -154,7 +154,7 @@ test.describe("Snippet Usage in Chat", () => {
         await expect(
           chatPage.page.getByTestId("error-message").locator("p"),
         ).toHaveText(
-          "Unknown Error: Snippet cycle detected: @cycle_a -> @cycle_b -> @cycle_a",
+          "Snippet cycle detected: @cycle_a -> @cycle_b -> @cycle_a",
         );
         await chatPage.expectMessageCount(0);
         chatMocker.verifyComplete();
