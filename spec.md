@@ -7,3 +7,8 @@
 - when waiting for individual snippets to finish, we'll identify them by id
 - an unresolved snippet should propagate an error.
 - tests should not use page.goto to navigate between pages (that would trigger reseeding the database state). page.goto is only allowed on initial page load. use clicks instead.
+
+## Message Editing and Regeneration Behavior
+
+- **Message Editing**: When a user edits a message and re-submits it, send only system prompt + new user message (discard old assistant response)
+- **Message Regeneration**: When regenerating an assistant message, send only context up to (but not including) the assistant message being regenerated
