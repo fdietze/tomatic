@@ -60,6 +60,7 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
           id: "system-prompt-display",
           role: "system" as const,
           content: systemPrompt.prompt,
+          raw_content: systemPrompt.prompt,
           timestamp: Date.now(),
         },
       ];

@@ -577,10 +577,13 @@ function* submitUserMessageSaga(
     try {
       while (true) {
         const event: ChatStreamEvent = yield take(channel);
+        console.log(`[DEBUG] submitUserMessageSaga: received streaming event:`, event);
 
         if ("chunk" in event) {
+          console.log(`[DEBUG] submitUserMessageSaga: processing chunk: "${event.chunk}"`);
           yield put(appendChunkToLatestMessage({ chunk: event.chunk }));
         } else if ("done" in event) {
+          console.log(`[DEBUG] submitUserMessageSaga: streaming complete, finalizing response`);
           yield put(
             submitUserMessageSuccess({ model: settings.modelName }),
           );

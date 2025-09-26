@@ -175,7 +175,7 @@ function* handleRegenerateSnippetSaga(
     console.log(`[DEBUG] handleRegenerateSnippetSaga: API request content:`, resolvedPrompt);
     const assistantResponse: string = yield call(() =>
       requestMessageContent(
-        [{ id: crypto.randomUUID(), role: "user", content: resolvedPrompt }],
+        [{ id: crypto.randomUUID(), role: "user", content: resolvedPrompt, raw_content: resolvedPrompt }],
         snippetToRegenerate.model!,
         settings.apiKey,
       ),

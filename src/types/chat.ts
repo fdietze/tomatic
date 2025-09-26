@@ -12,7 +12,7 @@ export interface Message {
   prompt_name?: string | null;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  raw_content?: string;
+  raw_content: string;
   model_name?: string | null;
   cost?: MessageCost | null;
   error?: AppError | null;
