@@ -498,7 +498,16 @@ function* submitUserMessageSaga(
     }
     
     // Then add non-system messages from the session
-    const nonSystemMessages = session.messages.filter(msg => msg.role !== 'system');
+    let nonSystemMessages = session.messages.filter(msg => msg.role !== 'system');
+    
+    // For regeneration, only include messages up to (but not including) the message being regenerated
+    if (isRegeneration && editMessageIndex !== undefined) {
+      // Convert editMessageIndex (which includes system message) to nonSystemMessages index
+      const systemMessageCount = session.messages.filter(msg => msg.role === 'system').length;
+      const nonSystemEditIndex = editMessageIndex - systemMessageCount;
+      nonSystemMessages = nonSystemMessages.slice(0, nonSystemEditIndex);
+    }
+    
     messagesToSubmit.push(...nonSystemMessages);
     
     console.log(`[DEBUG] submitUserMessageSaga: session.messages:`, session.messages.map((m, i) => ({ sessionIndex: i, role: m.role, content: m.content.substring(0, 30) + '...' })));
@@ -551,10 +560,8 @@ function* submitUserMessageSaga(
           message: { ...currentMessage, content: "" }
         }));
         
-        // CRITICAL FIX: For regeneration, we should NOT remove the assistant message from the API request
-        // The API expects the conversation history (user + assistant messages) for regeneration
-        console.log(`[DEBUG] submitUserMessageSaga: FIXED - keeping conversation history for regeneration API call`);
-        console.log(`[DEBUG] submitUserMessageSaga: messagesToSubmit will include the assistant message for API context`);
+        // OPTION 1 IMPLEMENTATION: For regeneration, we send only the context up to the user message
+        // This asks the model to "try again" with the same prompt, relying on temperature for variation
       }
     } else {
       // For new messages, add a new assistant placeholder

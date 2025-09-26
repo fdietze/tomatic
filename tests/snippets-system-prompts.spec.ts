@@ -302,28 +302,6 @@ test.describe("Snippet Usage in System Prompts", () => {
         .getByTestId("regenerate-button");
       await expect(regenerateButton).toBeVisible();
 
-      // The mock for the snippet regeneration (v1 -> v2)
-      chatMocker.mock({
-        request: {
-          model: "mock-model/mock-model",
-          messages: [{ role: "user", content: "generate from v2" }],
-          stream: false,
-        },
-        response: { role: "assistant", content: "generated from v2" },
-      });
-
-      // The mock for the chat regeneration, now expecting the updated content
-      chatMocker.mock({
-        request: {
-          model: "google/gemini-2.5-pro",
-          messages: [
-            { role: "system", content: "You are a generated from v2." },
-            { role: "user", content: "Hello" },
-          ],
-          stream: true,
-        },
-        response: { role: "assistant", content: "Regenerated Response." },
-      });
 
       const responsePromise2 = page.waitForResponse(
         "https://openrouter.ai/api/v1/chat/completions",

@@ -114,8 +114,7 @@ test.describe("System Prompt Interaction", () => {
             role: "system",
             content: "You are a world-renowned French chef.", // Updated system prompt for regeneration
           },
-          { role: "user", content: "Hello chef" },
-          { role: "assistant", content: "Hello there!" }, // Historical assistant message
+          { role: "user", content: "Hello chef" }
         ],
         stream: true,
       },

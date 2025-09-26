@@ -82,8 +82,7 @@ test.describe("Chat Regeneration with Snippets", () => {
       request: {
         model: "google/gemini-2.5-pro",
         messages: [
-          { role: "user", content: "UPDATED GREETING world" },
-          { role: "assistant", content: "Initial response" }
+          { role: "user", content: "UPDATED GREETING world" }
         ],
         stream: true,
       },

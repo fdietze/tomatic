@@ -130,8 +130,7 @@ test.describe("Chat Interaction", () => {
         request: {
           model: "google/gemini-2.5-pro",
           messages: [
-            { role: "user" as const, content: "Initial message" },
-            { role: "assistant" as const, content: "Hello!" }
+            { role: "user" as const, content: "Initial message" }
           ],
           stream: true,
         },
