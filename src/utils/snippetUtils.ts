@@ -1,6 +1,7 @@
 import type { Snippet } from '@/types/storage';
 
 /**
+ * req:snippet-id-vs-name, req:snippet-error-propagation, req:cycle-detection
  * Resolves snippets in a given text, handling recursion and cycle detection.
  * @param text The text to resolve snippets in.
  * @param allSnippets A list of all available snippets.

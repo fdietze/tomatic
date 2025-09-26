@@ -111,7 +111,7 @@ function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
   }
 }
 
-// Helper saga to create and save a new session from the current state
+// req:auto-save-new-chat: Helper saga to create and save a new session from the current state
 function* createAndSaveNewSessionSaga(): SagaIterator<string> {
   console.log(`[DEBUG] createAndSaveNewSessionSaga: starting session creation`);
   
@@ -339,6 +339,7 @@ type SnippetCompletionAction = {
   payload: { name: string; error?: string };
 };
 
+// req:message-edit-fork, req:regenerate-context, req:snippet-wait-before-submit
 function* submitUserMessageSaga(
   action: PayloadAction<{
     prompt: string;
@@ -350,7 +351,7 @@ function* submitUserMessageSaga(
     const { isRegeneration, prompt, editMessageIndex } = action.payload;
     console.log(`[DEBUG] submitUserMessageSaga: started with prompt="${prompt}", isRegeneration=${isRegeneration}, editMessageIndex=${editMessageIndex}`);
 
-    // --- Await Dirty Snippets ---
+    // req:snippet-wait-before-submit: --- Await Dirty Snippets ---
     const { snippets: allSnippets }: { snippets: Snippet[] } = yield select(
       (state: RootState) => state.snippets,
     );
@@ -421,6 +422,7 @@ function* submitUserMessageSaga(
         try {
           const resolvedContent: string = yield call(resolveSnippets, prompt, snippets.snippets);
           console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
+          // req:raw-content-preservation: Store raw content alongside resolved content
           const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
           yield put(updateUserMessage({ index: editMessageIndex, message: updatedMessage }));
         } catch (error) {
@@ -463,7 +465,7 @@ function* submitUserMessageSaga(
       }
     }
 
-    // --- Auto-save new chat sessions ---
+    // req:auto-save-new-chat: --- Auto-save new chat sessions ---
     // Check if we need to create a new session (after the user message is added to state)
     const { session: currentSession }: RootState = yield select(
       (state: RootState) => state,
@@ -560,7 +562,7 @@ function* submitUserMessageSaga(
           message: { ...currentMessage, content: "" }
         }));
         
-        // OPTION 1 IMPLEMENTATION: For regeneration, we send only the context up to the user message
+        // req:regenerate-context: OPTION 1 IMPLEMENTATION: For regeneration, we send only the context up to the user message
         // This asks the model to "try again" with the same prompt, relying on temperature for variation
       }
     } else {

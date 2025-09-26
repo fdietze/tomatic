@@ -16,7 +16,7 @@ const initialState: AppState = {
   activeChatSessionId: null,
   sidebarOpen: true,
   isMaximized: false,
-  isBatchRegenerating: false,
+  isBatchRegenerating: false, // req:global-loading-spinner: Track global batch regeneration state
   initializationError: null,
 };
 
@@ -45,6 +45,7 @@ export const appSlice = createSlice({
     setIsMaximized: (state, action: PayloadAction<boolean>) => {
       state.isMaximized = action.payload;
     },
+    // req:global-loading-spinner: Action to set global batch regeneration state
     setBatchRegenerating: (state, action: PayloadAction<boolean>) => {
       state.isBatchRegenerating = action.payload;
     },
