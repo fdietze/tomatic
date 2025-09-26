@@ -132,6 +132,8 @@ export async function requestMessageContentStream(
   };
 
   console.log('[DEBUG] requestMessageContentStream: API request body:', JSON.stringify(body, null, 2));
+  console.log('[DEBUG] requestMessageContentStream: input messages count:', messages.length);
+  console.log('[DEBUG] requestMessageContentStream: input messages details:', messages.map(m => ({ role: m.role, content: m.content.substring(0, 50) + (m.content.length > 50 ? '...' : '') })));
   const openai = getOpenAIClient(apiKey);
 
   try {

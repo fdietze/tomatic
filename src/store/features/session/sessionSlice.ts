@@ -5,6 +5,8 @@ import { RootState } from "../../store";
 import { AppError } from "@/types/errors";
 import {
   LoadSessionSuccessPayload,
+  SessionCreatedSuccessPayload,
+  SessionUpdatedPayload,
   SendMessageRequestPayload,
   EditMessageRequestPayload,
   RegenerateResponseRequestPayload,
@@ -56,6 +58,28 @@ export const sessionSlice = createSlice({
       state.prevSessionId = action.payload.prevId;
       state.nextSessionId = action.payload.nextId;
       console.log(`[DEBUG] sessionSlice.loadSessionSuccess: state now has ${state.messages.length} messages`);
+    },
+    sessionCreatedSuccess: (
+      state,
+      action: PayloadAction<SessionCreatedSuccessPayload>,
+    ) => {
+      console.log(`[DEBUG] sessionSlice.sessionCreatedSuccess: setting ${action.payload.messages.length} messages for new session ${action.payload.sessionId}`);
+      state.loading = "idle";
+      state.currentSessionId = action.payload.sessionId;
+      state.messages = action.payload.messages;
+      state.prevSessionId = action.payload.prevId;
+      state.nextSessionId = action.payload.nextId;
+      state.hasSessions = true; // A new session now exists
+      console.log(`[DEBUG] sessionSlice.sessionCreatedSuccess: state now has session ${state.currentSessionId} with ${state.messages.length} messages`);
+    },
+
+    sessionUpdated: (
+      state,
+      action: PayloadAction<SessionUpdatedPayload>,
+    ) => {
+      console.log(`[DEBUG] sessionSlice.sessionUpdated: session ${action.payload.sessionId} updated in database`);
+      // This is just a confirmation that the session was updated in the database
+      // No state changes needed since the messages are already in Redux state
     },
     loadSessionFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = "failed";
@@ -272,6 +296,8 @@ export const sessionSlice = createSlice({
 export const {
   loadSession,
   loadSessionSuccess,
+  sessionCreatedSuccess,
+  sessionUpdated,
   loadSessionFailure,
   loadInitialSessionSaga,
   startNewSession,

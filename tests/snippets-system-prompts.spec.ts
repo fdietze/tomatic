@@ -146,7 +146,7 @@ test.describe("Snippet Usage in System Prompts", () => {
       await chatPage.sendMessage("Hello");
       await responsePromise1;
       await chatPage.expectMessage(2, "assistant", /Initial Response/);
-
+      
       // 4. Update snippet via UI
       await settingsPage.navigation.goToSettings();
       await settingsPage.startEditingSnippet("character");
