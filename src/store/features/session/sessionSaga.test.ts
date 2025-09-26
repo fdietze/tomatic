@@ -173,10 +173,10 @@ describe("sessionSaga", () => {
     // Purpose: This test verifies that editing a user message correctly truncates
     // the chat history and resubmits the conversation from that point.
     const initialMessages: Message[] = [
-      { id: "1", role: "user", content: "Initial Message" },
-      { id: "2", role: "assistant", content: "Initial Response" },
-      { id: "3", role: "user", content: "Second Message" },
-      { id: "4", role: "assistant", content: "Second Response" },
+      { id: "1", role: "user", content: "Initial Message", raw_content: "Initial Message" },
+      { id: "2", role: "assistant", content: "Initial Response", raw_content: "Initial Response" },
+      { id: "3", role: "user", content: "Second Message", raw_content: "Second Message" },
+      { id: "4", role: "assistant", content: "Second Response", raw_content: "Second Response" },
     ];
     const store = createTestStore({
       session: {

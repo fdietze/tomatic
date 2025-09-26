@@ -202,7 +202,7 @@ export async function seedIndexedDB(
           storeName: "chat_sessions",
           keyPath: "session_id",
           indexes: [{ name: "updated_at_ms", keyPath: "updated_at_ms" }],
-          data: data.chat_sessions || [],
+          data: (data.chat_sessions || []) as ChatSession[],
         },
         {
           storeName: "system_prompts",
@@ -495,6 +495,7 @@ export class ChatCompletionMocker {
       });
     } else {
       const isStreaming = requestBody.stream === true;
+      console.log(`[DEBUG] ChatCompletionMocker: generating response, isStreaming: ${isStreaming}, content: "${nextMock.response.content}"`);
 
       const responseBody = isStreaming
         ? createStreamResponse(
@@ -508,11 +509,13 @@ export class ChatCompletionMocker {
           nextMock.response.role,
         );
 
+      console.log(`[DEBUG] ChatCompletionMocker: fulfilling response with ${isStreaming ? 'streaming' : 'non-streaming'} body`);
       await route.fulfill({
         status: 200,
         headers: { "Content-Type": "application/json; charset=utf-8" },
         body: responseBody,
       });
+      console.log(`[DEBUG] ChatCompletionMocker: response fulfilled successfully`);
     }
   }
 

@@ -18,6 +18,7 @@ export const messageSchema = z.object({
   error: z.string().nullable().optional(),
 }).transform((data): import('@/types/chat').Message => ({
   ...data,
+  raw_content: data.raw_content || data.content, // Ensure raw_content is always present
   error: data.error 
     ? createAppError.unknown(data.error) 
     : null,

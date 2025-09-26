@@ -158,8 +158,15 @@ export const sessionSlice = createSlice({
       console.log(`[DEBUG] sessionSlice.submitUserMessage: after - ${state.messages.length} messages`);
     },
     updateUserMessage: (state, action: PayloadAction<UpdateUserMessagePayload>) => {
-      if (state.messages[action.payload.index]) {
+      console.log(`[DEBUG] updateUserMessage: updating message at index ${action.payload.index}`);
+      console.log(`[DEBUG] updateUserMessage: new message:`, { role: action.payload.message.role, content: action.payload.message.content.substring(0, 30) + '...' });
+      const oldMessage = state.messages[action.payload.index];
+      if (oldMessage) {
+        console.log(`[DEBUG] updateUserMessage: old message:`, { role: oldMessage.role, content: oldMessage.content.substring(0, 30) + '...' });
         state.messages[action.payload.index] = action.payload.message;
+        console.log(`[DEBUG] updateUserMessage: message updated successfully`);
+      } else {
+        console.log(`[DEBUG] updateUserMessage: WARNING - no message found at index ${action.payload.index}`);
       }
     },
     addAssistantMessagePlaceholder: (state) => {
@@ -167,6 +174,7 @@ export const sessionSlice = createSlice({
         id: nanoid(),
         role: "assistant",
         content: "",
+        raw_content: "",
       });
     },
     addSystemMessage: (state, action: PayloadAction<Message>) => {
@@ -214,9 +222,29 @@ export const sessionSlice = createSlice({
       state,
       action: PayloadAction<AppendChunkPayload>,
     ) => {
+      console.log(`[DEBUG] appendChunkToLatestMessage: received chunk: "${action.payload.chunk}"`);
       const lastMessage = state.messages[state.messages.length - 1];
+
       if (lastMessage?.role === "assistant") {
-        lastMessage.content += action.payload.chunk;
+        const isFirstChunk = lastMessage.content === "";
+        const newChunk = action.payload.chunk;
+
+        console.log(`[DEBUG] appendChunkToLatestMessage: isFirstChunk: ${isFirstChunk}, lastMessage id: ${lastMessage.id}`);
+        
+        // For assistant messages, content and raw_content must be kept in sync.
+        if (isFirstChunk) {
+          // On the first chunk, we overwrite any stale data from a previous run.
+          lastMessage.content = newChunk;
+          lastMessage.raw_content = newChunk;
+          console.log(`[DEBUG] appendChunkToLatestMessage: initialized both fields to: "${newChunk}"`);
+        } else {
+          // On subsequent chunks, we append to both.
+          lastMessage.content += newChunk;
+          lastMessage.raw_content += newChunk;
+          console.log(`[DEBUG] appendChunkToLatestMessage: appended to both fields, new content: "${lastMessage.content}"`);
+        }
+      } else {
+        console.log(`[DEBUG] appendChunkToLatestMessage: WARNING - no assistant message found to append to`);
       }
     },
     submitUserMessageSuccess: (
