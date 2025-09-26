@@ -18,6 +18,7 @@ import {
   loadSession,
   setSessionError,
   setSystemPromptRequested,
+  setSelectedPromptName as setSessionSelectedPromptName,
 } from "@/store/features/session/sessionSlice";
 
 const ChatPage: React.FC = () => {
@@ -25,7 +26,7 @@ const ChatPage: React.FC = () => {
   const { sessionId: sessionIdFromUrl } = useParams<{ sessionId: string }>();
 
   // --- Redux State ---
-  const { selectedPromptName } = useSelector(selectSettings);
+  const { selectedPromptName: globalSelectedPromptName } = useSelector(selectSettings);
   const { prompts: systemPromptsMap } = useSelector(selectPrompts);
   const {
     prevSessionId,
@@ -33,7 +34,11 @@ const ChatPage: React.FC = () => {
     error,
     currentSessionId,
     hasSessions,
+    selectedPromptName: sessionSelectedPromptName,
   } = useSelector(selectSession);
+  
+  // Use session-specific prompt if available, otherwise fall back to global setting
+  const selectedPromptName = sessionSelectedPromptName ?? globalSelectedPromptName;
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
     if (!selectedPromptName) return undefined;
@@ -69,10 +74,12 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  const systemPromptEntities = useMemo(
-    () => Object.values(systemPromptsMap),
-    [systemPromptsMap],
-  );
+  const systemPromptEntities = useMemo(() => {
+    const entities = Object.values(systemPromptsMap);
+    console.log(`[DEBUG] ChatPage.systemPromptEntities: computed ${entities.length} entities`);
+    console.log(`[DEBUG] ChatPage.systemPromptEntities: entity names:`, entities.map(e => e.data.name));
+    return entities;
+  }, [systemPromptsMap]);
 
   const handleErrorClear = (): void => {
     dispatch(setSessionError(null));
@@ -90,11 +97,20 @@ const ChatPage: React.FC = () => {
           systemPrompts={systemPromptEntities}
           selectedPromptName={selectedPromptName}
           onSelectPrompt={(name) => {
+            console.log(`[DEBUG] ChatPage.onSelectPrompt: called with name: "${name}"`);
+            console.log(`[DEBUG] ChatPage.onSelectPrompt: current selectedPromptName: "${selectedPromptName}"`);
+            console.log(`[DEBUG] ChatPage.onSelectPrompt: systemPromptEntities count: ${systemPromptEntities.length}`);
+            
+            // Update both session-specific and global settings
+            dispatch(setSessionSelectedPromptName(name));
             dispatch(setSelectedPromptName(name));
+            
             const selectedPromptEntity = systemPromptEntities.find(
               (entity) => entity.data.name === name,
             );
+            console.log(`[DEBUG] ChatPage.onSelectPrompt: found selectedPromptEntity: ${!!selectedPromptEntity}`);
             if (selectedPromptEntity) {
+              console.log(`[DEBUG] ChatPage.onSelectPrompt: dispatching setSystemPromptRequested for: ${selectedPromptEntity.data.name}`);
               dispatch(setSystemPromptRequested(selectedPromptEntity.data));
             }
           }}

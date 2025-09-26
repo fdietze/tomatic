@@ -280,16 +280,20 @@ export async function seedIndexedDB(
         };
 
         state.indexedDB.stores.forEach((storeInfo) => {
+          console.log(`[DEBUG] Seeding store: ${storeInfo.storeName} with ${storeInfo.data.length} items`);
           if (storeInfo.data.length > 0) {
             const store = tx.objectStore(storeInfo.storeName);
-            storeInfo.data.forEach((item) => {
+            storeInfo.data.forEach((item, index) => {
+              console.log(`[DEBUG] Seeding item ${index} in ${storeInfo.storeName}:`, item);
               promises.push(
                 new Promise((resolvePut, rejectPut) => {
                   const putRequest = store.put(item);
                   putRequest.onsuccess = () => {
+                    console.log(`[DEBUG] Successfully seeded item ${index} in ${storeInfo.storeName}`);
                     resolvePut(putRequest.result);
                   };
                   putRequest.onerror = () => {
+                    console.log(`[DEBUG] Failed to seed item ${index} in ${storeInfo.storeName}:`, putRequest.error);
                     rejectPut(new Error(putRequest.error?.message));
                   };
                 }),

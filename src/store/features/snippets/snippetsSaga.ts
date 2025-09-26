@@ -154,10 +154,16 @@ function* handleRegenerateSnippetSaga(
 
     // If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
+      console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt is empty for ${snippetToRegenerate.name}, skipping generation`);
       yield put(regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: "" }));
+      console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event for empty prompt`);
+      window.dispatchEvent(
+        new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
+      );
+      console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event for empty prompt`);
       window.dispatchEvent(
         new CustomEvent("app:snippet:regeneration:complete", {
-          detail: { id: snippetId },
+          detail: { id: snippetId, name: snippetToRegenerate.name },
         }),
       );
       return;
@@ -179,8 +185,15 @@ function* handleRegenerateSnippetSaga(
     yield put(
       regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: assistantResponse }),
     );
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event`);
     window.dispatchEvent(
       new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
+    );
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event`);
+    window.dispatchEvent(
+      new CustomEvent("app:snippet:regeneration:complete", {
+        detail: { id: snippetId, name: snippetToRegenerate.name },
+      }),
     );
   } catch (error) {
     console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
@@ -201,6 +214,12 @@ function* handleRegenerateSnippetSaga(
     const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, errorMessage);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, getErrorMessage(appError));
     yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: appError }));
+    
+    // Dispatch failure event for batch orchestrator
+    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:failure:${snippetId} event`);
+    window.dispatchEvent(
+      new CustomEvent(`app:snippet:regeneration:failure:${snippetId}`)
+    );
   } finally {
     yield put({ type: "app/setBatchRegenerating", payload: false });
   }
@@ -240,6 +259,14 @@ function* markDependentsDirtySaga(
   }
 
   if (dependentsToUpdate.length > 0) {
+    // Check for cycles before starting regeneration
+    const { cyclic } = topologicalSort(allSnippets);
+    if (cyclic.length > 0) {
+      console.log("[DEBUG] [validateSnippetDependencies] Cycle detected in snippet dependencies:", cyclic.length);
+      // Don't start regeneration if there's a cycle
+      return;
+    }
+    
     yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
   }
 }
@@ -267,9 +294,6 @@ function* batchRegenerationOrchestratorSaga(
 ) {
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with snippets", action.payload.snippets.map(s => s.name));
   const { snippets } = action.payload;
-  /*const allSnippets: Snippet[] = yield select(
-    (state: RootState) => state.snippets.snippets,
-  );*/
 
   const { sorted, cyclic } = topologicalSort(snippets);
 
@@ -281,15 +305,65 @@ function* batchRegenerationOrchestratorSaga(
   const batches = groupSnippetsIntoBatches(sorted);
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
 
+  const failedSnippets = new Set<string>();
+
   for (const batch of batches) {
+    // Check if any snippet in this batch depends on a failed snippet
+    const shouldSkipBatch = batch.some(snippet => {
+      // Extract dependencies from the snippet's prompt
+      const dependencies = (snippet.prompt || '').match(/@(\w+)/g) || [];
+      return dependencies.some(dep => {
+        const depName = dep.substring(1); // Remove @ prefix
+        return failedSnippets.has(depName);
+      });
+    });
+
+    if (shouldSkipBatch) {
+      // Fail all snippets in this batch with upstream dependency error
+      console.log("[DEBUG] batchRegenerationOrchestratorSaga: skipping batch due to failed dependencies:", batch.map(s => s.name));
+      for (const snippet of batch) {
+        const dependencies = (snippet.prompt || '').match(/@(\w+)/g) || [];
+        const failedDep = dependencies.find(dep => {
+          const depName = dep.substring(1);
+          return failedSnippets.has(depName);
+        });
+        
+        if (failedDep) {
+          const depName = failedDep.substring(1);
+          const error = createAppError.snippetRegeneration(
+            snippet.name,
+            `Upstream dependency @${depName} failed to generate.`
+          );
+          yield put(regenerateSnippetFailure({ 
+            id: snippet.id, 
+            name: snippet.name, 
+            error 
+          }));
+          failedSnippets.add(snippet.name);
+        }
+      }
+      continue;
+    }
+
+    // Process the batch normally
     const regenerationPromises = batch.map((snippet: Snippet) => {
-      const promise = new Promise<void>((resolve) => {
-        const eventName = `app:snippet:regeneration:complete:${snippet.id}`;
-        const handleCompletion = () => {
-          window.removeEventListener(eventName, handleCompletion);
-          resolve();
+      const promise = new Promise<{ success: boolean; snippet: Snippet }>((resolve) => {
+        const successEventName = `app:snippet:regeneration:complete:${snippet.id}`;
+        const handleSuccess = () => {
+          window.removeEventListener(successEventName, handleSuccess);
+          window.removeEventListener(failureEventName, handleFailure);
+          resolve({ success: true, snippet });
         };
-        window.addEventListener(eventName, handleCompletion);
+        
+        const failureEventName = `app:snippet:regeneration:failure:${snippet.id}`;
+        const handleFailure = () => {
+          window.removeEventListener(successEventName, handleSuccess);
+          window.removeEventListener(failureEventName, handleFailure);
+          resolve({ success: false, snippet });
+        };
+        
+        window.addEventListener(successEventName, handleSuccess);
+        window.addEventListener(failureEventName, handleFailure);
       });
       return { promise, snippet };
     });
@@ -298,7 +372,15 @@ function* batchRegenerationOrchestratorSaga(
       regenerationPromises.map(({ snippet }) => put(regenerateSnippet(snippet))),
     );
 
-    yield all(regenerationPromises.map(({ promise }) => call(() => promise)));
+    const results: Array<{ success: boolean; snippet: Snippet }> = yield all(regenerationPromises.map(({ promise }) => call(() => promise)));
+    
+    // Check for failures in this batch
+    for (const result of results) {
+      if (!result.success) {
+        failedSnippets.add(result.snippet.name);
+        console.log("[DEBUG] batchRegenerationOrchestratorSaga: snippet failed:", result.snippet.name);
+      }
+    }
   }
   window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
 }

@@ -19,7 +19,7 @@ export const networkSecurityTest = base.extend({
       // Our test-specific mocks for openrouter.ai should have already handled API calls.
       // If a request reaches this point, it means it's an unmocked external call,
       // which we should block.
-      return route.abort('blockedbytest');
+      return route.abort('failed');
     });
     await use(context);
   },

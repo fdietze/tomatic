@@ -38,6 +38,7 @@ export const promptsSlice = createSlice({
     },
     loadPromptsSuccess: (state, action: PayloadAction<SystemPrompt[]>) => {
       state.loading = "idle";
+      console.log('[DEBUG] promptsSlice.loadPromptsSuccess: received prompts:', action.payload.map(p => ({ name: p.name, prompt: p.prompt })));
       state.prompts = action.payload.reduce(
         (acc: { [name: string]: PromptEntity }, prompt) => {
           acc[prompt.name] = {
@@ -49,6 +50,7 @@ export const promptsSlice = createSlice({
         },
         {},
       );
+      console.log('[DEBUG] promptsSlice.loadPromptsSuccess: state.prompts after update:', Object.keys(state.prompts));
     },
     loadPromptsFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = "failed";
@@ -60,11 +62,16 @@ export const promptsSlice = createSlice({
     },
     addPromptSuccess: (state, action: PayloadAction<SystemPrompt>) => {
       const newPrompt = action.payload;
+      console.log('[DEBUG] promptsSlice.addPromptSuccess: adding prompt:', newPrompt.name);
+      console.log('[DEBUG] promptsSlice.addPromptSuccess: prompt content:', newPrompt.prompt);
+      console.log('[DEBUG] promptsSlice.addPromptSuccess: prompt data:', newPrompt);
       state.prompts[newPrompt.name] = {
         data: newPrompt,
         status: "idle",
         error: null,
       };
+      console.log('[DEBUG] promptsSlice.addPromptSuccess: state.prompts after add:', Object.keys(state.prompts));
+      console.log('[DEBUG] promptsSlice.addPromptSuccess: full prompts state:', Object.values(state.prompts).map(p => ({ name: p.data.name, prompt: p.data.prompt })));
     },
     addPromptFailure: (
       _state,
