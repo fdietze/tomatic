@@ -36,7 +36,7 @@ export const settingsSlice = createSlice({
       return {
         ...state,
         ...action.payload,
-        loading: "idle",
+        loading: "idle" as const,
       };
     },
     loadSettingsFailure: (state) => {
