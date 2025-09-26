@@ -68,6 +68,7 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
     return session.messages;
   }, [session.messages, systemPrompt]);
 
+  // req:model-selection: Handle model selection change
   const handleModelChange = (newModel: string) => {
     dispatch(setModelName(newModel));
     dispatch(saveSettings({}));

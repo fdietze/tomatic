@@ -137,7 +137,7 @@ export const testWithAutoInit = test.extend<TestFixtures>({
 		hasNavigatedInitially = true;
 		await waitForEvent(page, "app_initialized");
 		
-		// Override page.goto to prevent accidental navigation after initialization
+		// req:test-no-page-goto: Override page.goto to prevent accidental navigation after initialization
 		const originalGoto = page.goto.bind(page);
 		page.goto = async (url: string | URL, options?: Parameters<typeof originalGoto>[1]) => {
 			if (hasNavigatedInitially) {

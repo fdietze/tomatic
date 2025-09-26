@@ -12,17 +12,18 @@ export interface DisplayModelInfo {
   completion_cost_usd_pm: number | null;
 }
 
+// req:snippet-id-vs-name, req:snippet-dirty-indexeddb, req:snippet-error-propagation
 export interface Snippet {
-  id: string;
-  name: string;
+  id: string; // req:snippet-id-vs-name: Primary key for identification
+  name: string; // req:snippet-id-vs-name: Unique name for referencing
   content: string;
   isGenerated: boolean; // Must be a required boolean
   prompt?: string;
   model?: string;
   createdAt_ms: number;
   updatedAt_ms: number;
-  generationError: AppError | null;
-  isDirty: boolean;
+  generationError: AppError | null; // req:snippet-error-propagation: Store generation errors
+  isDirty: boolean; // req:snippet-dirty-indexeddb: Flag for resuming generation on reload
 }
 
 // ================================================================================================

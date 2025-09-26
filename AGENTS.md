@@ -1,5 +1,10 @@
 # User requests
-- for every user request (feature request, bug report, etc), see if we can develop it in a test-driven way. What exactly needs to be tested? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests?
+- for every user request (feature request, bug report, etc), see if we can develop it in a test-driven way. What exactly needs to be tested? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests? extend @requirements.md if it extends or changes requirements.
+
+# Requirement Traceability
+- the code and documentation has comments like "// req:a-requierement" everywhere. Use grep to find other references.
+- when writing new code, extend @requirements.md and comments in the code accordingly
+
 
 # Validating Changes
 

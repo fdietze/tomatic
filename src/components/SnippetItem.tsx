@@ -24,6 +24,7 @@ interface SnippetItemProps {
   onCancel?: () => void;
 }
 
+// req:name-validation: Snippet names must contain only alphanumeric characters and underscores
 const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
 
 const SnippetItem: React.FC<SnippetItemProps> = ({
@@ -106,16 +107,19 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     const newName = e.target.value;
     setEditingName(newName);
 
+    // req:name-required: Name cannot be empty
     if (newName.trim() === '') {
       setNameError('Name cannot be empty.');
       return;
     }
 
+    // req:name-validation: Name can only contain alphanumeric characters and underscores
     if (!NAME_REGEX.test(newName)) {
       setNameError('Name can only contain alphanumeric characters and underscores.');
       return;
     }
 
+    // req:name-uniqueness: Names must be unique (case-insensitive)
     const isDuplicate = allSnippets.some(
       (s) => s.name.trim().toLowerCase() === newName.trim().toLowerCase() && s.id !== snippet.id
     );
@@ -209,6 +213,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
             </label>
           </div>
 
+          {/* req:generated-snippet-ui: Show generated snippet fields when checkbox is checked */}
           {editingIsGenerated && (
             <>
               <Combobox
@@ -312,6 +317,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       <div className="system-prompt-header">
         <span className="system-prompt-name">
           {snippet.name}
+          {/* req:error-warning-sign: Show warning for cyclic dependencies */}
           {isCyclic && (
             <span 
               className="cycle-warning-icon" 
@@ -354,6 +360,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
                   </div>
                 );
               case 'in_progress':
+                // req:dirty-loading-indicator: Show loading indicator for dirty/regenerating snippets
                 return <span className="spinner" data-testid="regenerating-spinner" />;
               default:
                 assertUnreachable(status);
@@ -368,6 +375,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         const regenerationError = regenerationStatus[snippet.id]?.error;
         const persistedError = snippet.generationError;
         
+        // req:error-warning-sign: Show error messages for failed generation
         if (regenerationError) {
           // For snippet regeneration errors, extract just the core error message
           let errorMessage: string;

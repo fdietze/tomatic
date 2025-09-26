@@ -137,6 +137,7 @@ export async function requestMessageContentStream(
   const openai = getOpenAIClient(apiKey);
 
   try {
+    // req:chat-stream-true: Chat requests use streaming
     return await openai.chat.completions.create({
       model: body.model,
       messages: body.messages,
@@ -163,6 +164,7 @@ export async function requestMessageContent(
   const openai = getOpenAIClient(apiKey);
 
   try {
+    // req:chat-stream-true: Snippet requests use non-streaming (stream=false)
     const completion = await openai.chat.completions.create({
       model: body.model,
       messages: body.messages,

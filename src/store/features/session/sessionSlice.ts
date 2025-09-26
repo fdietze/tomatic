@@ -113,6 +113,7 @@ export const sessionSlice = createSlice({
     },
 
     /** @deprecated Use specific command actions instead */
+    // req:message-edit-fork, req:regenerate-context
     submitUserMessage: (
       state,
       action: PayloadAction<{
@@ -133,11 +134,11 @@ export const sessionSlice = createSlice({
       ) {
         if (isRegeneration) {
           console.log(`[DEBUG] sessionSlice.submitUserMessage: regeneration - splicing from index ${editMessageIndex + 1}, removing ${state.messages.length - editMessageIndex - 1} messages`);
-          // For regeneration, keep the message at editMessageIndex and remove only messages after it
+          // req:regenerate-context: For regeneration, keep the message at editMessageIndex and remove only messages after it
           state.messages.splice(editMessageIndex + 1);
         } else {
           console.log(`[DEBUG] sessionSlice.submitUserMessage: edit - splicing from index ${editMessageIndex}, removing ${state.messages.length - editMessageIndex} messages`);
-          // For editing, remove the message at editMessageIndex and all messages after it
+          // req:message-edit-fork: For editing, remove the message at editMessageIndex and all messages after it
           state.messages.splice(editMessageIndex);
         }
       }

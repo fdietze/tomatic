@@ -115,6 +115,7 @@ function openTomaticDB(): Promise<{
             void cursor.continue().then(migrate);
           });
       }
+      // req:database-migrations: V3 introduces snippets
       if (oldVersion < 3) {
         // V3 introduces snippets. If the store exists from a pre-release version keyed by name,
         // we need to rebuild it to be keyed by a new `id` field.
@@ -130,14 +131,15 @@ function openTomaticDB(): Promise<{
             newStore.createIndex(SNIPPET_NAME_INDEX, "name", { unique: true });
             const now = Date.now();
             oldSnippets.forEach((oldSnippet) => {
-              const newSnippet: Snippet = {
-                id: crypto.randomUUID(),
-                ...oldSnippet,
-                createdAt_ms: now,
-                updatedAt_ms: now,
-                generationError: null,
-                isDirty: false,
-              };
+            // req:snippet-dirty-indexeddb: Snippets have isDirty flag for resuming generation
+            const newSnippet: Snippet = {
+              id: crypto.randomUUID(),
+              ...oldSnippet,
+              createdAt_ms: now,
+              updatedAt_ms: now,
+              generationError: null,
+              isDirty: false,
+            };
               void newStore.put(newSnippet);
             });
           } else {
@@ -146,7 +148,7 @@ function openTomaticDB(): Promise<{
           }
         };
 
-        // The migration logic is now wrapped in a promise to ensure it completes
+        // req:migration-events: The migration logic is now wrapped in a promise to ensure it completes
         // before the transaction is automatically committed.
         void migrationLogic().then(() => {
           dispatchEvent("db_migration_complete", { from: 2, to: 3 });

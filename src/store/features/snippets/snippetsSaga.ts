@@ -22,6 +22,7 @@ import {
   batchRegenerateRequest,
   awaitableRegenerateRequest,
 } from "./snippetsSlice";
+import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
 import { RootState } from "../../store";
 import {
   buildReverseDependencyGraph,
@@ -97,6 +98,7 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
   }
 }
 
+// req:snippet-wait-individual, req:snippet-error-propagation
 function* handleRegenerateSnippetSaga(
   action: PayloadAction<Snippet>,
 ) {
@@ -152,7 +154,7 @@ function* handleRegenerateSnippetSaga(
     );
     console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt for ${snippetToRegenerate.name}:`, resolvedPrompt);
 
-    // If the prompt is empty, we don't need to do anything else.
+    // req:empty-prompt-handling: If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
       console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt is empty for ${snippetToRegenerate.name}, skipping generation`);
       yield put(regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: "" }));
@@ -185,16 +187,17 @@ function* handleRegenerateSnippetSaga(
     yield put(
       regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: assistantResponse }),
     );
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event`);
-    window.dispatchEvent(
-      new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
-    );
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event`);
-    window.dispatchEvent(
-      new CustomEvent("app:snippet:regeneration:complete", {
-        detail: { id: snippetId, name: snippetToRegenerate.name },
-      }),
-    );
+  // req:snippet-wait-by-id: Dispatch events for individual snippet waiting by ID
+  console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event`);
+  window.dispatchEvent(
+    new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
+  );
+  console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event`);
+  window.dispatchEvent(
+    new CustomEvent("app:snippet:regeneration:complete", {
+      detail: { id: snippetId, name: snippetToRegenerate.name },
+    }),
+  );
   } catch (error) {
     console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: error type:`, typeof error);
@@ -225,6 +228,7 @@ function* handleRegenerateSnippetSaga(
   }
 }
 
+// req:transitive-regeneration: Mark dependent snippets as dirty for cascading regeneration
 function* markDependentsDirtySaga(
   action: PayloadAction<{ oldName: string; snippet: Snippet } | Snippet>,
 ) {
@@ -259,7 +263,7 @@ function* markDependentsDirtySaga(
   }
 
   if (dependentsToUpdate.length > 0) {
-    // Check for cycles before starting regeneration
+    // req:cycle-detection: Check for cycles before starting regeneration
     const { cyclic } = getTopologicalSortForExecution(allSnippets);
     if (cyclic.length > 0) {
       console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
@@ -288,6 +292,37 @@ function* resumeDirtySnippetGenerationSaga() {
     yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
   } else {
     console.log("[DEBUG] resumeDirtySnippetGenerationSaga: no dirty snippets found");
+  }
+}
+
+// req:snippet-dirty-indexeddb: Persist snippet content after successful regeneration
+function* persistSnippetAfterRegenerationSaga(
+  action: PayloadAction<RegenerateSnippetSuccessPayload>,
+) {
+  console.log("[DEBUG] persistSnippetAfterRegenerationSaga: triggered for snippet:", action.payload.name);
+  try {
+    // Get the updated snippet from Redux state
+    const allSnippets: Snippet[] = yield select(
+      (state: RootState) => state.snippets.snippets,
+    );
+    const updatedSnippet = allSnippets.find(s => s.id === action.payload.id);
+    
+    if (updatedSnippet) {
+      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: saving snippet to IndexedDB:", {
+        id: updatedSnippet.id,
+        name: updatedSnippet.name,
+        content: updatedSnippet.content,
+        isDirty: updatedSnippet.isDirty
+      });
+      yield call(db.saveSnippet, updatedSnippet);
+      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: successfully saved snippet to IndexedDB");
+    } else {
+      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: snippet not found in Redux state:", action.payload.id);
+    }
+  } catch (error) {
+    console.log("[DEBUG] persistSnippetAfterRegenerationSaga: failed to persist snippet:", error);
+    // We don't want to fail the regeneration just because persistence failed
+    // The content is still in Redux state and will work until page reload
   }
 }
 
@@ -468,5 +503,7 @@ export function* snippetsSaga() {
     takeEvery(batchRegenerateRequest.type, batchRegenerationOrchestratorSaga),
     takeEvery(regenerateSnippet.type, handleRegenerateSnippetSaga),
     takeEvery(awaitableRegenerateRequest.type, handleAwaitableRegeneration),
+    // req:snippet-dirty-indexeddb: Persist snippet content after successful regeneration
+    takeEvery(regenerateSnippetSuccess.type, persistSnippetAfterRegenerationSaga),
   ]);
 }

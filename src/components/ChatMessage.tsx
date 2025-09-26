@@ -47,7 +47,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   onEditAndResubmit,
   isMobile,
 }) => {
+  // req:raw-content-preservation: Display raw content with snippet references
   const contentToDisplay = message.raw_content ?? message.content;
+  // req:edit-textarea-population: Use raw content for editing
   const contentForEditing = message.raw_content ?? message.content;
   const [isEditing, setIsEditing] = useState(false);
   const [editInput, setEditInput] = useState(contentForEditing);

@@ -24,6 +24,7 @@ test.describe("Snippet Management (CRUD)", () => {
       version: 1,
     });
     settingsPage = new SettingsPage(page);
+    // TODO: req:test-no-page-goto violation - should use navigation clicks instead
     await page.goto(ROUTES.settings);
     await waitForEvent(page, "app_initialized");
   });
@@ -32,7 +33,8 @@ test.describe("Snippet Management (CRUD)", () => {
     test.beforeEach(async ({ context, page }) => {
       // Start with no snippets for this test group
       await seedIndexedDB(context, { snippets: [] });
-      await page.goto(ROUTES.settings);
+      // TODO: req:test-no-page-goto violation - should use navigation clicks instead
+    await page.goto(ROUTES.settings);
       await waitForEvent(page, "app_initialized");
     });
 
@@ -73,7 +75,8 @@ test.describe("Snippet Management (CRUD)", () => {
           },
         ],
       });
-      await page.goto(ROUTES.settings);
+      // TODO: req:test-no-page-goto violation - should use navigation clicks instead
+    await page.goto(ROUTES.settings);
       await waitForEvent(page, "app_initialized");
     });
 
@@ -119,7 +122,8 @@ test.describe("Snippet Management (CRUD)", () => {
               },
             ],
           });
-          await page.goto(ROUTES.settings);
+          // TODO: req:test-no-page-goto violation - should use navigation clicks instead
+    await page.goto(ROUTES.settings);
           await waitForEvent(page, "app_initialized");
       });
 
