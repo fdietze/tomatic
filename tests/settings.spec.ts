@@ -143,7 +143,7 @@ test.describe("Settings Page", () => {
   });
 
   test.describe("API Key Management", () => {
-    test.skip("should save the API key and persist it after reload", async ({
+    test("should save the API key and persist it after reload", async ({
       page,
     }) => {
       // Purpose: This test verifies that the API key is correctly saved and persists

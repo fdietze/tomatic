@@ -5,15 +5,17 @@ import { type Page, type Locator } from '@playwright/test';
  * This includes the header buttons for chat, settings, and session navigation.
  */
 export class NavigationComponent {
+  readonly chatTabButton: Locator;
+  readonly settingsTabButton: Locator;
   readonly newChatButton: Locator;
-  readonly settingsButton: Locator;
   readonly nextSessionButton: Locator;
   readonly prevSessionButton: Locator;
   readonly settingsTabSpinner: Locator;
 
   constructor(public readonly page: Page) {
-    this.newChatButton = page.getByTestId('chat-button');
-    this.settingsButton = page.getByTestId('settings-button');
+    this.chatTabButton = page.getByTestId('tab-chat');
+    this.settingsTabButton = page.getByTestId('tab-settings');
+    this.newChatButton = page.getByTestId('new-chat-button');
     this.nextSessionButton = page.getByTestId('next-session-button');
     this.prevSessionButton = page.getByTestId('prev-session-button');
     this.settingsTabSpinner = page.getByTestId('settings-tab-spinner');
@@ -25,12 +27,12 @@ export class NavigationComponent {
   }
 
   async goBackToChat() {
-    await this.newChatButton.click();
+    await this.chatTabButton.click();
     await this.page.waitForURL("**/chat/**");
   }
 
   async goToSettings() {
-    await this.settingsButton.click();
+    await this.settingsTabButton.click();
     await this.page.waitForURL("**/settings");
   }
 

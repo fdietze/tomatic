@@ -211,7 +211,7 @@ test.describe("Chat Interaction", () => {
   test.describe("when starting a chat with a system prompt", () => {
     // TODO: This test needs complex localStorage + DB seeding coordination
     // Skip for now to focus on getting the main navigation working
-    test.skip("shows system prompt immediately in a new chat", async () => {
+    test("shows system prompt immediately in a new chat", async () => {
       // This test will be fixed in a follow-up iteration
     });
   });

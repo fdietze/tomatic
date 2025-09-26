@@ -119,7 +119,9 @@ test.describe("Auto-Save New Chat Sessions", () => {
     await responsePromise;
 
     // 6. Verify the session was auto-saved and URL changed
+    // Wait for the URL to change from /chat/new to /chat/sessionId after the API response
     await expect(page).toHaveURL(/\/chat\/[a-zA-Z0-9-_]+$/);
+    await expect(page).not.toHaveURL(/\/chat\/new$/); // Ensure it's not still "new"
     const currentUrl = page.url();
     const sessionIdMatch = currentUrl.match(/\/chat\/([a-zA-Z0-9-_]+)$/);
     expect(sessionIdMatch).not.toBeNull();
