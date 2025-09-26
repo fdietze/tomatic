@@ -4,7 +4,7 @@ import SystemPromptItem from "@/components/SystemPromptItem";
 import SnippetItem from "@/components/SnippetItem";
 import type { Snippet, SystemPrompt } from "@/types/storage";
 import type { PromptEntity } from "@/store/features/prompts/promptsSlice";
-import { topologicalSort } from "@/utils/snippetUtils";
+import { getSnippetDisplayOrder } from "@/utils/snippetUtils";
 import {
   selectSettings,
   setApiKey,
@@ -112,9 +112,9 @@ const SettingsPage: React.FC = () => {
     return Promise.resolve();
   };
 
-  const sortedSnippets = useMemo(() => {
-    const { sorted } = topologicalSort(snippets);
-    return sorted;
+  const { sortedSnippets, cyclicSnippetNames } = useMemo(() => {
+    const { sorted, cyclic } = getSnippetDisplayOrder(snippets);
+    return { sortedSnippets: sorted, cyclicSnippetNames: new Set(cyclic) };
   }, [snippets]);
 
   if (snippetsLoading === "loading") {
@@ -249,6 +249,7 @@ const SettingsPage: React.FC = () => {
               key={snippet.id}
               snippet={snippet}
               isInitiallyEditing={false}
+              isCyclic={cyclicSnippetNames.has(snippet.name)}
               onUpdate={(updatedSnippet) =>
                 handleUpdateSnippet(updatedSnippet)
               }

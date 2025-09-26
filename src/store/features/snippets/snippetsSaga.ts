@@ -28,7 +28,7 @@ import {
   findTransitiveDependents,
   groupSnippetsIntoBatches,
   resolveSnippets,
-  topologicalSort,
+  getTopologicalSortForExecution,
 } from "@/utils/snippetUtils";
 import { requestMessageContent } from "@/api/openrouter";
 
@@ -260,7 +260,7 @@ function* markDependentsDirtySaga(
 
   if (dependentsToUpdate.length > 0) {
     // Check for cycles before starting regeneration
-    const { cyclic } = topologicalSort(allSnippets);
+    const { cyclic } = getTopologicalSortForExecution(allSnippets);
     if (cyclic.length > 0) {
       console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
       console.log("[DEBUG] markDependentsDirtySaga: Cyclic snippets:", cyclic);
@@ -297,7 +297,7 @@ function* batchRegenerationOrchestratorSaga(
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with snippets", action.payload.snippets.map(s => s.name));
   const { snippets } = action.payload;
 
-  const { sorted, cyclic } = topologicalSort(snippets);
+  const { sorted, cyclic } = getTopologicalSortForExecution(snippets);
 
   if (cyclic.length > 0) {
     console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected in snippets:", cyclic);
