@@ -1,5 +1,5 @@
 # User requests
-- for every user request (feature request, bug report, etc), see if we can develop it in a test-driven way. What exactly needs to be tested? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests? extend @requirements.md if it extends or changes requirements.
+- for every user request (feature request, bug report, etc), develop it in a test-driven way. What exactly needs to be tested? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests? extend @requirements.md if it extends or changes requirements.
 
 # Requirement Traceability
 - the code and documentation has comments like "// req:a-requierement" everywhere. Use grep to find other references.
@@ -49,6 +49,7 @@
 - always use unambiguous and stable data-testids in the e2e tests instead of classes, placeholders or strings.
 - when testing loading states, use manual mock triggers to assert that spinners appear before the mock is resolved and disappear after.
 - is the test waiting if the application is ready? (await waitForEvent(page, "app_initialized");)
+- when there are timing issues, use mocks that are triggered awaited manually
 - tests should not use page.goto to navigate between pages (that would trigger reseeding the database state). page.goto is only allowed on initial page load. use clicks instead.
 - Use a hierarchical, scenario-based architecture for test files. Group tests into `describe` blocks based on the feature and specific scenarios. Scope data seeding to the narrowest possible `beforeEach` block to ensure tests are perfectly isolated and self-contained.
 
