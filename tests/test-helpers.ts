@@ -325,6 +325,12 @@ export async function seedLocalStorage(
     },
   };
   await context.addInitScript((data) => {
+    // Check if localStorage already has data - if so, don't overwrite it
+    const existingData = window.localStorage.getItem("tomatic-storage");
+    if (existingData) {
+      return;
+    }
+    
     window.localStorage.setItem("tomatic-storage", JSON.stringify(data));
   }, finalData);
 }
