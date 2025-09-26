@@ -32,6 +32,17 @@ export interface LoadSessionSuccessPayload {
   nextId: string | null;
 }
 
+export interface SessionCreatedSuccessPayload {
+  sessionId: string;
+  messages: Message[];
+  prevId: string | null;
+  nextId: string | null;
+}
+
+export interface SessionUpdatedPayload {
+  sessionId: string;
+}
+
 export interface SendMessageRequestPayload {
   prompt: string;
 }

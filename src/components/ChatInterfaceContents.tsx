@@ -12,7 +12,6 @@ import {
 } from "@/store/features/settings/settingsSlice";
 import { selectModels, fetchModels } from "@/store/features/models/modelsSlice";
 import { isMobile as checkIsMobile } from "@/utils/isMobile";
-import { getErrorMessage } from "@/types/errors";
 import {
   SessionState,
   cancelSubmission,

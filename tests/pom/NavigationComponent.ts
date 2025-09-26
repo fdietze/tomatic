@@ -30,8 +30,6 @@ export class NavigationComponent {
   }
 
   async goToSettings() {
-    console.log(`[DEBUG] Current page URL: ${this.page.url()}`);
-    console.log(`[DEBUG] Current page title: ${await this.page.title()}`);
     await this.settingsButton.click();
     await this.page.waitForURL("**/settings");
   }
