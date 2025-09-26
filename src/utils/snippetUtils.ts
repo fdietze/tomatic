@@ -204,7 +204,7 @@ export function findTransitiveDependents(name: string, reverseGraph: Map<string,
  * @param allSnippets The list of all snippets to sort.
  * @returns An object containing the sorted snippets and any snippets found in cycles.
  */
-export function topologicalSort(allSnippets: Snippet[]): { sorted: Snippet[], cyclic: string[] } {
+export function getTopologicalSortForExecution(allSnippets: Snippet[]): { sorted: Snippet[], cyclic: string[] } {
   const inDegree = new Map<string, number>();
   const graph = new Map<string, string[]>(); // Adjacency list: dependency -> dependent
   const snippetMap = new Map(allSnippets.map(s => [s.name, s]));
@@ -265,6 +265,35 @@ export function topologicalSort(allSnippets: Snippet[]): { sorted: Snippet[], cy
   }
 
   return { sorted, cyclic };
+}
+
+/**
+ * Performs a topological sort on a list of snippets for display purposes.
+ * It always returns all snippets. Acyclic snippets are topologically sorted.
+ * Cyclic snippets are appended at the end in a stable order.
+ * @param allSnippets The list of all snippets to sort.
+ * @returns An object containing the sorted snippets and the names of snippets found in cycles.
+ */
+export function getSnippetDisplayOrder(allSnippets: Snippet[]): { sorted: Snippet[], cyclic: string[] } {
+  const { sorted: acyclicSorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+  
+  if (cyclic.length === 0) {
+    return { sorted: acyclicSorted, cyclic: [] };
+  }
+
+  const acyclicNames = new Set(acyclicSorted.map(s => s.name));
+  const cyclicSnippets: Snippet[] = [];
+
+  for (const snippet of allSnippets) {
+    if (!acyclicNames.has(snippet.name)) {
+      cyclicSnippets.push(snippet);
+    }
+  }
+
+  // Sort cyclic snippets alphabetically for a stable order
+  cyclicSnippets.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { sorted: [...acyclicSorted, ...cyclicSnippets], cyclic };
 }
 
 /**

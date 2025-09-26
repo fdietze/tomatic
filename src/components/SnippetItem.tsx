@@ -18,6 +18,7 @@ import { getErrorMessage } from '@/types/errors';
 interface SnippetItemProps {
   snippet: Snippet;
   isInitiallyEditing: boolean;
+  isCyclic?: boolean;
   onUpdate: (updatedSnippet: Snippet) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onCancel?: () => void;
@@ -28,6 +29,7 @@ const NAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const SnippetItem: React.FC<SnippetItemProps> = ({
   snippet,
   isInitiallyEditing,
+  isCyclic = false,
   onUpdate,
   onRemove,
   onCancel,
@@ -308,7 +310,24 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   return (
     <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
       <div className="system-prompt-header">
-        <span className="system-prompt-name">{snippet.name}</span>
+        <span className="system-prompt-name">
+          {snippet.name}
+          {isCyclic && (
+            <span 
+              className="cycle-warning-icon" 
+              data-testid="cycle-warning-icon"
+              title="This snippet is part of a dependency cycle. Automatic regeneration is disabled."
+              style={{
+                marginLeft: '8px',
+                color: 'var(--color-warning, #ff9800)',
+                fontSize: '16px',
+                cursor: 'help'
+              }}
+            >
+              ⚠️
+            </span>
+          )}
+        </span>
         <div className="system-prompt-actions">
           {(() => {
             const status = regenerationStatus[snippet.id]?.status || 'idle';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSnippets, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, topologicalSort } from '@/utils/snippetUtils';
+import { resolveSnippets, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, getSnippetDisplayOrder, getTopologicalSortForExecution } from '@/utils/snippetUtils';
 import type { Snippet } from '@/types/storage';
 
 const createSnippet = (overrides: Partial<Snippet> & { name: string }): Snippet => ({
@@ -253,25 +253,26 @@ describe('findTransitiveDependents', () => {
   });
 });
 
-describe('topologicalSort', () => {
+describe('getSnippetDisplayOrder', () => {
   it('should return a topologically sorted list for an acyclic graph', () => {
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: '@b' }),
       createSnippet({ name: 'b' }),
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
     const sortedNames = sorted.map(s => s.name);
     expect(sortedNames).toEqual(['b', 'a']);
     expect(cyclic).toEqual([]);
   });
 
-  it('should identify snippets involved in a cycle', () => {
+  it('should return all snippets even when a cycle is present, with cyclic snippets at the end', () => {
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: '@b' }),
       createSnippet({ name: 'b', content: '@a' }),
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
-    expect(sorted).toEqual([]);
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
+    // All snippets are returned, sorted alphabetically
+    expect(sorted.map(s => s.name)).toEqual(['a', 'b']);
     expect(new Set(cyclic)).toEqual(new Set(['a', 'b']));
   });
 
@@ -281,7 +282,7 @@ describe('topologicalSort', () => {
       createSnippet({ name: 'b' }),
       createSnippet({ name: 'c' }),
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
     const sortedNames = sorted.map(s => s.name);
     // The exact order of 'b' and 'c' can vary, so we check for presence and length
     expect(sortedNames).toContain('b');
@@ -293,7 +294,7 @@ describe('topologicalSort', () => {
 
   it('should return empty arrays for an empty list of snippets', () => {
     const allSnippets: Snippet[] = [];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
     expect(sorted).toEqual([]);
     expect(cyclic).toEqual([]);
   });
@@ -306,7 +307,7 @@ describe('topologicalSort', () => {
       createSnippet({ name: 'd' }),
       createSnippet({ name: 'e' }),
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
     const sortedNames = sorted.map(s => s.name);
 
     // Valid topological orders must have d and e before b and c, and b and c before a.
@@ -321,26 +322,118 @@ describe('topologicalSort', () => {
     expect(sortedNames.indexOf('c')).toBeLessThan(sortedNames.indexOf('a'));
   });
 
-  it('should correctly handle a graph with a cycle, returning only the non-cyclic parts sorted', () => {
+  it('should return all snippets, with acyclic parts sorted and cyclic parts appended', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'c', content: '@d' }), // acyclic part
+      createSnippet({ name: 'a', content: '@b' }), // part of cycle
+      createSnippet({ name: 'd' }),   // acyclic part
+      createSnippet({ name: 'b', content: '@a' }), // part of cycle
+    ];
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+
+    expect(sortedNames).toEqual(['d', 'c', 'a', 'b']);
+    expect(new Set(cyclic)).toEqual(new Set(['a', 'b']));
+  });
+
+  it('should identify a snippet that directly references itself as cyclic and append it', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: 'self @a' }),
+      createSnippet({ name: 'b', content: 'normal' }),
+    ];
+    const { sorted, cyclic } = getSnippetDisplayOrder(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+
+    expect(sortedNames).toEqual(['b', 'a']);
+    expect(cyclic).toEqual(['a']);
+  });
+});
+
+describe('getTopologicalSortForExecution', () => {
+  it('should return a topologically sorted list for an acyclic graph', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: '@b' }),
+      createSnippet({ name: 'b' }),
+    ];
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+    expect(sortedNames).toEqual(['b', 'a']);
+    expect(cyclic).toEqual([]);
+  });
+
+  it('should identify snippets involved in a cycle and not include them in the sorted list', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: '@b' }),
+      createSnippet({ name: 'b', content: '@a' }),
+    ];
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+    expect(sorted).toEqual([]);
+    expect(new Set(cyclic)).toEqual(new Set(['a', 'b']));
+  });
+
+  it('should handle disconnected components in the graph', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: '@b' }),
+      createSnippet({ name: 'b' }),
+      createSnippet({ name: 'c' }),
+    ];
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+    // The exact order of 'b' and 'c' can vary, so we check for presence and length
+    expect(sortedNames).toContain('b');
+    expect(sortedNames).toContain('c');
+    expect(sortedNames.indexOf('b')).toBeLessThan(sortedNames.indexOf('a'));
+    expect(sorted.length).toBe(3);
+    expect(cyclic).toEqual([]);
+  });
+
+  it('should return empty arrays for an empty list of snippets', () => {
+    const allSnippets: Snippet[] = [];
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+    expect(sorted).toEqual([]);
+    expect(cyclic).toEqual([]);
+  });
+
+  it('should correctly sort a more complex Directed Acyclic Graph', () => {
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: '@b @c' }),
+      createSnippet({ name: 'b', content: '@d' }),
+      createSnippet({ name: 'c', content: '@d @e' }),
+      createSnippet({ name: 'd' }),
+      createSnippet({ name: 'e' }),
+    ];
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+    const sortedNames = sorted.map(s => s.name);
+
+    expect(cyclic).toEqual([]);
+    expect(sortedNames.length).toBe(5);
+    expect(sortedNames.indexOf('d')).toBeLessThan(sortedNames.indexOf('b'));
+    expect(sortedNames.indexOf('d')).toBeLessThan(sortedNames.indexOf('c'));
+    expect(sortedNames.indexOf('e')).toBeLessThan(sortedNames.indexOf('c'));
+    expect(sortedNames.indexOf('b')).toBeLessThan(sortedNames.indexOf('a'));
+    expect(sortedNames.indexOf('c')).toBeLessThan(sortedNames.indexOf('a'));
+  });
+
+  it('should return only the non-cyclic parts sorted', () => {
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: '@b' }), // part of cycle
       createSnippet({ name: 'b', content: '@a' }), // part of cycle
       createSnippet({ name: 'c', content: '@d' }), // acyclic part
       createSnippet({ name: 'd' }),   // acyclic part
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
     const sortedNames = sorted.map(s => s.name);
 
     expect(sortedNames).toEqual(['d', 'c']);
     expect(new Set(cyclic)).toEqual(new Set(['a', 'b']));
   });
 
-  it('should identify a snippet that directly references itself as cyclic', () => {
+  it('should identify a snippet that directly references itself as cyclic and exclude it from sorted', () => {
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: 'self @a' }),
       createSnippet({ name: 'b', content: 'normal' }),
     ];
-    const { sorted, cyclic } = topologicalSort(allSnippets);
+    const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
     const sortedNames = sorted.map(s => s.name);
 
     expect(sortedNames).toEqual(['b']);
