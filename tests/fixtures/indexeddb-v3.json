@@ -1,0 +1,64 @@
+{
+  "dbVersion": 3,
+  "stores": {
+    "chat_sessions": [
+      {
+        "session_id": "v2-session-1",
+        "name": "Test Conversation",
+        "messages": [
+          {
+            "id": "msg-1",
+            "role": "user",
+            "content": "Hello from V2",
+            "prompt_name": null,
+            "model_name": null,
+            "cost": null,
+            "raw_content": "Hello from V2"
+          },
+          {
+            "id": "msg-2",
+            "role": "assistant",
+            "content": "Hi there! This is a V2 response with proper IDs.",
+            "prompt_name": null,
+            "model_name": "openai/gpt-4",
+            "cost": {
+              "prompt": 0.03,
+              "completion": 0.06,
+              "prompt_tokens": 12,
+              "completion_tokens": 20
+            }
+          }
+        ],
+        "created_at_ms": 1640995500000,
+        "updated_at_ms": 1640995560000
+      }
+    ],
+    "system_prompts": [
+      {
+        "name": "default",
+        "prompt": "You are a helpful assistant."
+      },
+      {
+        "name": "chef",
+        "prompt": "You are a professional chef who provides cooking advice and recipes."
+      },
+      {
+        "name": "developer",
+        "prompt": "You are an experienced software developer who helps with coding questions."
+      }
+    ],
+    "snippets": [
+      {
+        "id": "snippet-1",
+        "name": "test_snippet",
+        "content": "Hello from V3 snippet",
+        "isGenerated": false,
+        "createdAt_ms": 1000,
+        "updatedAt_ms": 1000,
+        "generationError": null,
+        "isDirty": false
+      }
+    ]
+  }
+}
+

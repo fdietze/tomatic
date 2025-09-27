@@ -33,6 +33,11 @@
 
 - req:database-migrations: support for migrating IndexedDB schema from v1→v2→v3 while preserving data integrity
 - req:migration-events: database migrations dispatch completion events for coordination
+- req:localStorage-migrations: support for migrating localStorage from v0→v1 with automatic version detection and data transformation
+- req:migration-test-fixtures: JSON fixtures exist for all migration versions (localStorage v0-v1, IndexedDB v1-v3) for comprehensive testing
+- req:migration-unit-tests: unit tests verify all migration paths work correctly and handle edge cases gracefully
+- req:migration-consolidation: unified migration system in src/services/persistence/migrations.ts serves as single source of truth for all storage layer migrations
+- req:migration-error-handling: when migrations fail, the user must see an error message
 
 ## Input Validation
 
@@ -54,3 +59,4 @@
 - req:raw-content-preservation: user messages preserve original raw input with snippet references for editing
 - req:edit-textarea-population: when editing messages, textarea is populated with raw content rather than resolved content
 - req:save-button-dirty-detection: pressing the save button on a generated snippet should mark it as dirty if the prompt input is different from the original
+- when migrations fail, the user must see an error message.

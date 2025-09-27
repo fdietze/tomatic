@@ -1,0 +1,44 @@
+{
+  "dbVersion": 2,
+  "stores": {
+    "chat_sessions": [
+      {
+        "session_id": "v2-session-with-snippets",
+        "name": "Session with Pre-V3 Snippets",
+        "messages": [
+          {
+            "id": "msg-pre-v3-1",
+            "role": "user",
+            "content": "Test with pre-V3 snippets",
+            "prompt_name": null,
+            "model_name": null,
+            "cost": null
+          }
+        ],
+        "created_at_ms": 1640995400000,
+        "updated_at_ms": 1640995450000
+      }
+    ],
+    "system_prompts": [
+      {
+        "name": "default",
+        "prompt": "You are a helpful assistant."
+      }
+    ],
+    "snippets": [
+      {
+        "name": "old-snippet-1",
+        "content": "// This snippet existed before V3 migration",
+        "isGenerated": false
+      },
+      {
+        "name": "old-snippet-2", 
+        "content": "function oldFunction() { return 'pre-v3'; }",
+        "isGenerated": true,
+        "prompt": "Create a simple function",
+        "model": "openai/gpt-3.5-turbo"
+      }
+    ]
+  }
+}
+
