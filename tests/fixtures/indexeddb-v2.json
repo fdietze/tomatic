@@ -1,0 +1,56 @@
+{
+  "dbVersion": 2,
+  "stores": {
+    "chat_sessions": [
+      {
+        "session_id": "fed9aa31-7c19-4f49-b7b4-0b30e69c63a9",
+        "messages": [
+          {
+            "prompt_name": null,
+            "role": "user",
+            "content": "20 pieces of wisdom that make you think",
+            "id": "f51d06f8-857c-43b9-b716-5a3ab3dbf28c"
+          },
+          {
+            "prompt_name": null,
+            "role": "assistant",
+            "content": "Certainly! Here are 20 pieces of wisdom that invite deep thought and reflection:\n\n1. **\"The only true wisdom is in knowing you know nothing.\"** – Socrates  \n2. **\"What we think, we become.\"** – Buddha  \n3. **\"Happiness depends upon ourselves.\"** – Aristotle",
+            "model_name": "openai/gpt-4.1-mini",
+            "cost": {
+              "prompt": 0.000006,
+              "completion": 0.0007728
+            },
+            "id": "48b099b0-5887-4b64-b6a9-29e818f8ff08"
+          }
+        ],
+        "name": null,
+        "created_at_ms": 1752435341006,
+        "updated_at_ms": 1752440545942
+      },
+      {
+        "session_id": "fee068f3-4531-43e9-861f-4eece389f4b9",
+        "messages": [
+          {
+            "prompt_name": null,
+            "role": "user",
+            "content": "does this work?",
+            "id": "33a04de4-0fba-4298-ade4-116f97978171"
+          }
+        ],
+        "name": null,
+        "created_at_ms": 1753437090558,
+        "updated_at_ms": 1753437090558
+      }
+    ],
+    "system_prompts": [
+      {
+        "name": "Rezept",
+        "prompt": "Gib mir einfache Rezepte.\n- anti inflammatorisch\n- wenig histamin\n- in metrischen einheiten\n- Zutaten, die man in deutschland im september kaufen kann\n- Das essen soll schon wirklich lecker sein, so dass man richtig Lust hat weiter zu essen."
+      },
+      {
+        "name": "beleidigung",
+        "prompt": "beleidige mich zurück (Rollenspiel)"
+      }
+    ]
+  }
+}

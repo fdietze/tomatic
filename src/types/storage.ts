@@ -53,7 +53,7 @@ export interface LocalStorageV0State {
   autoScrollEnabled?: boolean; // This was added later in the v0 lifecycle
 }
 
-// v1: The current state shape, as defined by the `partialize` function in the persist middleware.
+// v1: The deployed state shape with cachedModels and input fields
 export interface LocalStorageV1State {
   apiKey: string;
   modelName: string;
@@ -63,7 +63,16 @@ export interface LocalStorageV1State {
   autoScrollEnabled: boolean;
 }
 
-export type LocalStorageCurrent = LocalStoragePersistedState<LocalStorageV1State>;
+// v2: The current state shape - removed cachedModels and input, added initialChatPrompt
+export interface LocalStorageV2State {
+  apiKey: string;
+  modelName: string;
+  selectedPromptName: string | null;
+  autoScrollEnabled: boolean;
+  initialChatPrompt: string | null;
+}
+
+export type LocalStorageCurrent = LocalStoragePersistedState<LocalStorageV2State>;
 
 // ------------------------------------------------------------------------------------------------
 // IndexedDB

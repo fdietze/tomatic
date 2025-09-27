@@ -1,0 +1,10 @@
+{
+  "state": {
+    "apiKey": "test-api-key-v2",
+    "modelName": "google/gemini-2.5-flash-lite",
+    "selectedPromptName": null,
+    "autoScrollEnabled": false,
+    "initialChatPrompt": null
+  },
+  "version": 2
+}

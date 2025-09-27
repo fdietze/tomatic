@@ -1,25 +1,17 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ChatSession, Message } from "@/types/chat";
+import type { ChatSession } from "@/types/chat";
 import type { Snippet, SystemPrompt } from "@/types/storage";
 import { z } from "zod";
 import { snippetSchema, systemPromptSchema } from "@/services/db/schemas";
 import { dispatchEvent } from "@/utils/events";
-
-// For DB version < 2
-type V1Message = Omit<Message, "id" | "prompt_name"> & {
-  id?: string;
-  prompt_name?: string | null;
-};
-
-// For DB version < 3
-type V2Snippet = Omit<
-  Snippet,
-  "id" | "createdAt_ms" | "updatedAt_ms" | "generationError" | "isDirty"
->;
+import { 
+  CURRENT_INDEXEDDB_VERSION,
+  migrateV2SnippetsToV3,
+} from "./persistence/migrations";
 
 // --- IndexedDB Constants ---
 export const DB_NAME = "tomatic_chat_db";
-export const DB_VERSION = 3;
+export const DB_VERSION = CURRENT_INDEXEDDB_VERSION;
 export const SESSIONS_STORE_NAME = "chat_sessions";
 export const SYSTEM_PROMPTS_STORE_NAME = "system_prompts";
 export const SNIPPETS_STORE_NAME = "snippets";
@@ -68,6 +60,7 @@ function openTomaticDB(): Promise<{
       if (oldVersion > 0) {
         migrated = true;
       }
+      // Create base stores (needed for fresh databases in tests and new installs)
       if (oldVersion < 2) {
         // Create sessions store
         if (!db.objectStoreNames.contains(SESSIONS_STORE_NAME)) {
@@ -83,38 +76,8 @@ function openTomaticDB(): Promise<{
             keyPath: NAME_KEY_PATH,
           });
         }
-
-        // Migrate data
-        void tx
-          .objectStore(SESSIONS_STORE_NAME)
-          .openCursor()
-          .then(function migrate(cursor) {
-            if (!cursor) {
-              dispatchEvent("db_migration_complete", { from: 1, to: 2 });
-              return;
-            }
-
-            const oldSession = cursor.value;
-
-            // V2 introduces optional `name` on sessions and required `id` and optional `prompt_name` on messages
-            const newSession: ChatSession = {
-              ...oldSession,
-              name: oldSession.name || null,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              messages: (oldSession.messages as any[]).map((m: V1Message) => {
-                const newMessage: Message = {
-                  ...m,
-                  id: m.id || crypto.randomUUID(),
-                  prompt_name: m.prompt_name || null,
-                };
-                return newMessage;
-              }),
-            };
-
-            void cursor.update(newSession);
-            void cursor.continue().then(migrate);
-          });
       }
+      
       // req:database-migrations: V3 introduces snippets
       if (oldVersion < 3) {
         // V3 introduces snippets. If the store exists from a pre-release version keyed by name,
@@ -123,24 +86,17 @@ function openTomaticDB(): Promise<{
         
         const migrationLogic = async () => {
           if (storeExists) {
-            const oldSnippets = await tx.objectStore(SNIPPETS_STORE_NAME).getAll() as V2Snippet[];
+            const oldSnippets = await tx.objectStore(SNIPPETS_STORE_NAME).getAll();
             db.deleteObjectStore(SNIPPETS_STORE_NAME);
             const newStore = db.createObjectStore(SNIPPETS_STORE_NAME, {
               keyPath: "id",
             });
             newStore.createIndex(SNIPPET_NAME_INDEX, "name", { unique: true });
-            const now = Date.now();
-            oldSnippets.forEach((oldSnippet) => {
-            // req:snippet-dirty-indexeddb: Snippets have isDirty flag for resuming generation
-            const newSnippet: Snippet = {
-              id: crypto.randomUUID(),
-              ...oldSnippet,
-              createdAt_ms: now,
-              updatedAt_ms: now,
-              generationError: null,
-              isDirty: false,
-            };
-              void newStore.put(newSnippet);
+            
+            // Use centralized migration logic
+            const migratedSnippets = migrateV2SnippetsToV3(oldSnippets);
+            migratedSnippets.forEach((snippet) => {
+              void newStore.put(snippet);
             });
           } else {
             const newStore = db.createObjectStore(SNIPPETS_STORE_NAME, { keyPath: "id" });

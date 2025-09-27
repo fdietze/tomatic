@@ -1,0 +1,25 @@
+{
+  "state": {
+    "apiKey": "xxxx",
+    "modelName": "google/gemini-2.5-flash-lite",
+    "cachedModels": [
+      {
+        "id": "thedrummer/cydonia-24b-v4.1",
+        "name": "TheDrummer: Cydonia 24B V4.1",
+        "prompt_cost_usd_pm": 0.15,
+        "completion_cost_usd_pm": 0.5
+      },
+      {
+        "id": "relace/relace-apply-3",
+        "name": "Relace: Relace Apply 3",
+        "prompt_cost_usd_pm": 0.85,
+        "completion_cost_usd_pm": 1.25
+      }
+    ],
+    "input": "",
+    "selectedPromptName": null,
+    "autoScrollEnabled": false
+  },
+  "version": 1
+}
+
