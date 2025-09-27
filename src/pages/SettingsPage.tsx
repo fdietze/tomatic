@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import SystemPromptItem from "@/components/SystemPromptItem";
 import SnippetItem from "@/components/SnippetItem";
@@ -39,6 +39,7 @@ const SettingsPage: React.FC = () => {
     null,
   );
   const [isCreatingNewSnippet, setIsCreatingNewSnippet] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     dispatch(loadSettings());
@@ -272,17 +273,18 @@ const SettingsPage: React.FC = () => {
             Export Snippets
           </button>
           <input
+            ref={fileInputRef}
             type="file"
-            id="import-snippets-input"
-            style={{ display: "none" }}
+            className="visually-hidden"
             accept=".json"
             onChange={handleImportSnippets}
+            data-testid="import-snippets-input"
           />
           <button
             data-testid="import-snippets-button"
             data-role="secondary"
             data-size="compact"
-            onClick={() => document.getElementById('import-snippets-input')?.click()}
+            onClick={() => fileInputRef.current?.click()}
             style={{ marginBottom: "20px" }}
             disabled={isCreatingNewSnippet || !!editingPromptName}
           >

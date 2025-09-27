@@ -43,7 +43,7 @@ test.describe("Feature: Snippet Import/Export", () => {
 
     // 4. Import snippets
     await page.getByTestId("import-snippets-button").click();
-    await page.locator("#import-snippets-input").setInputFiles({
+    await page.getByTestId("import-snippets-input").setInputFiles({
         name: "snippets.json",
         mimeType: "application/json",
         buffer: Buffer.from(content),
