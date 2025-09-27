@@ -525,7 +525,10 @@ button.chat-controls-system-prompt {
 }
 
 .chat-message.collapsed .chat-message-content {
-    display: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 1.5em; /* Assumes line-height is around 1.5em */
 }
 
 header {
