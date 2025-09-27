@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/appStore';
 import SystemPromptItem from '@/components/SystemPromptItem';
 import type { SystemPrompt } from '@/types/storage';
@@ -14,6 +14,8 @@ const SettingsPage: React.FC = () => {
     addSystemPrompt,
     updateSystemPrompt,
     deleteSystemPrompt,
+    importPrompts,
+    exportPrompts,
   } = useAppStore(
     useShallow((state) => ({
       apiKey: state.apiKey,
@@ -24,6 +26,8 @@ const SettingsPage: React.FC = () => {
       addSystemPrompt: state.addSystemPrompt,
       updateSystemPrompt: state.updateSystemPrompt,
       deleteSystemPrompt: state.deleteSystemPrompt,
+      importPrompts: state.importPrompts,
+      exportPrompts: state.exportPrompts,
     }))
   );
 
@@ -31,6 +35,7 @@ const SettingsPage: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   // Local state to manage the creation of a new, unsaved prompt
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalApiKey(storeApiKey);
@@ -61,7 +66,31 @@ const SettingsPage: React.FC = () => {
 
   const handleCancelNew = () => {
     setIsCreatingNew(false);
-  }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result;
+      if (typeof text === 'string') {
+        await importPrompts(text);
+      }
+      // Reset the file input value to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div style={{ marginBottom: '50px' }}>
@@ -97,22 +126,51 @@ const SettingsPage: React.FC = () => {
       </div>
       <div className="settings-section">
         <div className="settings-label">system prompts</div>
-        <button data-testid="new-system-prompt-button"
-          data-role="primary"
-          data-size="compact"
-          onClick={handleNewPrompt}
-          style={{ marginBottom: '20px' }}
-          disabled={isCreatingNew}
-        >
-          New
-        </button>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+          <button
+            data-testid="new-system-prompt-button"
+            data-role="primary"
+            data-size="compact"
+            onClick={handleNewPrompt}
+            disabled={isCreatingNew}
+          >
+            New
+          </button>
+          <button
+            data-testid="import-prompts-button"
+            data-role="secondary"
+            data-size="compact"
+            onClick={handleImportClick}
+          >
+            Import
+          </button>
+          <button
+            data-testid="export-prompts-button"
+            data-role="secondary"
+            data-size="compact"
+            onClick={() => {
+              void exportPrompts();
+            }}
+          >
+            Export
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".json"
+            onChange={handleFileChange}
+          />
+        </div>
         <div className="system-prompt-list">
           {isCreatingNew && (
-             <SystemPromptItem
+            <SystemPromptItem
               prompt={{ name: '', prompt: '' }}
               isInitiallyEditing={true}
               allPrompts={systemPrompts}
-              onUpdate={(prompt) => { void handleCreatePrompt(prompt); }}
+              onUpdate={(prompt) => {
+                void handleCreatePrompt(prompt);
+              }}
               onRemove={handleCancelNew}
               onCancel={handleCancelNew}
             />
@@ -123,8 +181,12 @@ const SettingsPage: React.FC = () => {
               prompt={prompt}
               isInitiallyEditing={false}
               allPrompts={systemPrompts}
-              onUpdate={(updatedPrompt) => { void handleUpdatePrompt(prompt.name, updatedPrompt); }}
-              onRemove={() => { void handleRemovePrompt(prompt.name); }}
+              onUpdate={(updatedPrompt) => {
+                void handleUpdatePrompt(prompt.name, updatedPrompt);
+              }}
+              onRemove={() => {
+                void handleRemovePrompt(prompt.name);
+              }}
             />
           ))}
         </div>

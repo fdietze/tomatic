@@ -242,3 +242,63 @@ export async function deleteSystemPrompt(promptName: string): Promise<void> {
     throw new Error('Failed to delete system prompt.');
   }
 }
+
+// --- Import/Export ---
+
+export async function exportSystemPrompts(): Promise<void> {
+  try {
+    const prompts = await loadAllSystemPrompts();
+    if (prompts.length === 0) {
+      // It's better to handle this in the UI, but throwing an error is better than an alert.
+      throw new Error('No prompts to export.');
+    }
+
+    const json = JSON.stringify(prompts, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tomatic_prompts_export.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('[DB] Export: Failed to export system prompts:', error);
+    // Re-throw the error so it can be caught by the calling action in the store.
+    throw error;
+  }
+}
+
+const importPromptsSchema = z.array(systemPromptSchema);
+
+export async function importSystemPrompts(jsonContent: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const data: unknown = JSON.parse(jsonContent);
+    const validation = importPromptsSchema.safeParse(data);
+
+    if (!validation.success) {
+      console.error('[DB] Import: Zod validation failed:', validation.error);
+      return { success: false, error: 'Invalid file format or content.' };
+    }
+
+    const promptsToImport = validation.data;
+    const db = await dbPromise;
+    const tx = db.transaction(SYSTEM_PROMPTS_STORE_NAME, 'readwrite');
+
+    // Use Promise.all to handle all put operations concurrently within the transaction.
+    await Promise.all(promptsToImport.map(prompt => tx.store.put(prompt)));
+
+    await tx.done; // Ensure the transaction completes successfully.
+
+    console.log(`[DB] Import: Successfully imported and saved ${String(promptsToImport.length)} prompts.`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('[DB] Import: Failed to import system prompts:', error);
+    if (error instanceof SyntaxError) {
+      return { success: false, error: 'Invalid JSON. Please check the file content.' };
+    }
+    return { success: false, error: 'An unexpected error occurred during import.' };
+  }
+}

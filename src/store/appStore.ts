@@ -11,6 +11,8 @@ import {
   saveSystemPrompt,
   loadAllSystemPrompts,
   deleteSystemPrompt as dbDeleteSystemPrompt,
+  importSystemPrompts,
+  exportSystemPrompts,
 } from '@/services/persistence';
 import { listAvailableModels, requestMessageContentStreamed } from '@/api/openrouter';
 import type { ChatSession, Message } from '@/types/chat';
@@ -139,10 +141,11 @@ interface AppState {
   loadSystemPrompts: () => Promise<void>;
   addSystemPrompt: (prompt: SystemPrompt) => Promise<void>;
   updateSystemPrompt: (oldName: string, prompt: SystemPrompt) => Promise<void>;
-  deleteSystemPrompt: (name: string) => Promise<void>;
+  deleteSystemPrompt: (name:string) => Promise<void>;
+  exportPrompts: () => Promise<void>;
+  importPrompts: (jsonContent: string) => Promise<void>;
 
   fetchModelList: () => Promise<void>;
-  
   // Core chat actions
   submitMessage: (options: {
     promptOverride?: string;
@@ -387,6 +390,29 @@ export const useAppStore = create<AppState>()(
         } catch (e) {
           const error = e instanceof Error ? e.message : 'An unknown error occurred.';
           get().setError(`Failed to delete system prompt: ${error}`);
+        }
+      },
+
+      exportPrompts: async () => {
+        try {
+          await exportSystemPrompts();
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to export prompts: ${error}`);
+        }
+      },
+
+      importPrompts: async (jsonContent) => {
+        try {
+          const result = await importSystemPrompts(jsonContent);
+          if (result.success) {
+            await get().loadSystemPrompts(); // Refresh the list
+          } else {
+            get().setError(result.error || 'An unknown import error occurred.');
+          }
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'An unknown error occurred.';
+          get().setError(`Failed to import prompts: ${error}`);
         }
       },
 
