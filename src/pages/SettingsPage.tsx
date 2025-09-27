@@ -23,6 +23,7 @@ import {
   addSnippet,
   updateSnippet,
   deleteSnippet,
+  importSnippets,
 } from "@/store/features/snippets/snippetsSlice";
 
 const SettingsPage: React.FC = () => {
@@ -92,6 +93,45 @@ const SettingsPage: React.FC = () => {
   // --- Snippet Handlers ---
   const handleNewSnippet = (): void => {
     setIsCreatingNewSnippet(true);
+  };
+  const handleExportSnippets = (): void => {
+    const dataStr = JSON.stringify(snippets, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = 'snippets.json';
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    };
+  const handleImportSnippets = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          alert('Failed to read file.');
+          return;
+        }
+        const importedSnippets = JSON.parse(text);
+        // a simple validation
+        if (Array.isArray(importedSnippets) && importedSnippets.every(s => 'name' in s && 'content' in s)) {
+          dispatch(importSnippets(importedSnippets));
+        } else {
+          alert('Invalid file format.');
+        }
+      } catch (error) {
+        console.log("Failed to parse JSON file:", error);
+        alert('Failed to parse JSON.');
+      }
+    };
+    reader.readAsText(file);
   };
   const handleCancelNewSnippet = (): void => {
     setIsCreatingNewSnippet(false);
@@ -210,16 +250,45 @@ const SettingsPage: React.FC = () => {
       </div>
       <div className="settings-section">
         <div className="settings-label">Snippets</div>
-        <button
-          data-testid="new-snippet-button"
-          data-role="primary"
-          data-size="compact"
-          onClick={handleNewSnippet}
-          style={{ marginBottom: "20px" }}
-          disabled={isCreatingNewSnippet || !!editingPromptName}
-        >
-          New Snippet
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            data-testid="new-snippet-button"
+            data-role="primary"
+            data-size="compact"
+            onClick={handleNewSnippet}
+            style={{ marginBottom: "20px" }}
+            disabled={isCreatingNewSnippet || !!editingPromptName}
+          >
+            New Snippet
+          </button>
+          <button
+            data-testid="export-snippets-button"
+            data-role="secondary"
+            data-size="compact"
+            onClick={handleExportSnippets}
+            style={{ marginBottom: "20px" }}
+            disabled={isCreatingNewSnippet || !!editingPromptName}
+          >
+            Export Snippets
+          </button>
+          <input
+            type="file"
+            id="import-snippets-input"
+            style={{ display: "none" }}
+            accept=".json"
+            onChange={handleImportSnippets}
+          />
+          <button
+            data-testid="import-snippets-button"
+            data-role="secondary"
+            data-size="compact"
+            onClick={() => document.getElementById('import-snippets-input')?.click()}
+            style={{ marginBottom: "20px" }}
+            disabled={isCreatingNewSnippet || !!editingPromptName}
+          >
+            Import Snippets
+          </button>
+        </div>
         <div className="snippet-list">
           {isCreatingNewSnippet && (
             <SnippetItem
