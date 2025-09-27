@@ -192,6 +192,18 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
   }
 }
 
+export async function clearAllSnippets(): Promise<void> {
+  const db = await dbPromise;
+  try {
+    const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
+    await tx.store.clear();
+    await tx.done;
+  } catch (e) {
+    console.error("[DB|clearAllSnippets] Failed to clear snippets:", e);
+    throw new Error("Failed to clear snippets.");
+  }
+}
+
 export async function updateSnippetProperty(
   id: string,
   properties: Partial<Snippet>,
