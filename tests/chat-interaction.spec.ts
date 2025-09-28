@@ -205,3 +205,57 @@ test('shows system prompt immediately in a new chat', async ({ page }) => {
     page.locator('[data-testid="chat-message-0"] .chat-message-content')
   ).toHaveText(/You are a test bot/);
 });
+
+test('can collapse and expand messages', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('tomatic-storage', JSON.stringify({
+      state: { apiKey: 'TEST_API_KEY' },
+      version: 1,
+    }));
+  });
+
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const responseBody: Buffer = createStreamResponse('openai/gpt-4o', 'Assistant response');
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: responseBody,
+    });
+  });
+
+  await page.route('https://openrouter.ai/api/v1/models', async (route) => {
+    await route.fulfill({
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      status: 200,
+      body: JSON.stringify({ data: [] }),
+    });
+  });
+
+  await page.goto('http://localhost:5173/chat/new');
+  await page.waitForURL('**/chat/new');
+
+  await page.getByTestId('chat-input').fill('User message');
+  const responsePromise = page.waitForResponse('https://openrouter.ai/api/v1/chat/completions');
+  await page.getByTestId('chat-submit').click();
+  await responsePromise;
+
+  const userMessage = page.locator('[data-testid="chat-message-0"][data-role="user"]');
+  const assistantMessage = page.locator('[data-testid="chat-message-1"][data-role="assistant"]');
+
+  await expect(userMessage).toBeVisible();
+  await expect(assistantMessage).toBeVisible();
+
+  // Test collapsing and expanding the user message
+  await expect(userMessage).not.toHaveClass(/collapsed/);
+  await userMessage.locator('button:has-text("[-]")').click();
+  await expect(userMessage).toHaveClass(/collapsed/);
+  await userMessage.locator('button:has-text("[+]")').click();
+  await expect(userMessage).not.toHaveClass(/collapsed/);
+
+  // Test collapsing and expanding the assistant message
+  await expect(assistantMessage).not.toHaveClass(/collapsed/);
+  await assistantMessage.locator('button:has-text("[-]")').click();
+  await expect(assistantMessage).toHaveClass(/collapsed/);
+  await assistantMessage.locator('button:has-text("[+]")').click();
+  await expect(assistantMessage).not.toHaveClass(/collapsed/);
+});
