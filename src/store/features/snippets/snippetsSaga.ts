@@ -29,7 +29,7 @@ import {
   buildReverseDependencyGraph,
   findTransitiveDependents,
   groupSnippetsIntoBatches,
-  resolveSnippets,
+  resolveSnippetsWithTemplates,
   getTopologicalSortForExecution,
 } from "@/utils/snippetUtils";
 import { requestMessageContent } from "@/api/openrouter";
@@ -149,7 +149,8 @@ function* handleRegenerateSnippetSaga(
     );
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet model for ${snippetToRegenerate.name}:`, snippetToRegenerate.model);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet prompt for ${snippetToRegenerate.name}:`, snippetToRegenerate.prompt);
-    const resolvedPrompt = resolveSnippets(
+    const resolvedPrompt: string = yield call(
+      resolveSnippetsWithTemplates,
       snippetToRegenerate.prompt,
       allSnippets,
     );
