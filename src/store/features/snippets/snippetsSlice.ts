@@ -146,6 +146,9 @@ export const snippetsSlice = createSlice({
     batchRegenerateRequest: (_state, _action: PayloadAction<BatchRegenerateRequestPayload>) => {
       // Saga watcher will handle this.
     },
+    importSnippets: (_state, _action: PayloadAction<Snippet[]>) => {
+      // saga will handle the logic
+    },
   },
 });
 
@@ -169,6 +172,7 @@ export const {
   setSnippetDirtyState,
   awaitableRegenerateRequest,
   batchRegenerateRequest,
+  importSnippets,
 } = snippetsSlice.actions;
 
 export const selectSnippets = (state: RootState) => state.snippets;

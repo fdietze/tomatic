@@ -21,6 +21,7 @@ import {
   setSnippetDirtyState,
   batchRegenerateRequest,
   awaitableRegenerateRequest,
+  importSnippets,
 } from "./snippetsSlice";
 import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
 import { RootState } from "../../store";
@@ -490,12 +491,25 @@ export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, R
   }
 }
 
+function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
+  try {
+    const snippetsToImport = action.payload;
+    yield call(db.clearAllSnippets);
+    yield call(db.saveSnippets, snippetsToImport);
+    yield put(loadSnippets());
+  } catch (error) {
+    console.log("[DEBUG] importSnippetsSaga: failure", error);
+    yield put(loadSnippetsFailure(createAppError.persistence("importSnippets", "Failed to import snippets.")));
+  }
+}
+
 export function* snippetsSaga() {
   yield all([
     takeLatest(loadSnippets.type, loadSnippetsSaga),
     takeLatest(addSnippet.type, addSnippetSaga),
     takeLatest(updateSnippet.type, updateSnippetSaga),
     takeLatest(deleteSnippet.type, deleteSnippetSaga),
+    takeLatest(importSnippets.type, importSnippetsSaga),
     takeLatest(
       [updateSnippetSuccess.type, addSnippetSuccess.type],
       markDependentsDirtySaga,
