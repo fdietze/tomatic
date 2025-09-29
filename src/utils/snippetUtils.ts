@@ -1,46 +1,65 @@
 import type { Snippet } from '@/types/storage';
+import { evaluateTemplate } from './templateUtils';
 
 /**
- * req:snippet-id-vs-name, req:snippet-error-propagation, req:cycle-detection
- * Resolves snippets in a given text, handling recursion and cycle detection.
- * @param text The text to resolve snippets in.
+ * req:snippet-id-vs-name, req:snippet-error-propagation, req:cycle-detection, req:template-evaluation
+ * Asynchronously resolves snippets and templates in a given text.
+ *
+ * This function evaluates snippets in topological order, allowing snippets to depend on each other.
+ * It uses a template engine to execute JavaScript code within the snippets, including async operations.
+ *
+ * @param text The initial text containing snippet references (e.g., `@name` or `${name}`).
  * @param allSnippets A list of all available snippets.
- * @param visited A set to track visited snippets for cycle detection.
- * @returns The text with all snippets resolved.
- * @throws An error if a snippet is not found or a cycle is detected.
+ * @returns A promise that resolves to the final text with all snippets and templates evaluated.
+ * @throws An error if a cycle is detected, a snippet is not found, or a template evaluation fails.
  */
-export function resolveSnippets(
+export async function resolveSnippetsWithTemplates(
   text: string,
-  allSnippets: Snippet[],
-  path: string[] = []
-): string {
-  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
+  allSnippets: Snippet[]
+): Promise<string> {
+  const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
 
-  return text.replace(snippetRegex, (_match: string, snippetName: string) => {
-    console.log(`[DEBUG] resolveSnippets: resolving snippet '@${snippetName}' with content: "${allSnippets.find(s => s.name === snippetName)?.content || 'NOT FOUND'}"`);
-    
-    if (path.includes(snippetName)) {
-      const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
-      throw new Error(`Snippet cycle detected: ${cyclePath}`);
+  if (cyclic.length > 0) {
+    // Cycle detected. Run validation from a cyclic node to get a detailed error message.
+    validateSnippetDependencies(`@${cyclic[0]}`, allSnippets);
+    // Fallback in case validateSnippetDependencies doesn't throw for some reason.
+    throw new Error(`Snippet cycle detected involving: @${cyclic.join(', @')}`);
+  }
+
+  const resolvedValues: Record<string, string> = {};
+
+  for (const snippet of sorted) {
+    const template = snippet.content || '';
+    const preprocessedTemplate = template.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
+
+    try {
+      const result = await evaluateTemplate(preprocessedTemplate, resolvedValues);
+      resolvedValues[snippet.name] = String(result); // Ensure result is a string
+    } catch (error) {
+      if (error instanceof ReferenceError) {
+        const varName = error.message.split(' ')[0];
+        throw new Error(`Error evaluating snippet '@${snippet.name}': it references snippet '@${varName}', which has not been resolved.`);
+      }
+      throw new Error(`Error evaluating snippet '@${snippet.name}': ${(error as Error).message}`);
     }
+  }
 
-    const snippet = allSnippets.find((s) => s.name === snippetName);
-    if (!snippet) {
-      const error = new Error(`Snippet '@${snippetName}' not found.`);
-      console.log('[DEBUG] resolveSnippets: snippet not found, available snippets:', allSnippets.map(s => s.name));
-      console.log('[DEBUG] resolveSnippets: error object:', error);
-      console.log('[DEBUG] resolveSnippets: error message:', error.message);
-      console.log('[DEBUG] resolveSnippets: error type:', typeof error);
-      throw error;
+  const preprocessedText = text.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
+
+  try {
+    const finalText = await evaluateTemplate(preprocessedText, resolvedValues);
+    return finalText;
+  } catch (error) {
+    if (error instanceof ReferenceError) {
+      const snippetName = error.message.split(' ')[0];
+      // Check if the referenced variable exists as a snippet. If not, it's a "not found" error.
+      if (!allSnippets.some(s => s.name === snippetName)) {
+        throw new Error(`Snippet '@${snippetName}' not found.`);
+      }
     }
-
-    // Add the current snippet to the visited set for this resolution path
-    const newPath = [...path, snippetName];
-
-    // Recursively resolve snippets in the content of the found snippet
-    const resolvedContent = resolveSnippets(snippet.content, allSnippets, newPath);
-    return resolvedContent;
-  });
+    // Re-throw other errors, or ReferenceErrors for existing-but-unresolved snippets
+    throw error;
+  }
 }
 
 /**
@@ -49,13 +68,7 @@ export function resolveSnippets(
  * @returns An array of snippet names, without the "@" prefix.
  */
 export function findSnippetReferences(text: string): string[] {
-  if (!text) return [];
-  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
-  const matches = text.match(snippetRegex);
-  if (!matches) {
-    return [];
-  }
-  return matches.map((match) => match.substring(1));
+  return Array.from(getReferencedSnippetNames(text));
 }
 
 
@@ -71,18 +84,12 @@ export function validateSnippetDependencies(
   allSnippets: Snippet[],
   path: string[] = []
 ): void {
-  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
-
-  // Use matchAll to avoid issues with regex state
-  const matches = [...text.matchAll(snippetRegex)];
-  if (matches.length === 0) {
+  const referencedNames = getReferencedSnippetNames(text);
+  if (referencedNames.size === 0) {
     return;
   }
 
-  for (const match of matches) {
-    const snippetName = match[1]; // Group 1 is the name
-    if (!snippetName) continue;
-
+  for (const snippetName of referencedNames) {
     if (path.includes(snippetName)) {
       const cyclePath = [...path, snippetName].map((name) => `@${name}`).join(' -> ');
       throw new Error(`Snippet cycle detected: ${cyclePath}`);
@@ -110,24 +117,9 @@ export function validateSnippetDependencies(
  * @returns An array of the names of non-existent snippets.
  */
 export function findNonExistentSnippets(text: string, allSnippets: Snippet[]): string[] {
-  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
-  const matches = text.match(snippetRegex);
-  if (!matches) {
-    return [];
-  }
-  const referencedNames = matches.map(match => match.substring(1));
+  const referencedNames = getReferencedSnippetNames(text);
   const existingNames = new Set(allSnippets.map(s => s.name));
-
-  // Use a Set to get unique non-existent names
-  const nonExistent = new Set<string>();
-  for (const name of referencedNames) {
-    if (!existingNames.has(name)) {
-      nonExistent.add(name);
-    }
-  }
-
-  const result = [...nonExistent];
-  return result;
+  return [...referencedNames].filter(name => !existingNames.has(name));
 }
 
 
@@ -138,13 +130,19 @@ export function findNonExistentSnippets(text: string, allSnippets: Snippet[]): s
  */
 export function getReferencedSnippetNames(text: string): Set<string> {
   if (!text) return new Set();
-  const snippetRegex = /@([a-zA-Z0-9_]+)/g;
-  const matches = text.match(snippetRegex);
-  if (!matches) {
-    return new Set();
+  // This regex finds both @name and ${name} style references.
+  // It uses two capture groups.
+  const snippetRegex = /@([a-zA-Z0-9_]+)|\$\{([a-zA-Z0-9_]+)\}/g;
+  const matches = [...text.matchAll(snippetRegex)];
+  const names = new Set<string>();
+  for (const match of matches) {
+    // The name will be in either the first or second capture group.
+    const name = match[1] || match[2];
+    if (name) {
+      names.add(name);
+    }
   }
-  const result = new Set(matches.map(match => match.substring(1)));
-  return result;
+  return names;
 }
 
 /**
