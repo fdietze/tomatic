@@ -14,7 +14,7 @@ export interface SettingsState {
 
 export const initialState: SettingsState = {
   apiKey: "",
-  modelName: "openai/gpt-4o",
+  modelName: "google/gemini-2.5-pro",
   autoScrollEnabled: true,
   selectedPromptName: null,
   initialChatPrompt: null,
