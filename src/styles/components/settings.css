@@ -15,9 +15,10 @@
 }
 
 .settings-label {
-    font-size: smaller;
+    font-size: larger;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    margin-top: 24px;
 }
 
 .settings-system-prompt {
