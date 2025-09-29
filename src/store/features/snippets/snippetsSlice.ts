@@ -121,6 +121,9 @@ export const snippetsSlice = createSlice({
         state.regenerationStatus[id] = { status: "error", error };
       }
     },
+    cancelSnippetGeneration: (_state, _action: PayloadAction<string>) => {
+      // Saga will handle this side effect
+    },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
         delete state.regenerationStatus[action.payload];
     },
@@ -167,6 +170,7 @@ export const {
   regenerateSnippet,
   regenerateSnippetSuccess,
   regenerateSnippetFailure,
+  cancelSnippetGeneration,
   clearRegenerationStatus,
   updateSnippetContent,
   setSnippetDirtyState,

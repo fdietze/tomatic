@@ -13,7 +13,6 @@ import {
   selectSnippets,
   regenerateSnippet,
 } from '@/store/features/snippets/snippetsSlice';
-import { assertUnreachable } from '@/utils/assert';
 import { getErrorMessage } from '@/types/errors';
 
 interface SnippetItemProps {
@@ -371,44 +370,32 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           )}
         </span>
         <div className="system-prompt-actions">
-          {(() => {
-            const status = regenerationStatus[snippet.id]?.status || 'idle';
-            switch (status) {
-              case 'idle':
-              case 'success':
-              case 'error':
-                return (
-                  <div className="system-prompt-buttons">
-                    <button
-                      onClick={() => { setIsViewingFullScreen(true); }}
-                      data-size="compact"
-                      data-testid="snippet-view-button"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => { setIsEditing(true); }}
-                      data-size="compact"
-                      data-testid="snippet-edit-button"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => { void onRemove(snippet.id); }}
-                      data-size="compact"
-                      data-testid="snippet-delete-button"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                );
-              case 'in_progress':
-                // req:dirty-loading-indicator: Show loading indicator for dirty/regenerating snippets
-                return <span className="spinner" data-testid="regenerating-spinner" />;
-              default:
-                assertUnreachable(status);
-            }
-          })()}
+          {regenerationStatus[snippet.id]?.status === 'in_progress' && (
+            <span className="spinner" data-testid="regenerating-spinner" />
+          )}
+          <div className="system-prompt-buttons">
+            <button
+              onClick={() => { setIsViewingFullScreen(true); }}
+              data-size="compact"
+              data-testid="snippet-view-button"
+            >
+              View
+            </button>
+            <button
+              onClick={() => { setIsEditing(true); }}
+              data-size="compact"
+              data-testid="snippet-edit-button"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => { void onRemove(snippet.id); }}
+              data-size="compact"
+              data-testid="snippet-delete-button"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
       <div className="system-prompt-text">
