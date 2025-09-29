@@ -41,6 +41,7 @@
 
 # Migrations
 - we have persisted state in localstorage and indexeddb which must be migrated, when data structures change.
+- for new versions, add new json fixtures
 - don't break old migrations. add new types for new versions.
 
 # Tests
