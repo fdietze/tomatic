@@ -1,0 +1,85 @@
+/* src/styles/highlight.css */
+
+/* General styling for code blocks */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  background: var(--base00);
+  color: var(--base05);
+  border-radius: 5px;
+}
+
+/* Comments */
+.hljs-comment,
+.hljs-quote {
+  color: var(--base03);
+  font-style: italic;
+}
+
+/* Keywords, tags, and sections */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-section,
+.hljs-name,
+.hljs-attr {
+  color: var(--base0E);
+}
+
+/* Built-in names, types */
+.hljs-built_in,
+.hljs-type {
+    color: var(--base0D);
+}
+
+/* Strings, bullets, and symbols */
+.hljs-string,
+.hljs-bullet,
+.hljs-symbol,
+.hljs-regexp,
+.hljs-link {
+  color: var(--base0B);
+}
+
+/* Numbers and literals */
+.hljs-number,
+.hljs-literal {
+  color: var(--base09);
+}
+
+/* Variables, templates, and attributes */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attribute {
+  color: var(--base08);
+}
+
+/* Functions and titles */
+.hljs-title,
+.hljs-function {
+  color: var(--base0D);
+}
+
+/* Additions */
+.hljs-addition {
+  color: var(--base0B);
+  display: inline-block;
+  width: 100%;
+}
+
+/* Deletions */
+.hljs-deletion {
+  color: var(--base08);
+  display: inline-block;
+  width: 100%;
+}
+
+/* Emphasis */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+/* Strong emphasis */
+.hljs-strong {
+  font-weight: bold;
+}
