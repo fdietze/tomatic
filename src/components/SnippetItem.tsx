@@ -5,7 +5,6 @@ import { DisplayModelInfo } from '@/types/storage';
 import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
-import FullScreenMarkdownViewer from './FullScreenMarkdownViewer';
 import { selectModels } from '@/store/features/models/modelsSlice';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
@@ -36,14 +35,14 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   onRemove,
   onCancel,
 }) => {
-    const dispatch = useDispatch();
-    const { models: cachedModels } = useSelector(selectModels);
-    const { modelName: defaultModelName } = useSelector(selectSettings);
-    useSelector(selectPrompts);
-    const { snippets: allSnippets, regenerationStatus } = useSelector(selectSnippets);
-    
+  const dispatch = useDispatch();
+  const { models: cachedModels } = useSelector(selectModels);
+  const { modelName: defaultModelName } = useSelector(selectSettings);
+  useSelector(selectPrompts);
+  const { snippets: allSnippets, regenerationStatus } = useSelector(selectSnippets);
+
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
-  const [isViewingFullScreen, setIsViewingFullScreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // req:snippet-expand-collapse
   const [editingName, setEditingName] = useState(snippet.name);
   const [editingContent, setEditingContent] = useState(snippet.content);
   const [editingIsGenerated, setEditingIsGenerated] = useState(snippet.isGenerated);
@@ -99,9 +98,9 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     } catch (error) {
       errors.push(error instanceof Error ? error.message : 'An unknown cycle was detected.');
     }
-    
+
     const missingSnippets = findNonExistentSnippets(textToScan, snippetsForValidation);
-    if(missingSnippets.length > 0) {
+    if (missingSnippets.length > 0) {
       for (const missing of missingSnippets) {
         errors.push(`Warning: Snippet '@${missing}' not found.`);
       }
@@ -142,13 +141,13 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   const handleSave = async (): Promise<void> => {
     const trimmedName = editingName.trim();
     if (nameError || trimmedName === '') {
-        if (trimmedName === '') setNameError('Name cannot be empty.');
-        return;
+      if (trimmedName === '') setNameError('Name cannot be empty.');
+      return;
     }
 
     // req:save-button-dirty-detection: Check if prompt has changed for generated snippets
     const promptChanged = editingIsGenerated && (editingPrompt !== (snippet.prompt || ''));
-    
+
     // Only trigger automatic regeneration if:
     // 1. This is an existing snippet (not being created for the first time)
     // 2. The prompt has changed 
@@ -157,7 +156,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     const isExistingSnippet = Boolean(snippet.id);
     const hasPromptErrors = promptErrors.length > 0;
     const shouldAutoRegenerate = isExistingSnippet && promptChanged && !hasManuallyRegenerated && !hasPromptErrors;
-    
+
     const snippetForSave: Snippet = {
       ...snippet,
       id: snippet.id || crypto.randomUUID(),
@@ -264,14 +263,14 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
 
           {editingIsGenerated ? (
             <div className="generated-content-readonly" data-testid="snippet-content-display">
-                <div className="settings-label" style={{fontSize: 'var(--font-size-small)', marginTop: '10px'}}>Content (read-only)</div>
-                {promptErrors.length > 0 ? (
-                  <div className="error-message" data-testid="prompt-error-message">
-                    {promptErrors.map((error, i) => <div key={i}>{error}</div>)}
-                  </div>
-                ) : (
-                  <Markdown markdownText={editingContent} />
-                )}
+              <div className="settings-label" style={{ fontSize: 'var(--font-size-small)', marginTop: '10px' }}>Content (read-only)</div>
+              {promptErrors.length > 0 ? (
+                <div className="error-message" data-testid="prompt-error-message">
+                  {promptErrors.map((error, i) => <div key={i}>{error}</div>)}
+                </div>
+              ) : (
+                <Markdown markdownText={editingContent} />
+              )}
             </div>
           ) : (
             <>
@@ -326,8 +325,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
             const idToLookup = generatedId || snippet.id;
             const regenerationError = regenerationStatus[idToLookup]?.error;
             const persistedError = snippet.generationError;
-            
-            
+
+
             if (regenerationError) {
               return getErrorMessage(regenerationError);
             } else if (persistedError) {
@@ -342,21 +341,14 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   }
 
   return (
-    <>
-      {isViewingFullScreen && (
-        <FullScreenMarkdownViewer
-          markdownText={snippet.content}
-          onClose={() => setIsViewingFullScreen(false)}
-        />
-      )}
-      <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
-        <div className="system-prompt-header">
-          <span className="system-prompt-name">
+    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
+      <div className="system-prompt-header">
+        <span className="system-prompt-name">
           {snippet.name}
           {/* req:error-warning-sign: Show warning for cyclic dependencies */}
           {isCyclic && (
-            <span 
-              className="cycle-warning-icon" 
+            <span
+              className="cycle-warning-icon"
               data-testid="cycle-warning-icon"
               title="This snippet is part of a dependency cycle. Automatic regeneration is disabled."
               style={{
@@ -380,11 +372,11 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
                 return (
                   <div className="system-prompt-buttons">
                     <button
-                      onClick={() => { setIsViewingFullScreen(true); }}
+                      onClick={() => { setIsExpanded(!isExpanded); }}
                       data-size="compact"
-                      data-testid="snippet-view-button"
+                      data-testid="snippet-toggle-button"
                     >
-                      View
+                      {isExpanded ? 'Collapse' : 'Expand'}
                     </button>
                     <button
                       onClick={() => { setIsEditing(true); }}
@@ -411,13 +403,18 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           })()}
         </div>
       </div>
-      <div className="system-prompt-text">
-        <Markdown markdownText={snippet.content} />
+      <div>
+        {/* req:snippet-expand-collapse: Show plain text when collapsed, markdown when expanded */}
+        {isExpanded ? (
+          <Markdown markdownText={snippet.content} />
+        ) : (
+          <div className="system-prompt-text">{snippet.content}</div>
+        )}
       </div>
       {(() => {
         const regenerationError = regenerationStatus[snippet.id]?.error;
         const persistedError = snippet.generationError;
-        
+
         // req:error-warning-sign: Show error messages for failed generation
         if (regenerationError) {
           // For snippet regeneration errors, extract just the core error message
@@ -449,8 +446,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           return null;
         }
       })()}
-      </div>
-    </>
+    </div>
   );
 };
 

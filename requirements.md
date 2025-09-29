@@ -59,4 +59,5 @@
 - req:raw-content-preservation: user messages preserve original raw input with snippet references for editing
 - req:edit-textarea-population: when editing messages, textarea is populated with raw content rather than resolved content
 - req:save-button-dirty-detection: pressing the save button on a generated snippet should mark it as dirty if the prompt input is different from the original
+- req:snippet-expand-collapse: snippet content can be expanded/collapsed instead of fullscreen viewing. Collapsed shows plain text, expanded shows markdown rendering
 - when migrations fail, the user must see an error message.
