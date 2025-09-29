@@ -79,6 +79,7 @@ class PwActionsReporter {
 		if (result.status !== 'passed' && result.status !== 'skipped') {
 			const pwLogs = this.logs.get(test.id) || [];
 			let browserLogs = [];
+			let testSideLogs = [];
 
 			const browserLogsAttachment = result.attachments.find((a) => a.name === 'browser-logs');
 			if (browserLogsAttachment && browserLogsAttachment.body) {
@@ -89,7 +90,18 @@ class PwActionsReporter {
 				}
 			}
 
-			const allLogs = [...pwLogs, ...browserLogs].sort((a, b) => a.timestamp - b.timestamp);
+			const testSideLogsAttachment = result.attachments.find((a) => a.name === 'test-side-logs');
+			if (testSideLogsAttachment && testSideLogsAttachment.body) {
+				try {
+					testSideLogs = JSON.parse(testSideLogsAttachment.body.toString());
+				} catch (e) {
+					console.log(`[PwActionsReporter] Failed to parse test-side logs attachment: ${e}`);
+				}
+			}
+
+			const allLogs = [...pwLogs, ...browserLogs, ...testSideLogs].sort(
+				(a, b) => a.timestamp - b.timestamp
+			);
 
 			console.log(`\n\n### logs for "${test.title}":`);
 			this.printLogs(allLogs);
@@ -122,6 +134,9 @@ class PwActionsReporter {
 					break;
 				case 'BROWSER_CONSOLE':
 					console.log(`${log.data.type}: ${log.data.text}`);
+					break;
+				case 'TEST_SIDE_CONSOLE':
+					console.log(`TEST ${log.data.level.toUpperCase()}: ${log.data.message}`);
 					break;
 			}
 		});
