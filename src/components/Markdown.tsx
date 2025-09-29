@@ -43,22 +43,26 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
         const codeElement = codeBlock.querySelector('code');
         const codeText = codeElement ? codeElement.innerText : '';
 
-        // Create a container for the copy button to be injected into
+        // Create a wrapper div that will contain both the code block and the copy button.
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+
+        // Insert the wrapper before the code block and move the code block inside the wrapper.
+        codeBlock.parentNode?.insertBefore(wrapper, codeBlock);
+        wrapper.appendChild(codeBlock);
+
+        // Create a container for the copy button.
         const buttonContainer = document.createElement('div');
         buttonContainer.style.position = 'absolute';
         buttonContainer.style.top = '8px';
         buttonContainer.style.right = '8px';
+        wrapper.appendChild(buttonContainer);
 
-        // The parent <pre> tag needs to be positioned relatively for the
-        // absolute positioning of the button container to work.
-        codeBlock.style.position = 'relative';
-        codeBlock.appendChild(buttonContainer);
-
-        // Create a new React root in the container and render the CopyButton
-        const root = createRoot(buttonContainer as HTMLElement);
+        // Create a new React root in the container and render the CopyButton.
+        const root = createRoot(buttonContainer);
         root.render(<CopyButton textToCopy={codeText} />);
 
-        // Keep track of the created roots so they can be unmounted on cleanup
+        // Keep track of the created roots so they can be unmounted on cleanup.
         roots.current.push(root);
       });
     }
