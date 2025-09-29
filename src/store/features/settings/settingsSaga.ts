@@ -1,4 +1,6 @@
 import { call, put, takeLatest, select, debounce } from "redux-saga/effects";
+import { PayloadAction } from "@reduxjs/toolkit";
+import { retryFailedSnippets } from "../snippets/snippetsSlice";
 import {
   loadSettings,
   loadSettingsSuccess,
@@ -37,6 +39,13 @@ function* saveSettingsSaga() {
   }
 }
 
+function* watchApiKeyChangesSaga(action: PayloadAction<string>) {
+  // req:api-key-update-retries
+  if (action.payload) {
+    yield put(retryFailedSnippets());
+  }
+}
+
 export function* settingsSaga() {
   yield takeLatest(loadSettings.type, loadSettingsSaga);
   const actionsToSave = [
@@ -48,4 +57,5 @@ export function* settingsSaga() {
   ];
   yield debounce(500, actionsToSave, saveSettingsSaga);
   yield takeLatest(saveSettingsAction.type, saveSettingsSaga);
+  yield takeLatest(setApiKey.type, watchApiKeyChangesSaga);
 }

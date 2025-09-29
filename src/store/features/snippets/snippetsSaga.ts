@@ -21,6 +21,7 @@ import {
   setSnippetDirtyState,
   batchRegenerateRequest,
   awaitableRegenerateRequest,
+  retryFailedSnippets,
 } from "./snippetsSlice";
 import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
 import { RootState } from "../../store";
@@ -489,6 +490,29 @@ export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, R
   }
 }
 
+// req:api-key-update-retries:
+function* retryFailedSnippetsSaga() {
+  console.log('[DEBUG] retryFailedSnippetsSaga: triggered');
+  const { snippets }: { snippets: Snippet[] } = yield select(
+    (state: RootState) => state.snippets,
+  );
+
+  const failedSnippets = snippets.filter(
+    (snippet) => snippet.isGenerated && snippet.generationError,
+  );
+
+  if (failedSnippets.length === 0) {
+    console.log('[DEBUG] retryFailedSnippetsSaga: no failed snippets to retry');
+    return;
+  }
+
+  console.log(
+    '[DEBUG] retryFailedSnippetsSaga: found failed snippets to retry:',
+    failedSnippets.map((s) => s.name),
+  );
+  yield put(batchRegenerateRequest({ snippets: failedSnippets }));
+}
+
 export function* snippetsSaga() {
   yield all([
     takeLatest(loadSnippets.type, loadSnippetsSaga),
@@ -505,5 +529,6 @@ export function* snippetsSaga() {
     takeEvery(awaitableRegenerateRequest.type, handleAwaitableRegeneration),
     // req:snippet-dirty-indexeddb: Persist snippet content after successful regeneration
     takeEvery(regenerateSnippetSuccess.type, persistSnippetAfterRegenerationSaga),
+    takeLatest(retryFailedSnippets.type, retryFailedSnippetsSaga),
   ]);
 }
