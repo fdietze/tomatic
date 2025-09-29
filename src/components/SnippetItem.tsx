@@ -5,6 +5,7 @@ import { DisplayModelInfo } from '@/types/storage';
 import { validateSnippetDependencies, findNonExistentSnippets } from '@/utils/snippetUtils';
 import Combobox, { type ComboboxItem } from './Combobox';
 import Markdown from './Markdown';
+import FullScreenMarkdownViewer from './FullScreenMarkdownViewer';
 import { selectModels } from '@/store/features/models/modelsSlice';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
@@ -42,6 +43,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
     const { snippets: allSnippets, regenerationStatus } = useSelector(selectSnippets);
     
   const [isEditing, setIsEditing] = useState(isInitiallyEditing);
+  const [isViewingFullScreen, setIsViewingFullScreen] = useState(false);
   const [editingName, setEditingName] = useState(snippet.name);
   const [editingContent, setEditingContent] = useState(snippet.content);
   const [editingIsGenerated, setEditingIsGenerated] = useState(snippet.isGenerated);
@@ -340,9 +342,16 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
   }
 
   return (
-    <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
-      <div className="system-prompt-header">
-        <span className="system-prompt-name">
+    <>
+      {isViewingFullScreen && (
+        <FullScreenMarkdownViewer
+          markdownText={snippet.content}
+          onClose={() => setIsViewingFullScreen(false)}
+        />
+      )}
+      <div className="system-prompt-item-view" data-testid={`snippet-item-${snippet.id}`}>
+        <div className="system-prompt-header">
+          <span className="system-prompt-name">
           {snippet.name}
           {/* req:error-warning-sign: Show warning for cyclic dependencies */}
           {isCyclic && (
@@ -371,6 +380,13 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
                 return (
                   <div className="system-prompt-buttons">
                     <button
+                      onClick={() => { setIsViewingFullScreen(true); }}
+                      data-size="compact"
+                      data-testid="snippet-view-button"
+                    >
+                      View
+                    </button>
+                    <button
                       onClick={() => { setIsEditing(true); }}
                       data-size="compact"
                       data-testid="snippet-edit-button"
@@ -396,7 +412,7 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
         </div>
       </div>
       <div className="system-prompt-text">
-        {snippet.content}
+        <Markdown markdownText={snippet.content} />
       </div>
       {(() => {
         const regenerationError = regenerationStatus[snippet.id]?.error;
@@ -433,7 +449,8 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           return null;
         }
       })()}
-    </div>
+      </div>
+    </>
   );
 };
 
