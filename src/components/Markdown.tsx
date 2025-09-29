@@ -40,12 +40,18 @@ const Markdown: React.FC<MarkdownProps> = ({ markdownText }) => {
       const codeBlocks: NodeListOf<HTMLElement> = contentRef.current.querySelectorAll('pre');
 
       codeBlocks.forEach(codeBlock => {
+        // If the code block is already wrapped, don't wrap it again.
+        if (codeBlock.parentElement?.dataset.codeBlockWrapper === 'true') {
+          return;
+        }
+
         const codeElement = codeBlock.querySelector('code');
         const codeText = codeElement ? codeElement.innerText : '';
 
         // Create a wrapper div that will contain both the code block and the copy button.
         const wrapper = document.createElement('div');
         wrapper.style.position = 'relative';
+        wrapper.dataset.codeBlockWrapper = 'true';
 
         // Insert the wrapper before the code block and move the code block inside the wrapper.
         codeBlock.parentNode?.insertBefore(wrapper, codeBlock);
