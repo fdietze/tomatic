@@ -39,6 +39,10 @@
 - use exhaustiveness matching of typescript wherever possible
 - handled errors should never use console.error, only console.log. console.error is considered an error by the tests.
 
+# Migrations
+- we have persisted state in localstorage and indexeddb which must be migrated, when data structures change.
+- don't break old migrations. add new types for new versions.
+
 # Tests
 - We want a composable test setup with low abstraction levels and no builder patterns. 
 - each test must be as explicit and self-contained as possible.
