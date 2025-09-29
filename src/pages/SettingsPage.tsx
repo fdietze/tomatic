@@ -165,7 +165,7 @@ const SettingsPage: React.FC = () => {
   return (
     <div style={{ marginBottom: "50px" }}>
       <div className="settings-section">
-        <div className="settings-label">OpenRouter API Key (get one from <a href="https://openrouter.ai/" target="_blank">https://openrouter.ai</a>)</div>
+        <div className="settings-label">OpenRouter API Key (get one from <a href="https://openrouter.ai/" target="_blank" rel="noreferrer">https://openrouter.ai</a>)</div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <input
             type="text"
