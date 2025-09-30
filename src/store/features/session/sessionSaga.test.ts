@@ -9,12 +9,15 @@ import { submitUserMessage } from "./sessionSlice";
 import { type RootState } from "@/store/store";
 import type { Message } from "@/types/chat";
 import { expectSaga } from "redux-saga-test-plan";
-import { select } from "redux-saga/effects";
+import { select, call } from "redux-saga/effects";
 
-import { goToPrevSession, selectSession } from "./sessionSlice";
+import { goToPrevSession, selectSession, loadSession, loadSessionSuccess, setSelectedPromptName } from "./sessionSlice";
 import { sessionSaga } from "./sessionSaga";
 import { ROUTES } from "@/utils/routes";
 import { getNavigationService } from "@/services/NavigationProvider";
+import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
+import * as db from "@/services/db/chat-sessions";
+import type { ChatSession } from "@/types/chat";
 
 // Mock the chat service to avoid real API calls
 vi.mock("@/services/chatService", () => ({
@@ -24,6 +27,8 @@ vi.mock("@/services/chatService", () => ({
 vi.mock("@/services/NavigationProvider", () => ({
   getNavigationService: vi.fn(),
 }));
+
+// Note: We don't mock the entire db module to avoid breaking existing tests
 
 // Mock nanoid to have predictable IDs for snapshot consistency
 vi.mock("nanoid", () => ({
@@ -268,4 +273,87 @@ describe("sessionSaga", () => {
       )
       .run();
   });
+
+  test("should update selected prompt when loading session with system message", () => {
+    // Purpose: This test verifies that when loading a session with a system message containing
+    // a prompt_name, the saga updates both session and settings selected prompt name
+    // req:system-prompt-navigation-sync
+    const mockSession: ChatSession = {
+      session_id: "test-session",
+      messages: [
+        {
+          id: "system-msg",
+          role: "system",
+          content: "You are a helpful assistant.",
+          raw_content: "You are a helpful assistant.",
+          prompt_name: "assistant",
+        },
+        {
+          id: "user-msg",
+          role: "user",
+          content: "Hello",
+          raw_content: "Hello",
+        },
+      ],
+      name: null,
+      created_at_ms: Date.now(),
+      updated_at_ms: Date.now(),
+    };
+
+    const mockNeighbors = { prevId: null, nextId: "next-session" };
+
+    return expectSaga(sessionSaga)
+      .provide([
+        [call(db.loadSession, "test-session"), mockSession],
+        [call(db.findNeighbourSessionIds, mockSession), mockNeighbors],
+      ])
+      .dispatch(loadSession("test-session"))
+      .put(setSelectedPromptName("assistant"))
+      .put(setSettingsSelectedPromptName("assistant"))
+      .put(loadSessionSuccess({
+        messages: mockSession.messages,
+        sessionId: "test-session",
+        prevId: null,
+        nextId: "next-session",
+      }))
+      .run();
+  });
+
+  test("should deselect prompt when loading session without system message", () => {
+    // Purpose: This test verifies that when loading a session without a system message,
+    // the saga deselects the prompt to reflect what is persisted with the session
+    const mockSession: ChatSession = {
+      session_id: "test-session",
+      messages: [
+        {
+          id: "user-msg",
+          role: "user",
+          content: "Hello",
+          raw_content: "Hello",
+        },
+      ],
+      name: null,
+      created_at_ms: Date.now(),
+      updated_at_ms: Date.now(),
+    };
+
+    const mockNeighbors = { prevId: null, nextId: null };
+
+    return expectSaga(sessionSaga)
+      .provide([
+        [call(db.loadSession, "test-session"), mockSession],
+        [call(db.findNeighbourSessionIds, mockSession), mockNeighbors],
+      ])
+      .dispatch(loadSession("test-session"))
+      .put(setSelectedPromptName(null))
+      .put(setSettingsSelectedPromptName(null))
+      .put(loadSessionSuccess({
+        messages: mockSession.messages,
+        sessionId: "test-session",
+        prevId: null,
+        nextId: null,
+      }))
+      .run();
+  });
+
 });
