@@ -104,11 +104,19 @@ function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
 
 // Helper function to initialize a new session with the global selected prompt
 function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
-  const { settings }: RootState = yield select((state: RootState) => state);
+  // req:system-prompt-preservation
+  const { settings, prompts }: RootState = yield select(
+    (state: RootState) => state,
+  );
   const globalSelectedPromptName = settings.selectedPromptName;
-  
+
   if (globalSelectedPromptName) {
-    yield put(setSelectedPromptName(globalSelectedPromptName));
+    const promptEntity = prompts.prompts[globalSelectedPromptName];
+    if (promptEntity) {
+      // When creating a new session, we must also dispatch `setSystemPromptRequested`
+      // to ensure the system message is created with content.
+      yield put(setSystemPromptRequested(promptEntity.data));
+    }
   }
 }
 
