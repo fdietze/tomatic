@@ -140,4 +140,48 @@ test.describe("Auto-Save New Chat Sessions", () => {
 
     chatMocker.verifyComplete();
   });
+
+  test("preserves system prompt when starting a new chat from an existing one", async ({ page }) => {
+    // Purpose: This test verifies that if a user is in a session with a system prompt,
+    // clicking "New Chat" preserves the selected prompt and its message content.
+
+    // 1. Setup: Create a prompt and start a session with it.
+    await chatPage.navigation.goToSettings();
+    await settingsPage.createNewPrompt("MyTestPrompt", "You are a test assistant.");
+    await settingsPage.navigation.goBackToChat();
+    await page.getByTestId("system-prompt-button-MyTestPrompt").click();
+
+    // 2. Send a message to make the session persistent
+    chatMocker.mock({
+      request: {
+        model: "google/gemini-2.5-pro",
+        messages: [
+          { role: "system", content: "You are a test assistant." },
+          { role: "user", content: "First message to save session" },
+        ],
+        stream: true,
+      },
+      response: { role: "assistant", content: "Session saved." },
+    });
+    await chatPage.sendMessage("First message to save session");
+    await chatPage.expectMessage(2, "assistant", /Session saved./);
+    await expect(page).not.toHaveURL(/\/chat\/new$/); // Verify session is saved
+
+    // 3. Act: Click the "New Chat" button
+    await page.getByTestId("new-chat-button").click();
+
+    // After navigation, we need to re-expose the store getter
+    await chatPage.exposeTomaticTestGetStore();
+
+    // 4. Assert: We are on a new chat page, but the prompt is preserved
+    await expect(page).toHaveURL(/\/chat\/new$/);
+
+    // The prompt button should still be selected
+    const promptButton = page.getByTestId("system-prompt-button-MyTestPrompt");
+    await expect(promptButton).toHaveAttribute("data-selected", "true");
+
+    // The system message should be present in the new empty chat
+    await chatPage.expectMessageCount(1);
+    await chatPage.expectMessage(0, "system", /You are a test assistant./);
+  });
 });

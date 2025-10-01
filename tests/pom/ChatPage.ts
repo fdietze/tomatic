@@ -34,6 +34,15 @@ export class ChatPage {
     });
   }
 
+  async getMessagesFromStore() {
+    const messages = await this.page.evaluate(() => {
+      const w = window as unknown as { tomatic_test_getStore: () => { getState: () => { session: { messages: unknown[] } } } };
+      const state = w.tomatic_test_getStore().getState();
+      return state.session.messages;
+    });
+    return messages;
+  }
+
   // --- Actions ---
 
   /**
