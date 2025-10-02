@@ -96,26 +96,32 @@ export const testWithLogging = base.extend({
 			}
 		});
 
-		page.on('console', (msg) => {
-			const msgType = msg.type().toUpperCase();
-			const msgText = msg.text();
+    page.on('console', (msg) => {
+      const msgType = msg.type().toUpperCase();
+      const msgText = msg.text();
+      const location = msg.location();
 
-			if (
-				msgText.startsWith('[vite]') ||
-				msgText.includes('Download the React DevTools for a better development experience')
-			) {
-				return;
-			}
+      if (
+        msgText.startsWith('[vite]') ||
+        msgText.includes('Download the React DevTools for a better development experience')
+      ) {
+        return;
+      }
 
-			logs.push({
-				type: 'BROWSER_CONSOLE',
-				timestamp: Date.now(),
-				data: {
-					type: msgType,
-					text: msgText,
-				},
-			});
-		});
+      logs.push({
+        type: 'BROWSER_CONSOLE',
+        timestamp: Date.now(),
+        data: {
+          type: msgType,
+          text: msgText,
+          location: {
+            url: location.url,
+            line: location.lineNumber,
+            column: location.columnNumber,
+          },
+        },
+      });
+    });
 
 		await use(page);
 

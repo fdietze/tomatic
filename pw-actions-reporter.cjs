@@ -123,15 +123,15 @@ class PwActionsReporter {
       const ANSI_RED = '\x1b[31m';
       const ANSI_YELLOW = '\x1b[33m';
       const ANSI_RESET = '\x1b[0m';
-      
+
       const relativeLocation = path.relative(this.cwd, test.location.file);
-      
+
       console.log(`\n\n${ANSI_RED}✗ ${test.title}${ANSI_RESET}`);
       console.log(`${ANSI_YELLOW}Location: ${relativeLocation}:${test.location.line}:${test.location.column}${ANSI_RESET}`);
-      
+
       console.log(`\n${ANSI_YELLOW}### Interleaved logs:${ANSI_RESET}`);
       this.printLogs(allLogs);
-      
+
       // Print error details
       if (result.errors && result.errors.length > 0) {
         console.log(`\n${ANSI_RED}Error Details:${ANSI_RESET}`);
@@ -177,9 +177,26 @@ class PwActionsReporter {
         case 'NETWORK_RESPONSE':
           console.log(`${ANSI_BLUE}NET: ${log.data.status} ${log.data.url}${ANSI_RESET}`);
           break;
-        case 'BROWSER_CONSOLE':
-          console.log(`${log.data.type}: ${log.data.text}`);
+        case 'BROWSER_CONSOLE': {
+          let locationStr = '';
+          if (log.data.location) {
+            const loc = log.data.location;
+            // Extract filename from URL if it's a full URL
+            let fileDisplay = loc.url;
+            if (loc.url) {
+              // Remove base URL and query params
+              fileDisplay = loc.url.split('?')[0];
+              // Get just the filename for brevity
+              const parts = fileDisplay.split('/');
+              fileDisplay = parts[parts.length - 1] || fileDisplay;
+            }
+            if (fileDisplay && loc.line !== undefined) {
+              locationStr = ` [${fileDisplay}:${loc.line}]`;
+            }
+          }
+          console.log(`${log.data.type}: ${log.data.text}${locationStr}`);
           break;
+        }
         case 'TEST_SIDE_CONSOLE':
           console.log(`TEST ${log.data.level.toUpperCase()}: ${log.data.message}`);
           break;
