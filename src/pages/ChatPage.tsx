@@ -18,6 +18,7 @@ import {
   loadSession,
   setSessionError,
   setSystemPromptRequested,
+  removeSystemPrompt,
   setSelectedPromptName as setSessionSelectedPromptName,
 } from "@/store/features/session/sessionSlice";
 
@@ -105,13 +106,19 @@ const ChatPage: React.FC = () => {
             dispatch(setSessionSelectedPromptName(name));
             dispatch(setSelectedPromptName(name));
             
-            const selectedPromptEntity = systemPromptEntities.find(
-              (entity) => entity.data.name === name,
-            );
-            console.log(`[DEBUG] ChatPage.onSelectPrompt: found selectedPromptEntity: ${!!selectedPromptEntity}`);
-            if (selectedPromptEntity) {
-              console.log(`[DEBUG] ChatPage.onSelectPrompt: dispatching setSystemPromptRequested for: ${selectedPromptEntity.data.name}`);
-              dispatch(setSystemPromptRequested(selectedPromptEntity.data));
+            // req:system-prompt-interactive-update: Handle prompt selection/deselection
+            if (name === null) {
+              console.log(`[DEBUG] ChatPage.onSelectPrompt: deselecting prompt - removing system message`);
+              dispatch(removeSystemPrompt());
+            } else {
+              const selectedPromptEntity = systemPromptEntities.find(
+                (entity) => entity.data.name === name,
+              );
+              console.log(`[DEBUG] ChatPage.onSelectPrompt: found selectedPromptEntity: ${!!selectedPromptEntity}`);
+              if (selectedPromptEntity) {
+                console.log(`[DEBUG] ChatPage.onSelectPrompt: dispatching setSystemPromptRequested for: ${selectedPromptEntity.data.name}`);
+                dispatch(setSystemPromptRequested(selectedPromptEntity.data));
+              }
             }
           }}
         />

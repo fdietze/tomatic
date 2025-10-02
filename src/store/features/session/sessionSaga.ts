@@ -44,6 +44,7 @@ import {
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
 import { findSnippetReferences, resolveSnippetsWithTemplates } from "@/utils/snippetUtils";
+import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import {
   awaitableRegenerateRequest,
   regenerateSnippetFailure,
@@ -103,11 +104,19 @@ function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
 
 // Helper function to initialize a new session with the global selected prompt
 function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
-  const { settings }: RootState = yield select((state: RootState) => state);
+  // req:system-prompt-preservation
+  const { settings, prompts }: RootState = yield select(
+    (state: RootState) => state,
+  );
   const globalSelectedPromptName = settings.selectedPromptName;
-  
+
   if (globalSelectedPromptName) {
-    yield put(setSelectedPromptName(globalSelectedPromptName));
+    const promptEntity = prompts.prompts[globalSelectedPromptName];
+    if (promptEntity) {
+      // When creating a new session, we must also dispatch `setSystemPromptRequested`
+      // to ensure the system message is created with content.
+      yield put(setSystemPromptRequested(promptEntity.data));
+    }
   }
 }
 
@@ -267,6 +276,23 @@ function* loadSessionSaga(action: PayloadAction<string>) {
     );
     if (session) {
       console.log(`[DEBUG] loadSessionSaga: loaded session with ${session.messages.length} messages:`, session.messages.map(m => ({ role: m.role, content: m.content })));
+      
+      // req:system-prompt-navigation-sync: Extract prompt_name from system message and update selected prompt
+      const systemMessage = session.messages.find(m => m.role === "system");
+      if (systemMessage?.prompt_name) {
+        console.log(`[DEBUG] loadSessionSaga: found system message with prompt_name: "${systemMessage.prompt_name}"`);
+        // Update both session-specific and global selected prompt name
+        yield put(setSelectedPromptName(systemMessage.prompt_name));
+        
+        // Also update settings to maintain consistency
+        yield put(setSettingsSelectedPromptName(systemMessage.prompt_name));
+      } else {
+        console.log(`[DEBUG] loadSessionSaga: no system message with prompt_name found in session - deselecting prompt`);
+        // Deselect prompt to reflect that this session has no system prompt
+        yield put(setSelectedPromptName(null));
+        yield put(setSettingsSelectedPromptName(null));
+      }
+      
       const { prevId, nextId } = yield call(
         db.findNeighbourSessionIds,
         session,
