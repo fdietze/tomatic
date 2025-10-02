@@ -53,6 +53,13 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
     dispatch(fetchModels());
   }, [dispatch]);
 
+  // req:new-chat-autofocus: Automatically focus the input on new chat pages.
+  useEffect(() => {
+    if (session.currentSessionId === null) {
+      inputRef.current?.focus();
+    }
+  }, [session.currentSessionId, inputRef]);
+
   const displayMessages = useMemo(() => {
     if (systemPrompt && session.messages.length === 0) {
       return [
