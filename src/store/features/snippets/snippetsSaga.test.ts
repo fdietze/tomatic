@@ -131,4 +131,111 @@ describe("snippetsSaga", () => {
     
     saveSnippetSpy.mockRestore();
   });
+
+  describe("importSnippetsSaga", () => {
+    test("should add new snippets and update existing ones without deleting others", async () => {
+      // Purpose: This test verifies that importing snippets correctly adds new ones,
+      // updates snippets with the same name, and does not delete existing snippets
+      // that are not part of the import.
+      const initialSnippets: Snippet[] = [
+        {
+          id: "snippet-a-id",
+          name: "A",
+          content: "Initial content A",
+          isGenerated: false,
+          prompt: "",
+          createdAt_ms: 1,
+          updatedAt_ms: 1,
+          generationError: null,
+          isDirty: false,
+        },
+        {
+          id: "snippet-b-id",
+          name: "B",
+          content: "Initial content B",
+          isGenerated: false,
+          prompt: "",
+          createdAt_ms: 1,
+          updatedAt_ms: 1,
+          generationError: null,
+          isDirty: false,
+        },
+      ];
+
+      const snippetsToImport: Snippet[] = [
+        {
+          id: "new-snippet-b-id", // ID should be ignored and a new one generated for existing snippet
+          name: "B", // Existing name, should update
+          content: "Updated content B",
+          isGenerated: false,
+          prompt: "",
+          createdAt_ms: 2,
+          updatedAt_ms: 2,
+          generationError: null,
+          isDirty: false,
+        },
+        {
+          id: "snippet-c-id",
+          name: "C", // New name, should be added
+          content: "New content C",
+          isGenerated: false,
+          prompt: "",
+          createdAt_ms: 2,
+          updatedAt_ms: 2,
+          generationError: null,
+          isDirty: false,
+        },
+      ];
+
+      const store = createTestStore({
+        snippets: {
+          snippets: initialSnippets,
+          loading: 'idle',
+          error: null,
+          regenerationStatus: {},
+        }
+      });
+
+      const saveSnippetSpy = vi.spyOn(db, 'saveSnippet').mockResolvedValue();
+      const clearAllSnippetsSpy = vi.spyOn(db, 'clearAllSnippets');
+      const loadSnippetsSpy = vi.spyOn(db, 'loadAllSnippets').mockResolvedValueOnce(initialSnippets);
+
+      // Dispatch the import action
+      store.dispatch({ type: "snippets/importSnippets", payload: snippetsToImport });
+
+      // Allow the saga to run
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Verify that clearAllSnippets was NOT called
+      expect(clearAllSnippetsSpy).not.toHaveBeenCalled();
+
+      // Verify that saveSnippet was called for the updated and new snippets
+      expect(saveSnippetSpy).toHaveBeenCalledTimes(2);
+
+      // Check the updated snippet (B)
+      expect(saveSnippetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "snippet-b-id", // Should keep the original ID
+          name: "B",
+          content: "Updated content B",
+        })
+      );
+
+      // Check the new snippet (C)
+      expect(saveSnippetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.any(String), // A new ID should be generated
+          name: "C",
+          content: "New content C",
+        })
+      );
+
+      // Verify that the reload process was initiated
+      expect(loadSnippetsSpy).toHaveBeenCalledTimes(1);
+
+      saveSnippetSpy.mockRestore();
+      clearAllSnippetsSpy.mockRestore();
+      loadSnippetsSpy.mockRestore();
+    });
+  });
 });

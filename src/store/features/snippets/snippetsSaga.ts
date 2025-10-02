@@ -494,8 +494,38 @@ export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, R
 function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
   try {
     const snippetsToImport = action.payload;
-    yield call(db.clearAllSnippets);
-    yield call(db.saveSnippets, snippetsToImport);
+    const existingSnippets: Snippet[] = yield select(
+      (state: RootState) => state.snippets.snippets,
+    );
+    const existingSnippetsByName = new Map(
+      existingSnippets.map((s) => [s.name, s]),
+    );
+
+    for (const snippetToImport of snippetsToImport) {
+      const existingSnippet = existingSnippetsByName.get(snippetToImport.name);
+      if (existingSnippet) {
+        // Update existing snippet
+        const updatedSnippet = {
+          ...existingSnippet,
+          content: snippetToImport.content,
+          isGenerated: snippetToImport.isGenerated,
+          prompt: snippetToImport.prompt,
+          model: snippetToImport.model,
+          updatedAt_ms: Date.now(),
+        };
+        yield call(db.saveSnippet, updatedSnippet);
+      } else {
+        // Add new snippet
+        const newSnippet = {
+          ...snippetToImport,
+          id: crypto.randomUUID(),
+          createdAt_ms: Date.now(),
+          updatedAt_ms: Date.now(),
+        };
+        yield call(db.saveSnippet, newSnippet);
+      }
+    }
+
     yield put(loadSnippets());
   } catch (error) {
     console.log("[DEBUG] importSnippetsSaga: failure", error);
