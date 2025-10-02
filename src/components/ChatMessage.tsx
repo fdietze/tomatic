@@ -71,12 +71,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     if (message.role === 'assistant' && message.model_name) {
       displayString = `assistant (${message.model_name})`;
     } else if (message.role === 'system' && message.prompt_name) {
-      displayString = `system @${message.prompt_name}`;
+      displayString = `system (${message.prompt_name})`;
     }
 
     if (isSystemMessage) {
       const indicator = collapsed ? '▶' : '▼';
-      return `${indicator} ${displayString}`;
+      return `${displayString} ${indicator}`;
     }
     return displayString;
   }, [message, isSystemMessage, collapsed]);
@@ -163,7 +163,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       )}
       {message.error && (
         <div className="error-message" data-testid="error-message">
-            <p>{getErrorMessage(message.error)}</p>
+          <p>{getErrorMessage(message.error)}</p>
         </div>
       )}
     </div>

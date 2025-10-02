@@ -34,6 +34,15 @@ export class ChatPage {
     });
   }
 
+  async getMessagesFromStore() {
+    const messages = await this.page.evaluate(() => {
+      const w = window as unknown as { tomatic_test_getStore: () => { getState: () => { session: { messages: unknown[] } } } };
+      const state = w.tomatic_test_getStore().getState();
+      return state.session.messages;
+    });
+    return messages;
+  }
+
   // --- Actions ---
 
   /**
@@ -142,5 +151,32 @@ export class ChatPage {
     await expect(
       this.page.locator('[data-testid^="chat-message-"]'),
     ).toHaveCount(count);
+  }
+
+  /**
+   * Asserts that the currently selected system prompt matches the expected name.
+   *
+   * @param expectedPromptName The name of the expected system prompt.
+   */
+  async expectSelectedSystemPrompt(expectedPromptName: string | null) {
+    if (expectedPromptName === null) {
+      // When no prompt is selected, there should be no selected prompt button
+      const selectedPromptButton = this.page.locator('[data-testid^="system-prompt-button-"][data-selected="true"]');
+      await expect(selectedPromptButton).toHaveCount(0);
+    } else {
+      // Check that the specific prompt button is selected
+      const selectedPromptButton = this.page.getByTestId(`system-prompt-button-${expectedPromptName}`);
+      await expect(selectedPromptButton).toHaveAttribute("data-selected", "true");
+    }
+  }
+
+  /**
+   * Clicks a system prompt button to select or deselect it.
+   *
+   * @param promptName The name of the system prompt button to click.
+   */
+  async clickSystemPromptButton(promptName: string) {
+    const promptButton = this.page.getByTestId(`system-prompt-button-${promptName}`);
+    await promptButton.click();
   }
 }

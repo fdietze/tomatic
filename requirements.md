@@ -59,4 +59,7 @@
 - req:raw-content-preservation: user messages preserve original raw input with snippet references for editing
 - req:edit-textarea-population: when editing messages, textarea is populated with raw content rather than resolved content
 - req:save-button-dirty-detection: pressing the save button on a generated snippet should mark it as dirty if the prompt input is different from the original
+- req:snippet-expand-collapse: snippet content can be expanded/collapsed instead of fullscreen viewing. Collapsed shows plain text, expanded shows markdown rendering
+- req:system-prompt-navigation-sync: when navigating through chat history using prev/next buttons, the selected system prompt should automatically update to match the system prompt stored in the system message of the loaded chat history. If the session has no system message, no prompt should be selected, always reflecting what is persisted with the current session.
+- req:system-prompt-interactive-update: when a chat session is loaded (with or without system prompt) and the user selects a different system prompt, the system message must reflect what was selected (no selection -> no system message). This modified chat history is only persisted when an actual submission/regeneration happens.
 - when migrations fail, the user must see an error message.

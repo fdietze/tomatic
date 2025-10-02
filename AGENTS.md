@@ -1,14 +1,15 @@
 # User requests
-- update @requirements.md and add or change requirements.
-- for every user request (feature request, bug report, etc), develop it in a test-driven way. What exactly needs to be tested? can we reproduce the bug with a regression-test? Do we change or extend existing tests? Do we create a new test? do we use vitest unit/integration tests and/or playwright e2e tests?
+- update @requirements.md and add or change requirements. grep for relevant code with the requirement ids.
+- work test-driven (TDD). create a failing test, fix the code, the test must pass. Use vitest unit/integration tests and/or playwright e2e tests.
+- every new feature must be backed by a unit or integration test.
+- every bug fix must come with a reproducing regression test, which must stay in the project test suite.
+- every test must have a comment inside its test block stating its purpose
 
 # Requirement Traceability
-- the code and documentation has comments like "// req:a-requierement" everywhere. Use grep to find other references.
-- when writing new code, extend @requirements.md and comments in the code accordingly
-
+- the code and documentation has comments like "// req:category:a-requirement" everywhere. Use grep to find other references.
+- when writing new code, extend @requirements.md and reference the requirement-ids in comments of corresponding code.
 
 # Validating Changes
-
 - automatically run `just check` to check (for compiling, linting and running tests) in-between and after implementation milestones. Always plan at which points you will execute `just check`.
 - Where appropriate, add a new unit and/or e2e test for the feature. Look at other tests, test helpers and fixtures before attempting to write a new test. Always run all tests using the `just check` command.
 - before commiting, opening a PR or considering a task as done, `just check` must have run successfully
@@ -19,7 +20,7 @@
 # General
 - trust the type checker.
 - with every step, consider different options and their tradeoffs
-- all plans must contain linting (`npm run lint`) and testing (`just check`) steps.
+- all plans must be guided by the type checker (`npm run typecheck`). Which order is best?
 - prefer pure functions
 - design functions and datastructures that do one thing well. Follow SRP.
 - move code that is domain independent and is candidate for a library to separate files

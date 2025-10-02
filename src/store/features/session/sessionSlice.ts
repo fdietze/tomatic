@@ -56,6 +56,7 @@ export const sessionSlice = createSlice({
       state.currentSessionId = action.payload.sessionId;
       state.prevSessionId = action.payload.prevId;
       state.nextSessionId = action.payload.nextId;
+      state.selectedPromptName = action.payload.selectedPromptName;
     },
     sessionCreatedSuccess: (
       state,
@@ -215,6 +216,23 @@ export const sessionSlice = createSlice({
       }
       console.log(`[DEBUG] sessionSlice.setSystemPrompt: messages after system prompt update:`, state.messages.length);
     },
+    // req:system-prompt-interactive-update: Remove system message when no prompt is selected
+    removeSystemPrompt: (state) => {
+      console.log(`[DEBUG] sessionSlice.removeSystemPrompt: removing system message from messages`);
+
+      // Update the selected prompt name reference
+      state.selectedPromptName = null;
+
+      // Remove the first message if it's a system message
+      const firstMessage = state.messages[0];
+      if (firstMessage && firstMessage.role === "system") {
+        console.log(`[DEBUG] sessionSlice.removeSystemPrompt: removing existing system message`);
+        state.messages.shift(); // Remove the first message
+      } else {
+        console.log(`[DEBUG] sessionSlice.removeSystemPrompt: no system message found to remove`);
+      }
+      console.log(`[DEBUG] sessionSlice.removeSystemPrompt: messages after system prompt removal:`, state.messages.length);
+    },
     appendChunkToLatestMessage: (
       state,
       action: PayloadAction<AppendChunkPayload>,
@@ -339,6 +357,7 @@ export const {
   setSystemPromptRequested,
   setSelectedPromptName,
   setSystemPrompt,
+  removeSystemPrompt,
   appendChunkToLatestMessage,
   submitUserMessageSuccess,
   submitUserMessageFailure,

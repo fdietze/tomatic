@@ -30,6 +30,7 @@ export interface LoadSessionSuccessPayload {
   sessionId: string;
   prevId: string | null;
   nextId: string | null;
+  selectedPromptName: string | null;
 }
 
 export interface SessionCreatedSuccessPayload {

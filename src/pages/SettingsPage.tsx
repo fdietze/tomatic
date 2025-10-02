@@ -97,7 +97,7 @@ const SettingsPage: React.FC = () => {
   };
   const handleExportSnippets = (): void => {
     const dataStr = JSON.stringify(snippets, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
 
     const exportFileDefaultName = 'snippets.json';
 
@@ -105,7 +105,7 @@ const SettingsPage: React.FC = () => {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
-    };
+  };
   const handleImportSnippets = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -165,7 +165,7 @@ const SettingsPage: React.FC = () => {
   return (
     <div style={{ marginBottom: "50px" }}>
       <div className="settings-section">
-        <div className="settings-label">OPENROUTER_API_KEY</div>
+        <div className="settings-label">OpenRouter API Key (get one from <a href="https://openrouter.ai/" target="_blank" rel="noreferrer">https://openrouter.ai</a>)</div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <input
             type="text"
@@ -205,7 +205,7 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
       <div className="settings-section">
-        <div className="settings-label">system prompts</div>
+        <div className="settings-label">System Prompts</div>
         <button
           data-testid="new-system-prompt-button"
           data-role="primary"

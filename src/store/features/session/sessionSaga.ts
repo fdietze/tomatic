@@ -44,6 +44,7 @@ import {
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
 import { findSnippetReferences, resolveSnippetsWithTemplates } from "@/utils/snippetUtils";
+import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import {
   regenerateSnippetFailure,
   regenerateSnippetSuccess,
@@ -103,11 +104,19 @@ function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
 
 // Helper function to initialize a new session with the global selected prompt
 function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
-  const { settings }: RootState = yield select((state: RootState) => state);
+  // req:system-prompt-preservation
+  const { settings, prompts }: RootState = yield select(
+    (state: RootState) => state,
+  );
   const globalSelectedPromptName = settings.selectedPromptName;
-  
+
   if (globalSelectedPromptName) {
-    yield put(setSelectedPromptName(globalSelectedPromptName));
+    const promptEntity = prompts.prompts[globalSelectedPromptName];
+    if (promptEntity) {
+      // When creating a new session, we must also dispatch `setSystemPromptRequested`
+      // to ensure the system message is created with content.
+      yield put(setSystemPromptRequested(promptEntity.data));
+    }
   }
 }
 
@@ -267,6 +276,15 @@ function* loadSessionSaga(action: PayloadAction<string>) {
     );
     if (session) {
       console.log(`[DEBUG] loadSessionSaga: loaded session with ${session.messages.length} messages:`, session.messages.map(m => ({ role: m.role, content: m.content })));
+
+      // req:system-prompt-navigation-sync: Extract prompt_name from system message and update selected prompt
+      const systemMessage = session.messages.find(m => m.role === "system");
+      const selectedPromptName = systemMessage?.prompt_name || null;
+      console.log(`[DEBUG] loadSessionSaga: determined selectedPromptName: "${selectedPromptName}"`);
+
+      // Also update settings to maintain consistency across the app
+      yield put(setSettingsSelectedPromptName(selectedPromptName));
+
       const { prevId, nextId } = yield call(
         db.findNeighbourSessionIds,
         session,
@@ -277,6 +295,7 @@ function* loadSessionSaga(action: PayloadAction<string>) {
           sessionId: session.session_id,
           prevId,
           nextId,
+          selectedPromptName,
         }),
       );
       console.log(`[DEBUG] loadSessionSaga: dispatched loadSessionSuccess with ${session.messages.length} messages`);
