@@ -331,18 +331,32 @@ function* persistSnippetAfterRegenerationSaga(
 function* batchRegenerationOrchestratorSaga(
   action: PayloadAction<{ snippets: Snippet[] }>,
 ) {
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with snippets", action.payload.snippets.map(s => s.name));
-  const { snippets } = action.payload;
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with dirty snippets", action.payload.snippets.map(s => s.name));
+  const { snippets: dirtySnippets } = action.payload;
 
-  const { sorted, cyclic } = getTopologicalSortForExecution(snippets);
+  // req:transitive-regeneration-topological-sort: Select all snippets from the state to build a complete dependency graph.
+  const allSnippets: Snippet[] = yield select(
+    (state: RootState) => state.snippets.snippets,
+  );
+
+  // Perform topological sort on the entire set of snippets to get the correct execution order.
+  const { sorted: allSortedSnippets, cyclic } = getTopologicalSortForExecution(allSnippets);
 
   if (cyclic.length > 0) {
     console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected in snippets:", cyclic);
     console.log("[DEBUG] batchRegenerationOrchestratorSaga: Stopping batch regeneration due to cycles");
+    // Errors for cyclic snippets should already be set by the validation logic.
+    // We just need to stop the regeneration process here.
     return;
   }
 
-  const batches = groupSnippetsIntoBatches(sorted);
+  // Filter the globally sorted list to get only the dirty snippets that need regeneration,
+  // but now they are in the correct topological order.
+  const dirtySnippetNames = new Set(dirtySnippets.map(s => s.name));
+  const sortedDirtySnippets = allSortedSnippets.filter(s => dirtySnippetNames.has(s.name));
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: sorted dirty snippets for regeneration", sortedDirtySnippets.map(s => s.name));
+
+  const batches = groupSnippetsIntoBatches(sortedDirtySnippets);
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
 
   const failedSnippets = new Set<string>();
