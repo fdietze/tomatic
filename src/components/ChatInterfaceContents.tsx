@@ -55,10 +55,12 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
 
   // req:new-chat-autofocus: Automatically focus the input on new chat pages.
   useEffect(() => {
-    if (session.currentSessionId === null) {
+    // req:autofocus-wait-for-api-key: Do not focus until the API key is loaded,
+    // otherwise the input might be disabled.
+    if (session.currentSessionId === null && apiKey) {
       inputRef.current?.focus();
     }
-  }, [session.currentSessionId, inputRef]);
+  }, [session.currentSessionId, inputRef, apiKey]);
 
   const displayMessages = useMemo(() => {
     if (systemPrompt && session.messages.length === 0) {

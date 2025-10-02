@@ -1,6 +1,6 @@
 import { testWithAutoInit as test } from "../fixtures";
 import { ChatPage } from "../pom/ChatPage";
-import { expect } from "../test-helpers";
+import { expect, waitForEvent } from "../test-helpers";
 import { DBV3_ChatSession } from "@/types/storage";
 
 test.describe("Feature: Chat Auto-Focus", () => {
@@ -10,10 +10,13 @@ test.describe("Feature: Chat Auto-Focus", () => {
     chatPage = new ChatPage(page);
   });
 
-  test("Purpose: The chat input should be focused on a new chat page.", async () => {
+  test("Purpose: The chat input should be focused on a new chat page.", async ({
+    page,
+  }) => {
     // Purpose: This test ensures that when a user navigates to the `/chat/new`
-    // page (which the fixture does automatically), the main chat input field
-    // is automatically focused.
+    // page, the main chat input field is automatically focused after the app
+    // is fully initialized.
+    await waitForEvent(page, "app_initialized");
     await expect(chatPage.chatInput).toBeFocused();
   });
 
