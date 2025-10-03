@@ -1,4 +1,3 @@
-import "core-js/stable/structured-clone";
 import "fake-indexeddb/auto";
 import { beforeEach, afterEach, vi } from "vitest";
 import type { TestContext } from "vitest";
