@@ -11,8 +11,8 @@ import { selectPrompts } from '@/store/features/prompts/promptsSlice';
 import {
   selectSnippets,
   regenerateSnippet,
+  cancelSnippetRegeneration,
 } from '@/store/features/snippets/snippetsSlice';
-import { assertUnreachable } from '@/utils/assert';
 import { getErrorMessage } from '@/types/errors';
 
 interface SnippetItemProps {
@@ -363,44 +363,40 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           )}
         </span>
         <div className="system-prompt-actions">
-          {(() => {
-            const status = regenerationStatus[snippet.id]?.status || 'idle';
-            switch (status) {
-              case 'idle':
-              case 'success':
-              case 'error':
-                return (
-                  <div className="system-prompt-buttons">
-                    <button
-                      onClick={() => { setIsExpanded(!isExpanded); }}
-                      data-size="compact"
-                      data-testid="snippet-toggle-button"
-                    >
-                      {isExpanded ? 'Collapse' : 'Expand'}
-                    </button>
-                    <button
-                      onClick={() => { setIsEditing(true); }}
-                      data-size="compact"
-                      data-testid="snippet-edit-button"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => { void onRemove(snippet.id); }}
-                      data-size="compact"
-                      data-testid="snippet-delete-button"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                );
-              case 'in_progress':
-                // req:dirty-loading-indicator: Show loading indicator for dirty/regenerating snippets
-                return <span className="spinner" data-testid="regenerating-spinner" />;
-              default:
-                assertUnreachable(status);
-            }
-          })()}
+          {/* req:snippet-loading-buttons-visible: When a snippet is regenerating, the loading indicator is displayed next to the action buttons, which remain visible and clickable. */}
+          {/* req:dirty-loading-indicator: all snippets marked as dirty should show a loading indicator */}
+          {(regenerationStatus[snippet.id]?.status === 'in_progress' || snippet.isDirty) && (
+            <span className="spinner" data-testid="regenerating-spinner" />
+          )}
+          <div className="system-prompt-buttons">
+            <button
+              onClick={() => { setIsExpanded(!isExpanded); }}
+              data-size="compact"
+              data-testid="snippet-toggle-button"
+            >
+              {isExpanded ? 'Collapse' : 'Expand'}
+            </button>
+            <button
+              onClick={() => {
+                // req:snippet-edit-cancels-generation: If the snippet is currently regenerating, cancel it.
+                if (regenerationStatus[snippet.id]?.status === 'in_progress' || snippet.isDirty) {
+                  dispatch(cancelSnippetRegeneration(snippet.id));
+                }
+                setIsEditing(true);
+              }}
+              data-size="compact"
+              data-testid="snippet-edit-button"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => { void onRemove(snippet.id); }}
+              data-size="compact"
+              data-testid="snippet-delete-button"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
       <div>

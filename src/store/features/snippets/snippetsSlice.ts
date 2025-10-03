@@ -114,6 +114,7 @@ export const snippetsSlice = createSlice({
       const { id, error } = action.payload;
       const snippet = state.snippets.find((s) => s.id === id);
       if (snippet) {
+        snippet.isDirty = false;
         snippet.generationError = error;
         state.regenerationStatus[snippet.id] = { status: "error", error };
       } else {
@@ -146,6 +147,12 @@ export const snippetsSlice = createSlice({
     batchRegenerateRequest: (_state, _action: PayloadAction<BatchRegenerateRequestPayload>) => {
       // Saga watcher will handle this.
     },
+    cancelSnippetRegeneration: (state, action: PayloadAction<string>) => {
+      const snippetId = action.payload;
+      if (state.regenerationStatus[snippetId]) {
+        state.regenerationStatus[snippetId] = { status: "idle" };
+      }
+    },
     importSnippets: (_state, _action: PayloadAction<Snippet[]>) => {
       // saga will handle the logic
     },
@@ -173,6 +180,7 @@ export const {
   awaitableRegenerateRequest,
   batchRegenerateRequest,
   importSnippets,
+  cancelSnippetRegeneration,
 } = snippetsSlice.actions;
 
 export const selectSnippets = (state: RootState) => state.snippets;

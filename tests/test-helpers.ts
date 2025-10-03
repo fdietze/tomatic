@@ -379,6 +379,10 @@ export class ChatCompletionMocker {
     this.page = page;
   }
 
+  public getPendingTriggerCount(): number {
+    return this.pendingTriggers.length;
+  }
+
   async setup() {
     await this.page.route(
       "https://openrouter.ai/api/v1/chat/completions",
