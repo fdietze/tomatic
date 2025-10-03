@@ -10,7 +10,6 @@ import {
   RegenerateSnippetFailurePayload,
   SetSnippetDirtyStatePayload,
   UpdateSnippetContentPayload,
-  AwaitableRegenerateRequestPayload,
   BatchRegenerateRequestPayload,
 } from "@/types/payloads";
 
@@ -172,12 +171,6 @@ export const snippetsSlice = createSlice({
         }
       }
     },
-    awaitableRegenerateRequest: (
-      _state,
-      _action: PayloadAction<AwaitableRegenerateRequestPayload>
-    ) => {
-      // Saga watcher will handle this.
-    },
     batchRegenerateRequest: (
       _state,
       _action: PayloadAction<BatchRegenerateRequestPayload>
@@ -209,7 +202,6 @@ export const {
   updateSnippetContent,
   setSnippetDirtyState,
   setRegenerationStatus,
-  awaitableRegenerateRequest,
   batchRegenerateRequest,
   importSnippets,
 } = snippetsSlice.actions;
@@ -217,3 +209,4 @@ export const {
 export const selectSnippets = (state: RootState) => state.snippets;
 
 export default snippetsSlice.reducer;
+

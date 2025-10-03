@@ -114,10 +114,6 @@ export interface UpdateSnippetContentPayload {
   content: string;
 }
 
-export interface AwaitableRegenerateRequestPayload {
-  name: string;
-}
-
 export interface BatchRegenerateRequestPayload {
   snippets: import('./storage').Snippet[];
 }

@@ -46,9 +46,7 @@ import { ROUTES } from "@/utils/routes";
 import { findSnippetReferences, resolveSnippetsWithTemplates } from "@/utils/snippetUtils";
 import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import {
-  awaitableRegenerateRequest,
-  regenerateSnippetFailure,
-  regenerateSnippetSuccess,
+  batchRegenerateRequest,
   selectSnippets,
 } from "@/store/features/snippets/snippetsSlice";
 import {
@@ -360,11 +358,6 @@ function createChatStreamChannel(
   });
 }
 
-type SnippetCompletionAction = {
-  type: string;
-  payload: { name: string; error?: import('@/types/errors').AppError };
-};
-
 // req:message-edit-fork, req:regenerate-context, req:snippet-wait-before-submit
 function* submitUserMessageSaga(
   action: PayloadAction<{
@@ -388,45 +381,33 @@ function* submitUserMessageSaga(
       );
       const dirtySnippets = referencedSnippets.filter((s) => s.isDirty);
 
-      console.log(`[DEBUG] submitUserMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map(s => s.name));
       if (dirtySnippets.length > 0) {
-        console.log(`[DEBUG] submitUserMessageSaga: dispatching awaitable regenerate requests`);
-        yield all(
-          dirtySnippets.map((s) =>
-            put(awaitableRegenerateRequest({ name: s.name })),
-          ),
+        console.log(`[DEBUG] submitUserMessageSaga: found ${dirtySnippets.length} dirty snippets, delegating to batch orchestrator`);
+        
+        // Delegate to the centralized batch regeneration orchestrator
+        yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
+        
+        // Wait for batch completion using the window event
+        yield call(() =>
+          new Promise<void>((resolve) => {
+            window.addEventListener("app:snippet:regeneration:batch:complete", () => resolve(), { once: true });
+          })
         );
-
-        const results: SnippetCompletionAction[] = [];
-        const remainingSnippets = new Set(dirtySnippets.map((s) => s.name));
-        console.log(`[DEBUG] submitUserMessageSaga: waiting for ${remainingSnippets.size} snippets to complete`);
-
-        while (remainingSnippets.size > 0) {
-          console.log(`[DEBUG] submitUserMessageSaga: still waiting for ${remainingSnippets.size} snippets:`, Array.from(remainingSnippets));
-          const result: SnippetCompletionAction = yield take([
-            regenerateSnippetSuccess.type,
-            regenerateSnippetFailure.type,
-          ]);
-          console.log(`[DEBUG] submitUserMessageSaga: received regeneration result:`, result.type, result.payload);
-
-          if (remainingSnippets.has(result.payload.name)) {
-            console.log(`[DEBUG] submitUserMessageSaga: snippet ${result.payload.name} completed, removing from waiting list`);
-            remainingSnippets.delete(result.payload.name);
-            results.push(result);
-          } else {
-            console.log(`[DEBUG] submitUserMessageSaga: ignoring result for ${result.payload.name}, not in waiting list`);
-          }
-        }
-
-        console.log(`[DEBUG] submitUserMessageSaga: all snippets completed, checking for failures`);
-        const failedSnippet = results.find(
-          (r) => r.type === regenerateSnippetFailure.type,
+        
+        console.log(`[DEBUG] submitUserMessageSaga: batch regeneration complete, checking for failures`);
+        
+        // Check if any of the dirty snippets failed
+        const currentSnippetsState = (yield select(
+          (state: RootState) => state.snippets
+        )) as RootState["snippets"];
+        
+        const failedSnippet = dirtySnippets.find(s =>
+          currentSnippetsState.regenerationStatus[s.id]?.status === 'error'
         );
+        
         if (failedSnippet) {
-          console.log(`[DEBUG] submitUserMessageSaga: found failed snippet:`, failedSnippet.payload);
-          const errorMsg = failedSnippet.payload.error
-            ? getErrorMessage(failedSnippet.payload.error)
-            : "Unknown error";
+          const error = currentSnippetsState.regenerationStatus[failedSnippet.id]?.error;
+          const errorMsg = error ? getErrorMessage(error) : "Unknown error";
           const snippetError = new Error(
             `Snippet '@multiple' failed: ${errorMsg}`,
           );
@@ -434,6 +415,7 @@ function* submitUserMessageSaga(
           (snippetError as Error & { isSnippetError: boolean }).isSnippetError = true;
           throw snippetError;
         }
+        
         console.log(`[DEBUG] submitUserMessageSaga: all snippets regenerated successfully, proceeding with chat`);
       }
     }

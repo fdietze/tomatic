@@ -21,7 +21,6 @@ import {
   setSnippetDirtyState,
   setRegenerationStatus,
   batchRegenerateRequest,
-  awaitableRegenerateRequest,
   importSnippets,
 } from "./snippetsSlice";
 import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
@@ -453,22 +452,6 @@ function* batchRegenerationOrchestratorSaga(
   window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
 }
 
-function* handleAwaitableRegeneration(
-  action: PayloadAction<{ name: string }>,
-) {
-  const snippetName = action.payload.name;
-  const allSnippets: Snippet[] = yield select(
-    (state: RootState) => state.snippets.snippets,
-  );
-  const snippet = allSnippets.find((s) => s.name === snippetName);
-
-  if (snippet) {
-    yield call(handleRegenerateSnippetSaga, {
-      payload: snippet,
-      type: "handleRegenerateSnippetSaga",
-    });
-  }
-}
 
 /**
  * New worker saga that regenerates a single snippet using a provided resolver context.
@@ -625,7 +608,6 @@ export function* snippetsSaga() {
     takeLatest(loadSnippetsSuccess.type, resumeDirtySnippetGenerationSaga),
     takeEvery(batchRegenerateRequest.type, batchRegenerationOrchestratorSaga),
     takeEvery(regenerateSnippet.type, handleRegenerateSnippetSaga),
-    takeEvery(awaitableRegenerateRequest.type, handleAwaitableRegeneration),
     // req:snippet-dirty-indexeddb: Persist snippet content after successful regeneration
     takeEvery(regenerateSnippetSuccess.type, persistSnippetAfterRegenerationSaga),
   ]);
