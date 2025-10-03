@@ -1,4 +1,5 @@
-import { call, put, takeLatest, all, select, takeEvery, take } from "redux-saga/effects";
+import { call, put, takeLatest, all, select, takeEvery, take, fork, cancel, cancelled } from "redux-saga/effects";
+import { Task } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
@@ -22,6 +23,7 @@ import {
   batchRegenerateRequest,
   awaitableRegenerateRequest,
   importSnippets,
+  cancelSnippetRegeneration,
 } from "./snippetsSlice";
 import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
 import { RootState } from "../../store";
@@ -226,6 +228,11 @@ function* handleRegenerateSnippetSaga(
       new CustomEvent(`app:snippet:regeneration:failure:${snippetId}`)
     );
   } finally {
+    // req:snippet-edit-cancels-generation: Clean up the task registry.
+    if (yield cancelled()) {
+      console.log(`[DEBUG] handleRegenerateSnippetSaga: cancelled for ${snippetToRegenerate.name}`);
+    }
+    delete regenerationTasks[snippetId];
     yield put({ type: "app/setBatchRegenerating", payload: false });
   }
 }
@@ -452,9 +459,6 @@ export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, R
   try {
     console.log(`[DEBUG] regenerateSnippetWorker: starting regeneration for ${snippet.name}`);
     
-    // Dispatch the regeneration request
-    yield put(regenerateSnippet(snippet));
-    
     // Wait for either success or failure
     console.log(`[DEBUG] regenerateSnippetWorker: waiting for completion of ${snippet.name}`);
     const result = yield take((action: unknown) => {
@@ -533,6 +537,34 @@ function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
   }
 }
 
+// req:snippet-edit-cancels-generation: A registry to keep track of ongoing regeneration tasks.
+const regenerationTasks: Record<string, Task> = {};
+
+function* watchCancellationRequests() {
+  yield takeEvery(cancelSnippetRegeneration.type, function* (action: PayloadAction<string>): Generator<void> {
+    const snippetId = action.payload;
+    const task = regenerationTasks[snippetId];
+    if (task) {
+      yield cancel(task);
+      delete regenerationTasks[snippetId];
+    }
+  });
+}
+
+function* watchRegenerationRequests() {
+  yield takeEvery(regenerateSnippet.type, function* (action: PayloadAction<Snippet>): Generator<void> {
+    const snippetId = action.payload.id;
+    // Cancel any existing task for this snippet
+    if (regenerationTasks[snippetId]) {
+      yield cancel(regenerationTasks[snippetId]);
+      delete regenerationTasks[snippetId];
+    }
+    // Start a new task and store it
+    const task: Task = yield fork(handleRegenerateSnippetSaga, action);
+    regenerationTasks[snippetId] = task;
+  });
+}
+
 export function* snippetsSaga() {
   yield all([
     takeLatest(loadSnippets.type, loadSnippetsSaga),
@@ -546,7 +578,8 @@ export function* snippetsSaga() {
     ),
     takeLatest(loadSnippetsSuccess.type, resumeDirtySnippetGenerationSaga),
     takeEvery(batchRegenerateRequest.type, batchRegenerationOrchestratorSaga),
-    takeEvery(regenerateSnippet.type, handleRegenerateSnippetSaga),
+    fork(watchRegenerationRequests),
+    fork(watchCancellationRequests),
     takeEvery(awaitableRegenerateRequest.type, handleAwaitableRegeneration),
     // req:snippet-dirty-indexeddb: Persist snippet content after successful regeneration
     takeEvery(regenerateSnippetSuccess.type, persistSnippetAfterRegenerationSaga),

@@ -8,6 +8,7 @@ import {
   seedLocalStorage,
   ChatCompletionMocker,
   seedIndexedDB,
+  waitForEvent,
 } from "./test-helpers";
 
 test.describe("Automatic Regeneration Edge Cases", () => {
@@ -72,19 +73,9 @@ test.describe("Automatic Regeneration Edge Cases", () => {
   });
 
   test.describe("when a dependency fails to regenerate", () => {
-    test.beforeEach(async ({ context, page }) => {
-      await seedIndexedDB(context, {
-        snippets: [
-          { id: "a", name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
-          { id: "b", name: "B", content: "Content of B from v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
-          { id: "c", name: "C", content: "Content of C from B_v1", isGenerated: true, prompt: "Prompt for C using @B", model: "mock-model/mock-model", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
-        ],
-      });
-      await page.goto(ROUTES.settings);
-    });
-
     test("propagates failures transitively", async ({
       page,
+      context,
       expectedConsoleErrors,
     }) => {
       // Purpose: This test verifies that if a snippet in a dependency chain fails to
@@ -93,14 +84,13 @@ test.describe("Automatic Regeneration Edge Cases", () => {
       const chatMocker = new ChatCompletionMocker(page);
       await chatMocker.setup();
 
-      await settingsPage.expectGeneratedSnippetContent(
-        "B",
-        /Content of B from v1/,
-      );
-      await settingsPage.expectGeneratedSnippetContent(
-        "C",
-        /Content of C from B_v1/,
-      );
+      await seedIndexedDB(context, {
+        snippets: [
+          { id: "a", name: "A", content: "v1", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+          { id: "b", name: "B", content: "Content of B from v1", isGenerated: true, prompt: "Prompt for B using @A", model: "mock-model/mock-model", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false },
+          { id: "c", name: "C", content: "Content of C from B_v1", isGenerated: true, prompt: "Prompt for C using @B", model: "mock-model/mock-model", createdAt_ms: 2, updatedAt_ms: 2, generationError: null, isDirty: false },
+        ],
+      });
 
       chatMocker.mock({
         request: {
@@ -116,6 +106,18 @@ test.describe("Automatic Regeneration Edge Cases", () => {
         manualTrigger: true,
       });
 
+      await page.goto(ROUTES.settings);
+      await waitForEvent(page, "app_initialized");
+
+      await settingsPage.expectGeneratedSnippetContent(
+        "B",
+        /Content of B from v1/,
+      );
+      await settingsPage.expectGeneratedSnippetContent(
+        "C",
+        /Content of C from B_v1/,
+      );
+
       await settingsPage.startEditingSnippet("A");
       await settingsPage.fillSnippetForm("A", "v2");
       await settingsPage.saveSnippet();
@@ -124,6 +126,8 @@ test.describe("Automatic Regeneration Edge Cases", () => {
       const snippetC = settingsPage.getSnippetItemView("C");
 
       await expect(snippetB.getByTestId("regenerating-spinner")).toBeVisible();
+
+      await expect.poll(async () => chatMocker.getPendingTriggerCount()).toBe(1);
       await chatMocker.resolveNextCompletion();
 
       await expect(

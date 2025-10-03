@@ -16,6 +16,8 @@
 - req:dirty-loading-indicator: all snippets marked as dirty should show a loading indicator
 - req:error-warning-sign: all snippets with an error of any kind (cycle, invalid snippet references, failed generation etc) should show a warning sign.
 - req:global-loading-spinner: whenever there are dirty snippets being regenerated, that should be reflected in a global loading spinner in the settings tab
+- req:snippet-loading-buttons-visible: When a snippet is regenerating, the loading indicator is displayed next to the action buttons, which remain visible and clickable.
+- req:snippet-edit-cancels-generation: Starting to edit a regenerating snippet cancels the ongoing generation.
 
 ## Chat Session Management
 
