@@ -1,7 +1,7 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Snippet } from '@/types/storage';
-import { RootState } from '../../store';
-import { AppError } from '@/types/errors';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { Snippet } from "@/types/storage";
+import { RootState } from "../../store";
+import { AppError } from "@/types/errors";
 import {
   AddSnippetFailurePayload,
   UpdateSnippetSuccessPayload,
@@ -12,16 +12,16 @@ import {
   UpdateSnippetContentPayload,
   AwaitableRegenerateRequestPayload,
   BatchRegenerateRequestPayload,
-} from '@/types/payloads';
+} from "@/types/payloads";
 
 export type RegenerationStatus = {
-  status: 'in_progress' | 'error' | 'success';
+  status: "in_progress" | "error" | "success";
   error?: AppError;
-}
+};
 
 export interface SnippetsState {
   snippets: Snippet[];
-  loading: 'idle' | 'loading' | 'failed';
+  loading: "idle" | "loading" | "failed";
   error: AppError | null;
   regenerationStatus: Record<
     string,
@@ -31,25 +31,25 @@ export interface SnippetsState {
 
 const initialState: SnippetsState = {
   snippets: [],
-  loading: 'idle',
+  loading: "idle",
   error: null,
   regenerationStatus: {},
 };
 
 export const snippetsSlice = createSlice({
-  name: 'snippets',
+  name: "snippets",
   initialState,
   reducers: {
     loadSnippets: (state) => {
-      state.loading = 'loading';
+      state.loading = "loading";
       state.error = null;
     },
     loadSnippetsSuccess: (state, action: PayloadAction<Snippet[]>) => {
-      state.loading = 'idle';
+      state.loading = "idle";
       state.snippets = action.payload;
     },
     loadSnippetsFailure: (state, action: PayloadAction<AppError>) => {
-      state.loading = 'failed';
+      state.loading = "failed";
       state.error = action.payload;
     },
     addSnippet: (_state, _action: PayloadAction<Snippet>) => {
@@ -58,23 +58,37 @@ export const snippetsSlice = createSlice({
     addSnippetSuccess: (state, action: PayloadAction<Snippet>) => {
       state.snippets.push(action.payload);
     },
-    addSnippetFailure: (state, action: PayloadAction<AddSnippetFailurePayload>) => {
+    addSnippetFailure: (
+      state,
+      action: PayloadAction<AddSnippetFailurePayload>
+    ) => {
       // In the future, we might want to show this error in the UI.
       // For now, we'll just log it.
-      console.log(`[DEBUG] Failed to add snippet '${action.payload.name}':`, action.payload.error);
+      console.log(
+        `[DEBUG] Failed to add snippet '${action.payload.name}':`,
+        action.payload.error
+      );
     },
     updateSnippet: (_state, _action: PayloadAction<Snippet>) => {
       // saga will handle the logic
     },
-    updateSnippetSuccess: (state, action: PayloadAction<UpdateSnippetSuccessPayload>) => {
-      const index = state.snippets.findIndex(s => s.id === action.payload.snippet.id);
+    updateSnippetSuccess: (
+      state,
+      action: PayloadAction<UpdateSnippetSuccessPayload>
+    ) => {
+      const index = state.snippets.findIndex(
+        (s) => s.id === action.payload.snippet.id
+      );
       if (index !== -1) {
         state.snippets[index] = action.payload.snippet;
       }
     },
-    updateSnippetFailure: (state, action: PayloadAction<UpdateSnippetFailurePayload>) => {
+    updateSnippetFailure: (
+      state,
+      action: PayloadAction<UpdateSnippetFailurePayload>
+    ) => {
       // In the future, we might want to show this error in the UI.
-      const snippet = state.snippets.find(s => s.id === action.payload.id);
+      const snippet = state.snippets.find((s) => s.id === action.payload.id);
       if (snippet) {
         snippet.generationError = action.payload.error;
       }
@@ -83,10 +97,10 @@ export const snippetsSlice = createSlice({
       // saga will handle the logic
     },
     deleteSnippetSuccess: (state, action: PayloadAction<string>) => {
-      state.snippets = state.snippets.filter(s => s.id !== action.payload);
+      state.snippets = state.snippets.filter((s) => s.id !== action.payload);
     },
     regenerateSnippet(state, action: PayloadAction<Snippet>) {
-      const snippet = state.snippets.find(s => s.id === action.payload.id);
+      const snippet = state.snippets.find((s) => s.id === action.payload.id);
       if (snippet) {
         state.regenerationStatus[snippet.id] = { status: "in_progress" };
       } else {
@@ -96,7 +110,7 @@ export const snippetsSlice = createSlice({
     },
     regenerateSnippetSuccess(
       state,
-      action: PayloadAction<RegenerateSnippetSuccessPayload>,
+      action: PayloadAction<RegenerateSnippetSuccessPayload>
     ) {
       const { id, content } = action.payload;
       const snippet = state.snippets.find((s) => s.id === id);
@@ -109,12 +123,13 @@ export const snippetsSlice = createSlice({
     },
     regenerateSnippetFailure(
       state,
-      action: PayloadAction<RegenerateSnippetFailurePayload>,
+      action: PayloadAction<RegenerateSnippetFailurePayload>
     ) {
       const { id, error } = action.payload;
       const snippet = state.snippets.find((s) => s.id === id);
       if (snippet) {
         snippet.generationError = error;
+        snippet.isDirty = false; // Clear dirty flag after failed regeneration attempt
         state.regenerationStatus[snippet.id] = { status: "error", error };
       } else {
         // For new snippets not yet in the store, still track regeneration status
@@ -122,16 +137,24 @@ export const snippetsSlice = createSlice({
       }
     },
     clearRegenerationStatus: (state, action: PayloadAction<string>) => {
-        delete state.regenerationStatus[action.payload];
+      delete state.regenerationStatus[action.payload];
     },
-    updateSnippetContent: (state, action: PayloadAction<UpdateSnippetContentPayload>) => {
-        const snippet = state.snippets.find(s => s.id === action.payload.id);
-        if (snippet) {
-            snippet.content = action.payload.content;
-        }
+    updateSnippetContent: (
+      state,
+      action: PayloadAction<UpdateSnippetContentPayload>
+    ) => {
+      const snippet = state.snippets.find((s) => s.id === action.payload.id);
+      if (snippet) {
+        snippet.content = action.payload.content;
+      }
     },
-    setSnippetDirtyState: (state, action: PayloadAction<SetSnippetDirtyStatePayload>) => {
-      const snippet = state.snippets.find(s => s.name === action.payload.name);
+    setSnippetDirtyState: (
+      state,
+      action: PayloadAction<SetSnippetDirtyStatePayload>
+    ) => {
+      const snippet = state.snippets.find(
+        (s) => s.name === action.payload.name
+      );
       if (snippet) {
         snippet.isDirty = action.payload.isDirty;
         // Also reset regeneration status when a snippet becomes dirty
@@ -140,10 +163,16 @@ export const snippetsSlice = createSlice({
         }
       }
     },
-    awaitableRegenerateRequest: (_state, _action: PayloadAction<AwaitableRegenerateRequestPayload>) => {
+    awaitableRegenerateRequest: (
+      _state,
+      _action: PayloadAction<AwaitableRegenerateRequestPayload>
+    ) => {
       // Saga watcher will handle this.
     },
-    batchRegenerateRequest: (_state, _action: PayloadAction<BatchRegenerateRequestPayload>) => {
+    batchRegenerateRequest: (
+      _state,
+      _action: PayloadAction<BatchRegenerateRequestPayload>
+    ) => {
       // Saga watcher will handle this.
     },
     importSnippets: (_state, _action: PayloadAction<Snippet[]>) => {
