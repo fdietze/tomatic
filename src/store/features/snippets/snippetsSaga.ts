@@ -1,4 +1,4 @@
-import { call, put, takeLatest, all, select, takeEvery, take } from "redux-saga/effects";
+import { call, put, takeLatest, all, select, takeEvery } from "redux-saga/effects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
@@ -19,6 +19,7 @@ import {
   regenerateSnippetSuccess,
   regenerateSnippetFailure,
   setSnippetDirtyState,
+  setRegenerationStatus,
   batchRegenerateRequest,
   awaitableRegenerateRequest,
   importSnippets,
@@ -28,11 +29,14 @@ import { RootState } from "../../store";
 import {
   buildReverseDependencyGraph,
   findTransitiveDependents,
-  groupSnippetsIntoBatches,
+  groupSnippetsIntoWaves,
   resolveSnippetsWithTemplates,
   getTopologicalSortForExecution,
+  getReferencedSnippetNames,
 } from "@/utils/snippetUtils";
 import { requestMessageContent } from "@/api/openrouter";
+import { RegenerationResult } from "@/types/payloads";
+import { evaluateTemplate } from "@/utils/templateUtils";
 
 function* loadSnippetsSaga() {
   console.log("[DEBUG] loadSnippetsSaga: starting to load snippets");
@@ -285,15 +289,12 @@ function* resumeDirtySnippetGenerationSaga() {
     (state: RootState) => state.snippets.snippets,
   );
   const dirtySnippets = allSnippets.filter((s) => s.isDirty);
-  console.log("[DEBUG] resumeDirtySnippetGenerationSaga: all snippets:", allSnippets.map(s => ({ name: s.name, isDirty: s.isDirty, model: s.model })));
   if (dirtySnippets.length > 0) {
     console.log(
       "[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets",
       dirtySnippets.map((s) => s.name),
     );
     yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
-  } else {
-    console.log("[DEBUG] resumeDirtySnippetGenerationSaga: no dirty snippets found");
   }
 }
 
@@ -328,114 +329,127 @@ function* persistSnippetAfterRegenerationSaga(
   }
 }
 
+/**
+ * Wave-based batch regeneration orchestrator.
+ * Processes snippets in topological waves, ensuring each wave completes before the next begins.
+ * This eliminates the race condition where dependent snippets use stale data.
+ */
 function* batchRegenerationOrchestratorSaga(
   action: PayloadAction<{ snippets: Snippet[] }>,
 ) {
   console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with dirty snippets", action.payload.snippets.map(s => s.name));
   const { snippets: dirtySnippets } = action.payload;
 
-  // req:transitive-regeneration-topological-sort: Select all snippets from the state to build a complete dependency graph.
+  // Get all snippets to build the resolver context
   const allSnippets: Snippet[] = yield select(
     (state: RootState) => state.snippets.snippets,
   );
 
-  // Perform topological sort on the entire set of snippets to get the correct execution order.
-  const { sorted: allSortedSnippets, cyclic } = getTopologicalSortForExecution(allSnippets);
-
+  // Check for cycles before starting
+  const { cyclic } = getTopologicalSortForExecution(allSnippets);
   if (cyclic.length > 0) {
-    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected in snippets:", cyclic);
-    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Stopping batch regeneration due to cycles");
-    // Errors for cyclic snippets should already be set by the validation logic.
-    // We just need to stop the regeneration process here.
+    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected, stopping regeneration");
     return;
   }
 
-  // Filter the globally sorted list to get only the dirty snippets that need regeneration,
-  // but now they are in the correct topological order.
+  // Group dirty snippets into waves based on dependency levels
+  const waves = groupSnippetsIntoWaves(dirtySnippets);
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: created", waves.length, "waves");
+
+  // Initialize the resolver context with content from all non-dirty snippets
+  const resolverContext = new Map<string, string>();
   const dirtySnippetNames = new Set(dirtySnippets.map(s => s.name));
-  const sortedDirtySnippets = allSortedSnippets.filter(s => dirtySnippetNames.has(s.name));
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: sorted dirty snippets for regeneration", sortedDirtySnippets.map(s => s.name));
-
-  const batches = groupSnippetsIntoBatches(sortedDirtySnippets);
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: created batches", batches.map(b => b.map(s => s.name)));
-
-  const failedSnippets = new Set<string>();
-
-  for (const batch of batches) {
-    // Check if any snippet in this batch depends on a failed snippet
-    const shouldSkipBatch = batch.some(snippet => {
-      // Extract dependencies from the snippet's prompt
-      const dependencies = (snippet.prompt || '').match(/@(\w+)/g) || [];
-      return dependencies.some(dep => {
-        const depName = dep.substring(1); // Remove @ prefix
-        return failedSnippets.has(depName);
-      });
-    });
-
-    if (shouldSkipBatch) {
-      // Fail all snippets in this batch with upstream dependency error
-      console.log("[DEBUG] batchRegenerationOrchestratorSaga: skipping batch due to failed dependencies:", batch.map(s => s.name));
-      for (const snippet of batch) {
-        const dependencies = (snippet.prompt || '').match(/@(\w+)/g) || [];
-        const failedDep = dependencies.find(dep => {
-          const depName = dep.substring(1);
-          return failedSnippets.has(depName);
-        });
-        
-        if (failedDep) {
-          const depName = failedDep.substring(1);
-          const error = createAppError.snippetRegeneration(
-            snippet.name,
-            `Upstream dependency @${depName} failed to generate.`
-          );
-          yield put(regenerateSnippetFailure({ 
-            id: snippet.id, 
-            name: snippet.name, 
-            error 
-          }));
-          failedSnippets.add(snippet.name);
-        }
-      }
-      continue;
+  
+  for (const snippet of allSnippets) {
+    if (!dirtySnippetNames.has(snippet.name)) {
+      resolverContext.set(snippet.name, snippet.content);
     }
+  }
 
-    // Process the batch normally
-    const regenerationPromises = batch.map((snippet: Snippet) => {
-      const promise = new Promise<{ success: boolean; snippet: Snippet }>((resolve) => {
-        const successEventName = `app:snippet:regeneration:complete:${snippet.id}`;
-        const handleSuccess = () => {
-          window.removeEventListener(successEventName, handleSuccess);
-          window.removeEventListener(failureEventName, handleFailure);
-          resolve({ success: true, snippet });
-        };
-        
-        const failureEventName = `app:snippet:regeneration:failure:${snippet.id}`;
-        const handleFailure = () => {
-          window.removeEventListener(successEventName, handleSuccess);
-          window.removeEventListener(failureEventName, handleFailure);
-          resolve({ success: false, snippet });
-        };
-        
-        window.addEventListener(successEventName, handleSuccess);
-        window.addEventListener(failureEventName, handleFailure);
-      });
-      return { promise, snippet };
-    });
-
-    yield all(
-      regenerationPromises.map(({ snippet }) => put(regenerateSnippet(snippet))),
+  // Process waves sequentially
+  for (let waveIndex = 0; waveIndex < waves.length; waveIndex++) {
+    const wave = waves[waveIndex];
+    if (!wave) continue;
+    
+    console.log(`[DEBUG] batchRegenerationOrchestratorSaga: processing wave ${waveIndex}/${waves.length}:`, wave.map(s => s.name));
+    
+    // Set status and dispatch start events for all snippets in this wave
+    for (const snippet of wave) {
+      // Set status to "in_progress" (for spinner display) without triggering the saga watcher
+      yield put(setRegenerationStatus({ id: snippet.id, status: "in_progress" }));
+      
+      // Dispatch start events for E2E test compatibility
+      window.dispatchEvent(
+        new CustomEvent("app:snippet:regeneration:start", {
+          detail: { id: snippet.id, name: snippet.name },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("snippet_regeneration_started", {
+          detail: { id: snippet.id, name: snippet.name },
+        }),
+      );
+    }
+    
+    // Regenerate all snippets in this wave in parallel
+    const waveResults: Array<RegenerationResult | { error: string; snippet: Snippet }> = yield all(
+      wave.map((snippet) =>
+        call(function* () {
+          try {
+            const result: RegenerationResult = yield call(
+              regenerateSnippetWorkerWithContext,
+              snippet,
+              resolverContext
+            );
+            return result;
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { error: errorMessage, snippet };
+          }
+        })
+      )
     );
 
-    const results: Array<{ success: boolean; snippet: Snippet }> = yield all(regenerationPromises.map(({ promise }) => call(() => promise)));
-    
-    // Check for failures in this batch
-    for (const result of results) {
-      if (!result.success) {
-        failedSnippets.add(result.snippet.name);
-        console.log("[DEBUG] batchRegenerationOrchestratorSaga: snippet failed:", result.snippet.name);
+    // Update resolver context and dispatch actions for this wave
+    for (let i = 0; i < waveResults.length; i++) {
+      const result = waveResults[i];
+      const snippet = wave[i];
+      
+      if (!snippet || !result) continue;
+
+      if ('error' in result) {
+        // Handle error
+        console.log(`[DEBUG] batchRegenerationOrchestratorSaga: snippet ${snippet.name} failed:`, result.error);
+        const appError = createAppError.snippetRegeneration(snippet.name, result.error);
+        yield put(regenerateSnippetFailure({
+          id: snippet.id,
+          name: snippet.name,
+          error: appError
+        }));
+        
+        // Dispatch failure event for E2E test compatibility
+        window.dispatchEvent(
+          new CustomEvent(`app:snippet:regeneration:failure:${snippet.id}`)
+        );
+      } else {
+        // Success - update context and dispatch success
+        resolverContext.set(snippet.name, result.content);
+        yield put(regenerateSnippetSuccess(result));
+        
+        // Dispatch completion events for E2E test compatibility
+        window.dispatchEvent(
+          new CustomEvent(`app:snippet:regeneration:complete:${snippet.id}`)
+        );
+        window.dispatchEvent(
+          new CustomEvent("app:snippet:regeneration:complete", {
+            detail: { id: snippet.id, name: snippet.name },
+          }),
+        );
       }
     }
   }
+
+  console.log("[DEBUG] batchRegenerationOrchestratorSaga: all waves completed");
   window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
 }
 
@@ -456,54 +470,104 @@ function* handleAwaitableRegeneration(
   }
 }
 
-// Result type for the worker saga
-type RegenerateResult = 
-  | { success: true; snippet: Snippet }
-  | { success: false; error: string };
-
-// New worker saga for the fork/join pattern
-export function* regenerateSnippetWorker(snippet: Snippet): Generator<unknown, RegenerateResult, unknown> {
+/**
+ * New worker saga that regenerates a single snippet using a provided resolver context.
+ * This is the core execution unit for wave-based parallel regeneration.
+ *
+ * @param snippet The snippet to regenerate
+ * @param resolverContext A map of snippet names to their resolved content
+ * @returns A RegenerationResult containing the new content or an error
+ */
+export function* regenerateSnippetWorkerWithContext(
+  snippet: Snippet,
+  resolverContext: ReadonlyMap<string, string>
+): Generator<unknown, RegenerationResult, unknown> {
+  console.log(`[DEBUG] regenerateSnippetWorkerWithContext: starting regeneration for ${snippet.name}`);
+  
   try {
-    console.log(`[DEBUG] regenerateSnippetWorker: starting regeneration for ${snippet.name}`);
+    // Get settings for API call
+    const settings = (yield select(
+      (state: RootState) => state.settings
+    )) as RootState["settings"];
+
+    // Validation
+    if (
+      !snippet.isGenerated ||
+      typeof snippet.prompt !== "string" ||
+      !snippet.model
+    ) {
+      throw new Error("Invalid snippet for regeneration.");
+    }
+
+    // Pre-flight validation: Check if all dependencies exist in the resolver context
+    const dependencies = getReferencedSnippetNames(snippet.prompt);
+    for (const dep of dependencies) {
+      if (!resolverContext.has(dep)) {
+        throw new Error(`Upstream dependency @${dep} failed to generate.`);
+      }
+    }
     
-    // Dispatch the regeneration request
-    yield put(regenerateSnippet(snippet));
+    // Resolve the prompt using the resolver context
+    const preprocessedPrompt = snippet.prompt.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
     
-    // Wait for either success or failure
-    console.log(`[DEBUG] regenerateSnippetWorker: waiting for completion of ${snippet.name}`);
-    const result = yield take((action: unknown) => {
-      const typedAction = action as { type: string; payload: { name: string; error?: string } };
-      return (typedAction.type === regenerateSnippetSuccess.type && typedAction.payload.name === snippet.name) ||
-             (typedAction.type === regenerateSnippetFailure.type && typedAction.payload.name === snippet.name);
+    // Convert ReadonlyMap to plain object for evaluateTemplate
+    const contextObj: Record<string, string> = {};
+    resolverContext.forEach((value, key) => {
+      contextObj[key] = value;
     });
     
-    const typedResult = result as { type: string; payload: { name: string; error?: AppError } };
-    if (typedResult.type === regenerateSnippetFailure.type) {
-      console.log(`[DEBUG] regenerateSnippetWorker: regeneration failed for ${snippet.name}:`, typedResult.payload.error);
-      const errorMessage = typedResult.payload.error ? getErrorMessage(typedResult.payload.error) : 'Unknown error';
-      console.log(`[DEBUG] regenerateSnippetWorker: converted error to string:`, errorMessage);
-      return { success: false, error: errorMessage };
+    const resolvedPrompt = (yield call(
+      evaluateTemplate,
+      preprocessedPrompt,
+      contextObj
+    )) as string;
+    
+    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: resolved prompt for ${snippet.name}:`, resolvedPrompt);
+
+    // Handle empty prompt
+    if (resolvedPrompt.trim() === "") {
+      console.log(`[DEBUG] regenerateSnippetWorkerWithContext: resolved prompt is empty for ${snippet.name}`);
+      return { id: snippet.id, name: snippet.name, content: "" };
     }
+
+    // Call the API
+    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: calling API for ${snippet.name}`);
+    const assistantResponse = (yield call(() =>
+      requestMessageContent(
+        [{
+          id: crypto.randomUUID(),
+          role: "user",
+          content: resolvedPrompt,
+          raw_content: resolvedPrompt
+        }],
+        snippet.model!,
+        settings.apiKey,
+      ),
+    )) as string;
     
-    // Get the updated snippet from the store
-    const updatedSnippets = (yield select(
-      (state: RootState) => state.snippets.snippets
-    )) as Snippet[];
-    const updatedSnippet = updatedSnippets.find(s => s.id === snippet.id);
-    
-    if (!updatedSnippet) {
-      console.log(`[DEBUG] regenerateSnippetWorker: snippet ${snippet.name} not found after regeneration`);
-      return { success: false, error: `Snippet ${snippet.name} not found after regeneration` };
-    }
-    
-    console.log(`[DEBUG] regenerateSnippetWorker: completed regeneration for ${snippet.name}`);
-    return { success: true, snippet: updatedSnippet };
+    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: got response for ${snippet.name}:`, assistantResponse);
+
+    return {
+      id: snippet.id,
+      name: snippet.name,
+      content: assistantResponse
+    };
   } catch (error) {
-    console.log(`[DEBUG] regenerateSnippetWorker: caught unexpected error for ${snippet.name}:`, error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return { success: false, error: errorMessage };
+    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: error for ${snippet.name}:`, error);
+    
+    let errorMessage: string;
+    if (error && typeof error === 'object' && 'type' in error) {
+      errorMessage = getErrorMessage(error as AppError);
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = String(error);
+    }
+    
+    throw new Error(errorMessage);
   }
 }
+
 
 function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
   try {

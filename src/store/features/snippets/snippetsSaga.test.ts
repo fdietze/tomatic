@@ -17,6 +17,7 @@ import {
   loadSnippetsSuccess,
   regenerateSnippet,
 } from "./snippetsSlice";
+import { regenerateSnippetWorkerWithContext } from "./snippetsSaga";
 import { type RootState } from "@/store/store";
 import { type Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
@@ -240,16 +241,121 @@ describe("snippetsSaga", () => {
     });
   });
 
-  test("should regenerate snippets in correct topological order for a diamond dependency", async () => {
-    // Purpose: This test ensures that when a batch of dirty snippets with complex
-    // inter-dependencies is regenerated, the process respects the topological sort order
-    // to prevent using stale data. It reproduces a bug where sorting was done on a
-    // subset of snippets, leading to an incomplete dependency graph.
+  describe("regenerateSnippetWorkerWithContext", () => {
+    test("should regenerate a snippet using the provided resolver context", async () => {
+      // Purpose: Verify the worker uses the resolver context instead of Redux state
+      // This worker will be tested more thoroughly through the orchestrator tests
+      // Here we just verify it's exported and has the right signature
+      
+      const snippetB: Snippet = {
+        id: "snippet-b-id",
+        name: "B",
+        content: "old B content",
+        isGenerated: true,
+        prompt: "Generate using @A",
+        model: "mock-model/b",
+        createdAt_ms: 1,
+        updatedAt_ms: 1,
+        generationError: null,
+        isDirty: false,
+      };
 
-    const snippetA: Snippet = { id: "a", name: "A", content: "new content for A", isGenerated: true, prompt: "A", model: "mock-model/A", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: false };
-    const snippetB: Snippet = { id: "b", name: "B", content: "initial B", isGenerated: true, prompt: "B needs @A", model: "mock-model/B", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true };
-    const snippetC: Snippet = { id: "c", name: "C", content: "initial C", isGenerated: true, prompt: "C needs @A", model: "mock-model/C", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true };
-    const snippetD: Snippet = { id: "d", name: "D", content: "initial D", isGenerated: true, prompt: "D needs @B and @C", model: "mock-model/D", createdAt_ms: 1, updatedAt_ms: 1, generationError: null, isDirty: true };
+      const store = createTestStore({
+        settings: {
+          apiKey: '',
+          modelName: 'mock-model/b',
+          autoScrollEnabled: true,
+          selectedPromptName: null,
+          initialChatPrompt: null,
+          loading: 'idle' as const,
+          saving: 'idle' as const
+        }
+      });
+
+      // Create a resolver context with fresh content for A
+      const resolverContext = new Map([["A", "fresh A content"]]);
+
+      // Mock the API call
+      (requestMessageContent as Mock).mockResolvedValueOnce("new B content");
+
+      // Manually step through the generator to test it
+      const generator = regenerateSnippetWorkerWithContext(snippetB, resolverContext);
+      
+      // Step 1: select settings
+      let step = generator.next();
+      expect(step.value).toBeDefined();
+      
+      // Step 2: call evaluateTemplate - provide mock return
+      step = generator.next(store.getState().settings);
+      
+      // Step 3: call API - provide the resolved prompt value first
+      step = generator.next("Generate using fresh A content");
+      
+      // Step 4: get the API response
+      step = generator.next("new B content");
+      
+      // Final result
+      expect(step.done).toBe(true);
+      expect(step.value).toEqual({
+        id: "snippet-b-id",
+        name: "B",
+        content: "new B content",
+      });
+    });
+  });
+
+  test("should regenerate snippets in correct topological order with wave-based approach", async () => {
+    // Purpose: This test ensures that the new wave-based orchestrator correctly
+    // processes a diamond dependency (A -> B/C -> D) without using stale data.
+    
+    const snippetA: Snippet = {
+      id: "a",
+      name: "A",
+      content: "fresh A content",
+      isGenerated: false,  // Not generated, so it won't be regenerated
+      prompt: "",
+      model: undefined,
+      createdAt_ms: 1,
+      updatedAt_ms: 1,
+      generationError: null,
+      isDirty: false
+    };
+    const snippetB: Snippet = {
+      id: "b",
+      name: "B",
+      content: "stale B",
+      isGenerated: true,
+      prompt: "B uses @A",
+      model: "mock-model/B",
+      createdAt_ms: 1,
+      updatedAt_ms: 1,
+      generationError: null,
+      isDirty: true
+    };
+    const snippetC: Snippet = {
+      id: "c",
+      name: "C",
+      content: "stale C",
+      isGenerated: true,
+      prompt: "C uses @A",
+      model: "mock-model/C",
+      createdAt_ms: 1,
+      updatedAt_ms: 1,
+      generationError: null,
+      isDirty: true
+    };
+    const snippetD: Snippet = {
+      id: "d",
+      name: "D",
+      content: "stale D",
+      isGenerated: true,
+      prompt: "D uses @B and @C",
+      model: "mock-model/D",
+      createdAt_ms: 1,
+      updatedAt_ms: 1,
+      generationError: null,
+      isDirty: true
+    };
 
     const allSnippetsInStore = [snippetA, snippetB, snippetC, snippetD];
 
@@ -257,6 +363,7 @@ describe("snippetsSaga", () => {
     store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     const regenerationLog: {name: string, prompt: string}[] = [];
+    (requestMessageContent as Mock).mockReset(); // Ensure clean state
     (requestMessageContent as Mock).mockImplementation((messages: Message[], model: string) => {
       const name = model.split('/')[1];
       if (!name) {
@@ -267,40 +374,45 @@ describe("snippetsSaga", () => {
       }
       const prompt = messages[0].content;
       regenerationLog.push({ name, prompt });
-      // This simulates the API generating new content
-      return Promise.resolve(`new content for ${name}`);
+      return Promise.resolve(`regenerated ${name}`);
     });
 
-    // The batch regeneration should be triggered automatically by the resumeDirtySnippetGenerationSaga
-    // after the initial load of dirty snippets. We don't need to dispatch it manually.
-
-    // Wait for the entire batch regeneration process to complete
+    // Wait for batch regeneration to complete
     await new Promise(resolve => {
       window.addEventListener("app:snippet:regeneration:batch:complete", resolve, { once: true });
     });
 
-    const regeneratedNames = regenerationLog.map(l => l.name);
-    expect(regeneratedNames).toHaveLength(3);
+    // Verify the correct number of regenerations
+    expect(regenerationLog).toHaveLength(3);
 
+    const regeneratedNames = regenerationLog.map(l => l.name);
     const bIndex = regeneratedNames.indexOf("B");
     const cIndex = regeneratedNames.indexOf("C");
     const dIndex = regeneratedNames.indexOf("D");
 
+    // All three dirty snippets should be regenerated
     expect(bIndex).not.toBe(-1);
     expect(cIndex).not.toBe(-1);
     expect(dIndex).not.toBe(-1);
 
-    // D must be regenerated after B and C have finished
+    // D must come after both B and C (wave ordering)
     expect(dIndex).toBeGreaterThan(bIndex);
     expect(dIndex).toBeGreaterThan(cIndex);
 
-    // Crucially, check that D was regenerated with the *new* content of B and C,
-    // which proves that it waited for them to complete.
+    // CRITICAL: D's prompt should use the FRESH/REGENERATED content from B and C
     const dLog = regenerationLog.find(l => l.name === 'D');
     expect(dLog).toBeDefined();
-    expect(dLog!.prompt).toContain('new content for B');
-    expect(dLog!.prompt).toContain('new content for C');
-    expect(dLog!.prompt).not.toContain('initial B');
-    expect(dLog!.prompt).not.toContain('initial C');
+    expect(dLog!.prompt).toContain('regenerated B');
+    expect(dLog!.prompt).toContain('regenerated C');
+    
+    // D should NOT use the stale content
+    expect(dLog!.prompt).not.toContain('stale B');
+    expect(dLog!.prompt).not.toContain('stale C');
+
+    // Verify final Redux state has updated content
+    const finalState = store.getState();
+    const finalD = finalState.snippets.snippets.find(s => s.name === 'D');
+    expect(finalD?.content).toBe('regenerated D');
+    expect(finalD?.isDirty).toBe(false);
   });
 });
