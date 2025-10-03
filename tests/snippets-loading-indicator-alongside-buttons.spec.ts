@@ -142,7 +142,76 @@ test.describe("Snippet Loading Indicator with Buttons", () => {
     });
   });
 
-  test.describe("when snippet is not regenerating", () => {
+  test.describe("when snippet is dirty but not regenerating", () => {
+    test.beforeEach(async ({ context, page }) => {
+      // Set up the mock BEFORE seeding because dirty snippets auto-regenerate on load
+      chatMocker.mock({
+        request: {
+          model: "mock-model/mock-model",
+          messages: [{ role: "user", content: "Generate content" }],
+          stream: false,
+        },
+        response: {
+          role: "assistant",
+          content: "Regenerated content for dirty snippet",
+        },
+        manualTrigger: true,
+      });
+
+      await seedIndexedDB(context, {
+        snippets: [
+          {
+            id: "test-snippet",
+            name: "test_snippet",
+            content: "Static content",
+            isGenerated: true,
+            prompt: "Generate content",
+            model: "mock-model/mock-model",
+            createdAt_ms: 0,
+            updatedAt_ms: 0,
+            generationError: null,
+            isDirty: true, // Dirty but not actively regenerating
+          },
+        ],
+      });
+      await page.goto(ROUTES.settings);
+      await waitForEvent(page, "app:models_loaded");
+      await waitForEvent(page, "app:snippet:regeneration:start");
+    });
+
+    test("shows spinner alongside buttons for dirty snippet", async () => {
+      // Purpose: This test verifies that when a snippet is marked as dirty,
+      // it shows the loading spinner alongside the buttons during regeneration.
+
+      const snippetView = settingsPage.getSnippetItemView("test_snippet");
+
+      // Assert that spinner and buttons are both visible during regeneration
+      await expect(
+        snippetView.getByTestId("regenerating-spinner")
+      ).toBeVisible();
+      await expect(
+        snippetView.getByTestId("snippet-toggle-button")
+      ).toBeVisible();
+      await expect(
+        snippetView.getByTestId("snippet-edit-button")
+      ).toBeVisible();
+      await expect(
+        snippetView.getByTestId("snippet-delete-button")
+      ).toBeVisible();
+
+      // Complete the regeneration
+      await chatMocker.resolveNextCompletion();
+
+      // After regeneration, spinner should be gone (since snippet is no longer dirty)
+      await expect(
+        snippetView.getByTestId("regenerating-spinner")
+      ).not.toBeVisible();
+
+      chatMocker.verifyComplete();
+    });
+  });
+
+  test.describe("when snippet is not dirty and not regenerating", () => {
     test.beforeEach(async ({ context, page }) => {
       await seedIndexedDB(context, {
         snippets: [
@@ -165,7 +234,7 @@ test.describe("Snippet Loading Indicator with Buttons", () => {
     });
 
     test("shows buttons without spinner", async () => {
-      // Purpose: This test verifies that when a snippet is not regenerating,
+      // Purpose: This test verifies that when a snippet is not dirty and not regenerating,
       // the buttons are visible and no spinner is shown.
 
       const snippetView = settingsPage.getSnippetItemView("test_snippet");

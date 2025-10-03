@@ -439,11 +439,12 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
           {(() => {
             const status = regenerationStatus[snippet.id]?.status || "idle";
             const isRegenerating = status === "in_progress";
+            const shouldShowSpinner = isRegenerating || snippet.isDirty;
 
             return (
               <div className="system-prompt-buttons">
                 {/* req:dirty-loading-indicator: Show loading indicator for dirty/regenerating snippets */}
-                {isRegenerating && (
+                {shouldShowSpinner && (
                   <span
                     className="spinner"
                     data-testid="regenerating-spinner"
