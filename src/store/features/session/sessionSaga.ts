@@ -1,6 +1,6 @@
 import { all, call, put, select, take, takeLatest, fork, join } from "redux-saga/effects";
 import { END, eventChannel, EventChannel } from "redux-saga";
-import { PayloadAction, nanoid } from "@reduxjs/toolkit";
+import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";
 import type { Stream } from "openai/streaming";
 import { SagaIterator } from "redux-saga";
@@ -131,7 +131,7 @@ function* createAndSaveNewSessionSaga(): SagaIterator<string> {
   console.log(`[DEBUG] createAndSaveNewSessionSaga: creating session with ${currentMessages.length} messages`);
   
   // Generate a new unique session ID
-  const newSessionId = nanoid();
+  const newSessionId = crypto.randomUUID();
   
   // Create the ChatSession object
   const newSession: ChatSession = {

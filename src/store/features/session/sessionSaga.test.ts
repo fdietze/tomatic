@@ -30,10 +30,12 @@ vi.mock("@/services/NavigationProvider", () => ({
 
 // Note: We don't mock the entire db module to avoid breaking existing tests
 
-// Mock nanoid to have predictable IDs for snapshot consistency
-vi.mock("nanoid", () => ({
-  nanoid: vi.fn(() => "test-id-123"),
-}));
+// Mock crypto.randomUUID to have predictable IDs for test consistency
+const mockUUID = vi.fn(() => "test-id-123");
+vi.stubGlobal('crypto', {
+  ...crypto,
+  randomUUID: mockUUID,
+});
 
 // Mock the event dispatcher to avoid window is not defined error in Node.js env
 vi.mock("@/utils/events", () => ({
