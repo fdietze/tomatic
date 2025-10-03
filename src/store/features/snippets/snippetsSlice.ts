@@ -108,6 +108,15 @@ export const snippetsSlice = createSlice({
         state.regenerationStatus[action.payload.id] = { status: "in_progress" };
       }
     },
+    setRegenerationStatus(
+      state,
+      action: PayloadAction<{ id: string; status: "in_progress" | "success" | "error"; error?: AppError }>
+    ) {
+      state.regenerationStatus[action.payload.id] = {
+        status: action.payload.status,
+        error: action.payload.error,
+      };
+    },
     regenerateSnippetSuccess(
       state,
       action: PayloadAction<RegenerateSnippetSuccessPayload>
@@ -199,6 +208,7 @@ export const {
   clearRegenerationStatus,
   updateSnippetContent,
   setSnippetDirtyState,
+  setRegenerationStatus,
   awaitableRegenerateRequest,
   batchRegenerateRequest,
   importSnippets,

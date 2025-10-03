@@ -91,6 +91,13 @@ export interface RegenerateSnippetSuccessPayload {
   content: string;
 }
 
+/**
+ * Result type for the regenerateSnippetWorker saga.
+ * This is identical to RegenerateSnippetSuccessPayload as it represents
+ * the same data structure - a successfully regenerated snippet's output.
+ */
+export type RegenerationResult = RegenerateSnippetSuccessPayload;
+
 export interface RegenerateSnippetFailurePayload {
   id: string;
   name: string;

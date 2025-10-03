@@ -1,4 +1,4 @@
-import { all, call, put, select, take, takeLatest, fork, join } from "redux-saga/effects";
+import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
 import { END, eventChannel, EventChannel } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";
@@ -54,8 +54,8 @@ import {
 import {
   toAppError,
   createAppError,
+  getErrorMessage,
 } from "@/types/errors";
-import { regenerateSnippetWorker } from "@/store/features/snippets/snippetsSaga";
 
 // --- Helper Functions ---
 
@@ -362,7 +362,7 @@ function createChatStreamChannel(
 
 type SnippetCompletionAction = {
   type: string;
-  payload: { name: string; error?: string };
+  payload: { name: string; error?: import('@/types/errors').AppError };
 };
 
 // req:message-edit-fork, req:regenerate-context, req:snippet-wait-before-submit
@@ -424,13 +424,15 @@ function* submitUserMessageSaga(
         );
         if (failedSnippet) {
           console.log(`[DEBUG] submitUserMessageSaga: found failed snippet:`, failedSnippet.payload);
-          throw new Error(
-            `Snippet '@${
-              failedSnippet.payload.name
-            }' failed to regenerate: ${
-              failedSnippet.payload.error ?? "Unknown error"
-            }`,
+          const errorMsg = failedSnippet.payload.error
+            ? getErrorMessage(failedSnippet.payload.error)
+            : "Unknown error";
+          const snippetError = new Error(
+            `Snippet '@multiple' failed: ${errorMsg}`,
           );
+          // Tag the error so we know to cancel submission
+          (snippetError as Error & { isSnippetError: boolean }).isSnippetError = true;
+          throw snippetError;
         }
         console.log(`[DEBUG] submitUserMessageSaga: all snippets regenerated successfully, proceeding with chat`);
       }
@@ -653,6 +655,12 @@ function* submitUserMessageSaga(
     console.log(`[DEBUG] submitUserMessageSaga: caught error in main catch block:`, error);
     const appError = toAppError(error);
     yield put(submitUserMessageFailure(appError));
+    
+    // Only cancel submission (remove user message) for snippet errors
+    // For API/streaming errors, keep the user message
+    if (error && typeof error === 'object' && 'isSnippetError' in error && error.isSnippetError) {
+      yield put(cancelSubmission());
+    }
   }
 }
 
@@ -663,65 +671,16 @@ function* sendMessageSaga(action: PayloadAction<{ prompt: string }>): SagaIterat
     const { prompt } = action.payload;
     console.log(`[DEBUG] sendMessageSaga: started with prompt="${prompt}"`);
 
-    // Get current state
-    const { snippets }: RootState = yield select(
-      (state: RootState) => state,
-    );
-
-    // Note: Session creation is now handled in submitUserMessageSaga after the message is added to state
-
-    // Identify dirty snippets referenced in the prompt
-    const snippetReferences = findSnippetReferences(prompt);
-    const referencedSnippets = snippets.snippets.filter((s: Snippet) =>
-      snippetReferences.includes(s.name),
-    );
-    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
-
-    console.log(`[DEBUG] sendMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
-
-    // Use fork/join pattern for snippet regeneration
-    if (dirtySnippets.length > 0) {
-      console.log(`[DEBUG] sendMessageSaga: forking workers for dirty snippets`);
-      const regenerationTasks = yield all(
-        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
-      );
-
-      console.log(`[DEBUG] sendMessageSaga: waiting for all workers to complete`);
-      const results = yield join(regenerationTasks);
-      console.log(`[DEBUG] sendMessageSaga: all workers completed, checking results:`, results);
-      
-      // Check if any workers failed
-      const failedResults = results.filter((result: unknown) => (result as { success: boolean }).success === false);
-      if (failedResults.length > 0) {
-        const firstError = (failedResults[0] as { error: string }).error;
-        console.log(`[DEBUG] sendMessageSaga: worker(s) failed with error: ${firstError}`);
-        throw new Error(firstError);
-      }
-      
-      console.log(`[DEBUG] sendMessageSaga: all workers completed successfully`);
-    }
-
-    // After snippet regeneration, delegate to the existing saga logic
-    console.log(`[DEBUG] sendMessageSaga: delegating to submitUserMessageSaga via dispatch`);
-    
-    // Dispatch the action to go through the slice logic (which adds the message to state)
-    // instead of calling the saga directly
+    // Delegate to submitUserMessageSaga which handles dirty snippet waiting
     yield put(submitUserMessage({
       prompt,
       isRegeneration: false,
     }));
   } catch (error) {
     console.log(`[DEBUG] sendMessageSaga: caught error:`, error);
-    console.log(`[DEBUG] sendMessageSaga: error type:`, typeof error);
-    console.log(`[DEBUG] sendMessageSaga: error instanceof Error:`, error instanceof Error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(`[DEBUG] sendMessageSaga: errorMessage:`, errorMessage);
     const appError = createAppError.snippetRegeneration('multiple', errorMessage);
-    console.log(`[DEBUG] sendMessageSaga: appError:`, appError);
-    console.log(`[DEBUG] sendMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${errorMessage}"`);
-    // Dispatch the dedicated action to set a UI-facing error message
     yield put(setSessionError(appError));
-    console.log(`[DEBUG] sendMessageSaga: setSessionError dispatched successfully`);
   }
 }
 
@@ -730,31 +689,7 @@ function* editMessageSaga(action: PayloadAction<{ index: number; newPrompt: stri
     const { index, newPrompt } = action.payload;
     console.log(`[DEBUG] editMessageSaga: started with index=${index}, newPrompt="${newPrompt}"`);
 
-    // Get current snippets state
-    const snippetsState = yield select((state: RootState) => state.snippets);
-
-    // Identify dirty snippets referenced in the new prompt
-    const snippetReferences = findSnippetReferences(newPrompt);
-    const referencedSnippets = snippetsState.snippets.filter((s: Snippet) =>
-      snippetReferences.includes(s.name),
-    );
-    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
-
-    console.log(`[DEBUG] editMessageSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
-
-    // Use fork/join pattern for snippet regeneration
-    if (dirtySnippets.length > 0) {
-      console.log(`[DEBUG] editMessageSaga: forking workers for dirty snippets`);
-      const regenerationTasks = yield all(
-        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
-      );
-
-      console.log(`[DEBUG] editMessageSaga: waiting for all workers to complete`);
-      const _results: Snippet[] = yield join(regenerationTasks);
-      console.log(`[DEBUG] editMessageSaga: all workers completed successfully`);
-    }
-
-    // For now, delegate to the old saga with the resolved logic
+    // Delegate to submitUserMessageSaga which handles dirty snippet waiting
     yield put(submitUserMessage({
       prompt: newPrompt,
       isRegeneration: false,
@@ -764,8 +699,6 @@ function* editMessageSaga(action: PayloadAction<{ index: number; newPrompt: stri
     console.log(`[DEBUG] editMessageSaga: caught error:`, error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
     const appError = createAppError.snippetRegeneration('edit', errorMessage);
-    console.log(`[DEBUG] editMessageSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${errorMessage}"`);
-    // Dispatch the dedicated action to set a UI-facing error message
     yield put(setSessionError(appError));
   }
 }
@@ -775,32 +708,7 @@ function* regenerateResponseSaga(action: PayloadAction<{ index: number }>): Saga
     const { index } = action.payload;
     console.log(`[DEBUG] regenerateResponseSaga: started with index=${index}`);
 
-    // For regeneration, we need to check if any messages reference dirty snippets
-    const { session, snippets } = yield select((state: RootState) => state);
-    
-    // Find all user messages up to the regeneration point
-    const messagesToCheck = session.messages.slice(0, index + 1).filter((m: Message) => m.role === 'user');
-    const allReferences = messagesToCheck.flatMap((m: Message) => findSnippetReferences(m.raw_content || m.content));
-    const referencedSnippets = snippets.snippets.filter((s: Snippet) =>
-      allReferences.includes(s.name),
-    );
-    const dirtySnippets = referencedSnippets.filter((s: Snippet) => s.isDirty);
-
-    console.log(`[DEBUG] regenerateResponseSaga: found ${dirtySnippets.length} dirty snippets:`, dirtySnippets.map((s: Snippet) => s.name));
-
-    // Use fork/join pattern for snippet regeneration
-    if (dirtySnippets.length > 0) {
-      console.log(`[DEBUG] regenerateResponseSaga: forking workers for dirty snippets`);
-      const regenerationTasks = yield all(
-        dirtySnippets.map((snippet: Snippet) => fork(regenerateSnippetWorker, snippet))
-      );
-
-      console.log(`[DEBUG] regenerateResponseSaga: waiting for all workers to complete`);
-      const _results: Snippet[] = yield join(regenerationTasks);
-      console.log(`[DEBUG] regenerateResponseSaga: all workers completed successfully`);
-    }
-
-    // For now, delegate to the old saga with the resolved logic
+    // Delegate to submitUserMessageSaga which handles dirty snippet waiting
     yield put(submitUserMessage({
       prompt: "",
       isRegeneration: true,
@@ -810,8 +718,6 @@ function* regenerateResponseSaga(action: PayloadAction<{ index: number }>): Saga
     console.log(`[DEBUG] regenerateResponseSaga: caught error:`, error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
     const appError = createAppError.snippetRegeneration('regenerate', errorMessage);
-    console.log(`[DEBUG] regenerateResponseSaga: dispatching setSessionError with message: "Snippet regeneration failed: ${errorMessage}"`);
-    // Dispatch the dedicated action to set a UI-facing error message
     yield put(setSessionError(appError));
   }
 }

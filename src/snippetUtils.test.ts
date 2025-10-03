@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSnippetsWithTemplates, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, getSnippetDisplayOrder, getTopologicalSortForExecution } from '@/utils/snippetUtils';
+import { resolveSnippetsWithTemplates, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, getSnippetDisplayOrder, getTopologicalSortForExecution, groupSnippetsIntoWaves } from '@/utils/snippetUtils';
 import type { Snippet } from '@/types/storage';
 
 const createSnippet = (overrides: Partial<Snippet> & { name: string }): Snippet => ({
@@ -452,6 +452,110 @@ describe('getSnippetDisplayOrder', () => {
 
     expect(sortedNames).toEqual(['b', 'a']);
     expect(cyclic).toEqual(['a']);
+  });
+});
+
+describe('groupSnippetsIntoWaves', () => {
+  it('should group snippets with diamond dependency correctly', () => {
+    // Purpose: Verify that for A -> B/C -> D, we get waves [[A], [B, C], [D]]
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', content: '@A' });
+    const snippetC = createSnippet({ name: 'C', content: '@A' });
+    const snippetD = createSnippet({ name: 'D', content: '@B and @C' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC, snippetD]);
+
+    expect(waves).toHaveLength(3);
+    expect(waves[0]?.map(s => s.name)).toEqual(['A']);
+    expect(new Set(waves[1]?.map(s => s.name))).toEqual(new Set(['B', 'C']));
+    expect(waves[2]?.map(s => s.name)).toEqual(['D']);
+  });
+
+  it('should handle linear chain dependencies', () => {
+    // Purpose: Verify that A -> B -> C results in waves [[A], [B], [C]]
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', content: '@A' });
+    const snippetC = createSnippet({ name: 'C', content: '@B' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC]);
+
+    expect(waves).toHaveLength(3);
+    expect(waves[0]?.map(s => s.name)).toEqual(['A']);
+    expect(waves[1]?.map(s => s.name)).toEqual(['B']);
+    expect(waves[2]?.map(s => s.name)).toEqual(['C']);
+  });
+
+  it('should put all independent snippets in the same wave', () => {
+    // Purpose: Verify that snippets with no dependencies can all run in parallel
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', content: 'B content' });
+    const snippetC = createSnippet({ name: 'C', content: 'C content' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC]);
+
+    expect(waves).toHaveLength(1);
+    expect(new Set(waves[0]?.map(s => s.name))).toEqual(new Set(['A', 'B', 'C']));
+  });
+
+  it('should handle complex graph with multiple roots and branches', () => {
+    // Purpose: Test a more complex dependency structure
+    // Graph: A -> C, B -> C, C -> D, C -> E
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', content: 'B content' });
+    const snippetC = createSnippet({ name: 'C', content: '@A and @B' });
+    const snippetD = createSnippet({ name: 'D', content: '@C' });
+    const snippetE = createSnippet({ name: 'E', content: '@C' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC, snippetD, snippetE]);
+
+    expect(waves).toHaveLength(3);
+    expect(new Set(waves[0]?.map(s => s.name))).toEqual(new Set(['A', 'B']));
+    expect(waves[1]?.map(s => s.name)).toEqual(['C']);
+    expect(new Set(waves[2]?.map(s => s.name))).toEqual(new Set(['D', 'E']));
+  });
+
+  it('should return empty array for empty input', () => {
+    // Purpose: Edge case validation for empty input
+    const waves = groupSnippetsIntoWaves([]);
+    expect(waves).toEqual([]);
+  });
+
+  it('should handle cyclic dependencies by excluding them', () => {
+    // Purpose: Verify that cyclic snippets are not included in waves
+    const snippetA = createSnippet({ name: 'A', content: '@B' });
+    const snippetB = createSnippet({ name: 'B', content: '@A' });
+    const snippetC = createSnippet({ name: 'C', content: 'C content' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC]);
+
+    // Only C should be processed, A and B form a cycle
+    expect(waves).toHaveLength(1);
+    expect(waves[0]?.map(s => s.name)).toEqual(['C']);
+  });
+
+  it('should use prompt for generated snippets dependencies', () => {
+    // Purpose: Verify that generated snippets use their prompt for dependency detection
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', isGenerated: true, prompt: '@A', content: 'old B' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB]);
+
+    expect(waves).toHaveLength(2);
+    expect(waves[0]?.map(s => s.name)).toEqual(['A']);
+    expect(waves[1]?.map(s => s.name)).toEqual(['B']);
+  });
+
+  it('should handle mixed ${} and @ syntax', () => {
+    // Purpose: Verify both reference syntaxes work correctly
+    const snippetA = createSnippet({ name: 'A', content: 'A content' });
+    const snippetB = createSnippet({ name: 'B', content: '${A}' });
+    const snippetC = createSnippet({ name: 'C', content: '@A' });
+
+    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC]);
+
+    expect(waves).toHaveLength(2);
+    expect(waves[0]?.map(s => s.name)).toEqual(['A']);
+    expect(new Set(waves[1]?.map(s => s.name))).toEqual(new Set(['B', 'C']));
   });
 });
 
