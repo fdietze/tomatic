@@ -22,8 +22,10 @@ import {
   setRegenerationStatus,
   batchRegenerateRequest,
   importSnippets,
+  updateAndRegenerateSnippetRequested,
+  updateSnippetSuccessInternal,
 } from "./snippetsSlice";
-import { RegenerateSnippetSuccessPayload } from "@/types/payloads";
+import { RegenerateSnippetSuccessPayload, UpdateAndRegenerateSnippetPayload } from "@/types/payloads";
 import { RootState } from "../../store";
 import {
   buildReverseDependencyGraph,
@@ -267,19 +269,19 @@ function* markDependentsDirtySaga(
     }
   }
 
-  if (dependentsToUpdate.length > 0) {
-    // req:cycle-detection: Check for cycles before starting regeneration
-    const { cyclic } = getTopologicalSortForExecution(allSnippets);
-    if (cyclic.length > 0) {
-      console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
-      console.log("[DEBUG] markDependentsDirtySaga: Cyclic snippets:", cyclic);
-      console.log("[DEBUG] markDependentsDirtySaga: All snippets for context:", allSnippets.map(s => ({ name: s.name, content: s.content, prompt: s.prompt })));
-      // Don't start regeneration if there's a cycle
-      return;
-    }
-    
-    yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
+if (dependentsToUpdate.length > 0) {
+  // req:cycle-detection: Check for cycles before starting regeneration
+  const { cyclic } = getTopologicalSortForExecution(allSnippets);
+  if (cyclic.length > 0) {
+    console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
+    console.log("[DEBUG] markDependentsDirtySaga: Cyclic snippets:", cyclic);
+    console.log("[DEBUG] markDependentsDirtySaga: All snippets for context:", allSnippets.map(s => ({ name: s.name, content: s.content, prompt: s.prompt })));
+    // Don't start regeneration if there's a cycle
+    return;
   }
+  
+  yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
+}
 }
 
 function* resumeDirtySnippetGenerationSaga() {
@@ -552,6 +554,86 @@ export function* regenerateSnippetWorkerWithContext(
 }
 
 
+/**
+ * Master orchestrator saga for updating and regenerating a snippet with its dependents.
+ * This saga ensures the correct sequential flow:
+ * 1. Save the snippet to DB and update Redux state
+ * 2. If the prompt changed, regenerate the snippet itself and WAIT for completion
+ * 3. Only after the snippet is regenerated, find and regenerate its dependents
+ *
+ * This eliminates the race condition where dependents start regenerating before
+ * the parent snippet has finished, causing them to use stale data.
+ */
+function* updateAndRegenerateSaga(
+  action: PayloadAction<UpdateAndRegenerateSnippetPayload>
+) {
+  const { snippet: updatedSnippet } = action.payload;
+  
+  try {
+    // Step 1: Get the old snippet for comparison
+    const oldSnippet: Snippet | undefined = yield select(
+      (state: RootState) => state.snippets.snippets.find(s => s.id === updatedSnippet.id)
+    );
+    
+    if (!oldSnippet) {
+      throw new Error(`Snippet with id ${updatedSnippet.id} not found in state.`);
+    }
+    
+    const promptChanged = oldSnippet.prompt !== updatedSnippet.prompt;
+    
+    // Step 2: Save to DB and update Redux state
+    // CRITICAL: Use internal action to update state WITHOUT triggering markDependentsDirtySaga
+    // The orchestrator will handle dependents itself after waiting for regeneration
+    yield call(db.saveSnippet, updatedSnippet);
+    yield put(updateSnippetSuccessInternal({ oldName: oldSnippet.name, snippet: updatedSnippet }));
+    
+    // Step 3: If it's a generated snippet with a changed prompt, regenerate it NOW
+    if (updatedSnippet.isGenerated && promptChanged) {
+      // CRITICAL: Use 'call' to WAIT for the regeneration to complete
+      // This ensures the snippet's content is fresh before we proceed
+      yield call(handleRegenerateSnippetSaga, { payload: updatedSnippet, type: regenerateSnippet.type });
+    }
+    
+    // Step 4: NOW find and regenerate dependents (they will use fresh state)
+    const allSnippets: Snippet[] = yield select(
+      (state: RootState) => state.snippets.snippets,
+    );
+    const reverseGraph = buildReverseDependencyGraph(allSnippets);
+    const changedSnippetName = oldSnippet.name; // Use old name in case name changed
+    const dependentNames = findTransitiveDependents(changedSnippetName, reverseGraph);
+    
+    if (dependentNames.size === 0) {
+      return;
+    }
+    
+    // Step 5: Mark dependents as dirty and trigger batch regeneration
+    const dependentsToUpdate: Snippet[] = [];
+    for (const name of dependentNames) {
+      const dependentSnippet = allSnippets.find((s) => s.name === name);
+      if (dependentSnippet && dependentSnippet.isGenerated) {
+        dependentsToUpdate.push(dependentSnippet);
+        yield put(setSnippetDirtyState({ name, isDirty: true }));
+        yield call([db, db.updateSnippetProperty], name, { isDirty: true });
+      }
+    }
+    
+    if (dependentsToUpdate.length > 0) {
+      // Check for cycles
+      const { cyclic } = getTopologicalSortForExecution(allSnippets);
+      if (cyclic.length > 0) {
+        console.log("[DEBUG] updateAndRegenerateSaga: Cycle detected, stopping");
+        return;
+      }
+      
+      yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
+    }
+  } catch (error) {
+    const appError = toAppError(error);
+    console.log("[DEBUG] updateAndRegenerateSaga: error", error);
+    yield put(updateSnippetFailure({ id: updatedSnippet.id, error: appError }));
+  }
+}
+
 function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
   try {
     const snippetsToImport = action.payload;
@@ -601,6 +683,7 @@ export function* snippetsSaga() {
     takeLatest(updateSnippet.type, updateSnippetSaga),
     takeLatest(deleteSnippet.type, deleteSnippetSaga),
     takeLatest(importSnippets.type, importSnippetsSaga),
+    takeLatest(updateAndRegenerateSnippetRequested.type, updateAndRegenerateSaga),
     takeLatest(
       [updateSnippetSuccess.type, addSnippetSuccess.type],
       markDependentsDirtySaga,

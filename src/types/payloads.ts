@@ -118,6 +118,10 @@ export interface BatchRegenerateRequestPayload {
   snippets: import('./storage').Snippet[];
 }
 
+export interface UpdateAndRegenerateSnippetPayload {
+  snippet: import('./storage').Snippet;
+}
+
 // Prompts-related payloads
 export interface AddPromptFailurePayload {
   name: string;
