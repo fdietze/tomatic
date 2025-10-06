@@ -14,6 +14,7 @@ import { selectPrompts } from "@/store/features/prompts/promptsSlice";
 import {
   selectSnippets,
   regenerateSnippet,
+  updateAndRegenerateSnippetRequested,
 } from "@/store/features/snippets/snippetsSlice";
 import { getErrorMessage } from "@/types/errors";
 
@@ -203,11 +204,17 @@ const SnippetItem: React.FC<SnippetItemProps> = ({
       isDirty: shouldAutoRegenerate || snippet.isDirty,
     };
 
-    await onUpdate(snippetForSave);
-
-    // req:save-button-dirty-detection: Trigger regeneration if prompt changed and not manually regenerated
+    // req:save-button-dirty-detection: Use new orchestrated flow for auto-regeneration
+    // The new action ensures snippet regenerates BEFORE its dependents, eliminating race condition
     if (shouldAutoRegenerate) {
-      dispatch(regenerateSnippet(snippetForSave));
+      // Use the new master orchestrator saga that handles the entire flow:
+      // 1. Save snippet
+      // 2. Regenerate snippet and WAIT for completion
+      // 3. Regenerate dependents with fresh data
+      dispatch(updateAndRegenerateSnippetRequested({ snippet: snippetForSave }));
+    } else {
+      // No auto-regeneration needed, just save normally
+      await onUpdate(snippetForSave);
     }
 
     setIsEditing(false);

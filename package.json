@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint --type-aware",
     "preview": "vite preview",
+    "test": "npm run test:unit && npm run test:e2e",
     "test:e2e": "npx playwright test | cat",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run"
@@ -52,3 +53,4 @@
     "web-streams-polyfill": "^4.2.0"
   }
 }
+

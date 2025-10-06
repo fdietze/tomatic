@@ -10,8 +10,8 @@ import {
   RegenerateSnippetFailurePayload,
   SetSnippetDirtyStatePayload,
   UpdateSnippetContentPayload,
-  AwaitableRegenerateRequestPayload,
   BatchRegenerateRequestPayload,
+  UpdateAndRegenerateSnippetPayload,
 } from "@/types/payloads";
 
 export type RegenerationStatus = {
@@ -108,6 +108,15 @@ export const snippetsSlice = createSlice({
         state.regenerationStatus[action.payload.id] = { status: "in_progress" };
       }
     },
+    setRegenerationStatus(
+      state,
+      action: PayloadAction<{ id: string; status: "in_progress" | "success" | "error"; error?: AppError }>
+    ) {
+      state.regenerationStatus[action.payload.id] = {
+        status: action.payload.status,
+        error: action.payload.error,
+      };
+    },
     regenerateSnippetSuccess(
       state,
       action: PayloadAction<RegenerateSnippetSuccessPayload>
@@ -163,12 +172,6 @@ export const snippetsSlice = createSlice({
         }
       }
     },
-    awaitableRegenerateRequest: (
-      _state,
-      _action: PayloadAction<AwaitableRegenerateRequestPayload>
-    ) => {
-      // Saga watcher will handle this.
-    },
     batchRegenerateRequest: (
       _state,
       _action: PayloadAction<BatchRegenerateRequestPayload>
@@ -177,6 +180,25 @@ export const snippetsSlice = createSlice({
     },
     importSnippets: (_state, _action: PayloadAction<Snippet[]>) => {
       // saga will handle the logic
+    },
+    updateAndRegenerateSnippetRequested: (
+      _state,
+      _action: PayloadAction<UpdateAndRegenerateSnippetPayload>
+    ) => {
+      // Saga will orchestrate the entire update and regeneration flow
+    },
+    // Internal action used by the orchestrator to update state without triggering markDependentsDirtySaga
+    updateSnippetSuccessInternal: (
+      state,
+      action: PayloadAction<UpdateSnippetSuccessPayload>
+    ) => {
+      // Same logic as updateSnippetSuccess, but won't trigger the watcher
+      const index = state.snippets.findIndex(
+        (s) => s.id === action.payload.snippet.id
+      );
+      if (index !== -1) {
+        state.snippets[index] = action.payload.snippet;
+      }
     },
   },
 });
@@ -199,11 +221,15 @@ export const {
   clearRegenerationStatus,
   updateSnippetContent,
   setSnippetDirtyState,
-  awaitableRegenerateRequest,
+  setRegenerationStatus,
   batchRegenerateRequest,
   importSnippets,
+  updateAndRegenerateSnippetRequested,
+  updateSnippetSuccessInternal,
 } = snippetsSlice.actions;
 
 export const selectSnippets = (state: RootState) => state.snippets;
 
 export default snippetsSlice.reducer;
+
+
