@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction, nanoid } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Message } from "@/types/chat";
 import { SystemPrompt } from "@/types/storage";
 import { RootState } from "../../store";
@@ -146,7 +146,7 @@ export const sessionSlice = createSlice({
       if (!isRegeneration) {
         // Add the new/edited user message.
         state.messages.push({
-          id: nanoid(),
+          id: crypto.randomUUID(),
           role: "user",
           content: prompt, // Initially, content is the same as raw_content
           raw_content: prompt,
@@ -168,7 +168,7 @@ export const sessionSlice = createSlice({
     },
     addAssistantMessagePlaceholder: (state) => {
       state.messages.push({
-        id: nanoid(),
+        id: crypto.randomUUID(),
         role: "assistant",
         content: "",
         raw_content: "",

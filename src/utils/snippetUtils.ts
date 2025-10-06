@@ -296,54 +296,88 @@ export function getSnippetDisplayOrder(allSnippets: Snippet[]): { sorted: Snippe
 }
 
 /**
- * Groups a topologically sorted list of snippets into batches that can be run in parallel.
- * A batch consists of snippets that do not depend on each other.
- * @param sortedSnippets A list of snippets, already topologically sorted.
- * @returns An array of arrays, where each inner array is a batch of snippets.
+ * Groups snippets into "waves" based on their dependency levels.
+ * Each wave contains snippets that can be processed in parallel.
+ * A wave can only start after all previous waves have completed.
+ *
+ * This uses a level-by-level topological sort approach (Kahn's algorithm with levels).
+ *
+ * @param snippets The list of snippets to organize into waves
+ * @returns An array of waves, where each wave is an array of snippets that can run in parallel
  */
-export function groupSnippetsIntoBatches(
-  sortedSnippets: Snippet[],
+export function groupSnippetsIntoWaves(
+  snippets: Snippet[]
 ): Snippet[][] {
-  const batches: Snippet[][] = [];
-  let processedSnippets = new Set<string>();
-
-  for (const snippet of sortedSnippets) {
-    let batchFound = false;
-    const dependencies = getReferencedSnippetNames(
-      snippet.isGenerated ? snippet.prompt || "" : snippet.content
-    );
-
-    for (const batch of batches) {
-      const batchDependencies = new Set<string>();
-      for (const s of batch) {
-        const s_deps = getReferencedSnippetNames(
-          s.isGenerated ? s.prompt || "" : s.content
-        );
-        s_deps.forEach((dep) => batchDependencies.add(dep));
-      }
-
-      // Check if this snippet depends on anything in the current batch
-      const dependsOnBatch = [...dependencies].some((dep) =>
-        batch.some((s) => s.name === dep)
-      );
-
-      // Check if anything in the batch depends on this snippet
-      const batchDependsOnSnippet = [...batchDependencies].some(
-        (dep) => dep === snippet.name
-      );
-
-      if (!dependsOnBatch && !batchDependsOnSnippet) {
-        batch.push(snippet);
-        batchFound = true;
-        break;
-      }
-    }
-
-    if (!batchFound) {
-      batches.push([snippet]);
-    }
-    processedSnippets.add(snippet.name);
+  if (snippets.length === 0) {
+    return [];
   }
 
-  return batches;
+  const inDegree = new Map<string, number>();
+  const graph = new Map<string, string[]>(); // Adjacency list: dependency -> dependents
+  const snippetMap = new Map(snippets.map(s => [s.name, s]));
+
+  // Initialize in-degree and graph
+  for (const snippet of snippets) {
+    inDegree.set(snippet.name, 0);
+    graph.set(snippet.name, []);
+  }
+
+  // Build the graph and calculate in-degrees
+  for (const snippet of snippets) {
+    const textToScan = snippet.isGenerated ? snippet.prompt || '' : snippet.content;
+    const dependencies = getReferencedSnippetNames(textToScan);
+    
+    for (const depName of dependencies) {
+      if (snippetMap.has(depName)) {
+        // snippet depends on depName, so increment snippet's in-degree
+        inDegree.set(snippet.name, (inDegree.get(snippet.name) || 0) + 1);
+        // Add snippet as a dependent of depName
+        const dependents = graph.get(depName) || [];
+        dependents.push(snippet.name);
+        graph.set(depName, dependents);
+      }
+    }
+  }
+
+  const waves: Snippet[][] = [];
+  const processed = new Set<string>();
+
+  // Process snippets level by level
+  while (processed.size < snippets.length) {
+    const currentWave: Snippet[] = [];
+    
+    // Find all snippets with in-degree 0 that haven't been processed
+    for (const [name, degree] of inDegree.entries()) {
+      if (degree === 0 && !processed.has(name)) {
+        const snippet = snippetMap.get(name);
+        if (snippet) {
+          currentWave.push(snippet);
+        }
+      }
+    }
+
+    // If no snippets can be processed, we have a cycle
+    if (currentWave.length === 0) {
+      // Remaining snippets are cyclic, we should not process them
+      break;
+    }
+
+    waves.push(currentWave);
+
+    // Mark current wave as processed and update in-degrees
+    for (const snippet of currentWave) {
+      processed.add(snippet.name);
+      
+      // Reduce in-degree for all dependents
+      const dependents = graph.get(snippet.name) || [];
+      for (const dependentName of dependents) {
+        const currentDegree = inDegree.get(dependentName) || 0;
+        inDegree.set(dependentName, currentDegree - 1);
+      }
+    }
+  }
+
+  return waves;
 }
+
+

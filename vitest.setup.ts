@@ -1,4 +1,3 @@
-import "core-js/stable/structured-clone";
 import "fake-indexeddb/auto";
 import { beforeEach, afterEach, vi } from "vitest";
 import type { TestContext } from "vitest";
@@ -34,11 +33,24 @@ beforeEach(() => {
 });
 
 afterEach((context: TestContext) => {
+  // Restore spies first so we can use console.log normally
   consoleLogSpy.mockRestore();
   consoleErrorSpy.mockRestore();
 
-  if (context.task.result?.state === "fail") {
+  if (context.task.result?.state === "fail" && logBuffer.length > 0) {
+    const testName = context.task.name;
+    // Print the captured logs using the restored console.log
+    // Vitest will capture this as stdout and display it only once
+    console.log(
+      `\n=== Captured console output for failed test: "${testName}" ===`,
+    );
+    logBuffer.forEach((args) => {
+      console.log(...args);
+    });
+    console.log("=== End of captured output ===\n");
   }
 
   logBuffer.length = 0;
 });
+
+

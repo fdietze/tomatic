@@ -8,7 +8,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 8,
-  reporter: [["list"], ["./pw-actions-reporter.cjs"]],
+  reporter: [['./pw-actions-reporter.cjs']],
   use: {
     baseURL: "http://127.0.0.1:5173",
     // trace: 'retain-on-failure',
