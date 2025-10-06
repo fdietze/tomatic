@@ -581,42 +581,40 @@ function* updateAndRegenerateSaga(
     
     const promptChanged = oldSnippet.prompt !== updatedSnippet.prompt;
     
-    // Step 2: Save to DB and update Redux state
-    // CRITICAL: Use internal action to update state WITHOUT triggering markDependentsDirtySaga
-    // The orchestrator will handle dependents itself after waiting for regeneration
-    yield call(db.saveSnippet, updatedSnippet);
-    yield put(updateSnippetSuccessInternal({ oldName: oldSnippet.name, snippet: updatedSnippet }));
-    
-    // Step 3: If it's a generated snippet with a changed prompt, regenerate it NOW
-    if (updatedSnippet.isGenerated && promptChanged) {
-      // CRITICAL: Use 'call' to WAIT for the regeneration to complete
-      // This ensures the snippet's content is fresh before we proceed
-      yield call(handleRegenerateSnippetSaga, { payload: updatedSnippet, type: regenerateSnippet.type });
-    }
-    
-    // Step 4: NOW find and regenerate dependents (they will use fresh state)
+    // Step 2: Find dependents EARLY and mark them as dirty
+    // This ensures they show loading indicators immediately
     const allSnippets: Snippet[] = yield select(
       (state: RootState) => state.snippets.snippets,
     );
     const reverseGraph = buildReverseDependencyGraph(allSnippets);
-    const changedSnippetName = oldSnippet.name; // Use old name in case name changed
+    const changedSnippetName = oldSnippet.name;
     const dependentNames = findTransitiveDependents(changedSnippetName, reverseGraph);
     
-    if (dependentNames.size === 0) {
-      return;
-    }
-    
-    // Step 5: Mark dependents as dirty and trigger batch regeneration
     const dependentsToUpdate: Snippet[] = [];
     for (const name of dependentNames) {
       const dependentSnippet = allSnippets.find((s) => s.name === name);
       if (dependentSnippet && dependentSnippet.isGenerated) {
         dependentsToUpdate.push(dependentSnippet);
+        // Mark as dirty NOW to show spinner immediately
         yield put(setSnippetDirtyState({ name, isDirty: true }));
         yield call([db, db.updateSnippetProperty], name, { isDirty: true });
       }
     }
     
+    // Step 3: Save to DB and update Redux state
+    // CRITICAL: Use internal action to update state WITHOUT triggering markDependentsDirtySaga
+    // The orchestrator handles dependents itself
+    yield call(db.saveSnippet, updatedSnippet);
+    yield put(updateSnippetSuccessInternal({ oldName: oldSnippet.name, snippet: updatedSnippet }));
+    
+    // Step 4: If it's a generated snippet with a changed prompt, regenerate it NOW
+    if (updatedSnippet.isGenerated && promptChanged) {
+      // CRITICAL: Use 'call' to WAIT for the regeneration to complete
+      // This ensures the snippet's content is fresh before dependents regenerate
+      yield call(handleRegenerateSnippetSaga, { payload: updatedSnippet, type: regenerateSnippet.type });
+    }
+    
+    // Step 5: Trigger batch regeneration for dependents (now with fresh data)
     if (dependentsToUpdate.length > 0) {
       // Check for cycles
       const { cyclic } = getTopologicalSortForExecution(allSnippets);
