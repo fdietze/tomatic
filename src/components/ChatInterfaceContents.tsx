@@ -17,6 +17,7 @@ import {
   cancelSubmission,
   regenerateResponseRequested,
   editMessageRequested,
+  setClearInput,
 } from "@/store/features/session/sessionSlice";
 
 interface ChatInterfaceContentsProps {
@@ -53,6 +54,13 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
     dispatch(fetchModels());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (session.clearInput) {
+      setInput("");
+      dispatch(setClearInput(false));
+    }
+  }, [session.clearInput, dispatch]);
+
   const displayMessages = useMemo(() => {
     if (systemPrompt && session.messages.length === 0) {
       return [
@@ -74,10 +82,9 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
     dispatch(saveSettings({}));
   };
 
-  const handleSubmit = (prompt: string): void => {
+  const handleSubmit = (prompt:string): void => {
     onNewMessage(prompt);
-    setInput("");
-  };
+  }
 
   const handleRegenerate = (index: number): void => {
     dispatch(regenerateResponseRequested({ index }));

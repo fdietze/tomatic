@@ -40,6 +40,7 @@ import {
   cancelSubmission,
   updateUserMessage,
   setSessionError,
+  setClearInput
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
@@ -609,7 +610,7 @@ function* submitUserMessageSaga(
           yield put(
             submitUserMessageSuccess({ model: settings.modelName }),
           );
-          
+          yield put(setClearInput(true));
           // Update the session in the database now that the assistant response is complete
           const { session: finalSession }: RootState = yield select((state: RootState) => state);
           if (finalSession.currentSessionId && finalSession.currentSessionId !== "new") {
