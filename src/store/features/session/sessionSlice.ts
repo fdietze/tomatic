@@ -25,6 +25,7 @@ export interface SessionState {
   submitting: boolean;
   error: AppError | null;
   selectedPromptName: string | null;
+  clearInput: boolean;
 }
 
 const initialState: SessionState = {
@@ -37,6 +38,7 @@ const initialState: SessionState = {
   submitting: false,
   error: null,
   selectedPromptName: null,
+  clearInput: false,
 };
 
 export const sessionSlice = createSlice({
@@ -102,6 +104,7 @@ export const sessionSlice = createSlice({
       // Saga will intercept this. We can set loading state here.
       state.submitting = true;
       state.error = null;
+      state.clearInput = false;
     },
     editMessageRequested: (state, _action: PayloadAction<EditMessageRequestPayload>) => {
       state.submitting = true;
@@ -332,10 +335,14 @@ export const sessionSlice = createSlice({
         }
       }
     },
+    setClearInput: (state, action: PayloadAction<boolean>) => {
+      state.clearInput = action.payload;
+    }
   },
 });
 
 export const {
+  setClearInput,
   loadSession,
   loadSessionSuccess,
   sessionCreatedSuccess,
