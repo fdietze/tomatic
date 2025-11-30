@@ -48,6 +48,15 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
   } = useSelector(selectModels);
 
   const [input, setInput] = useState("");
+  // Keep track of the last submitted input to restore it if an error occurs
+  const lastSubmittedInputRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (session.error && lastSubmittedInputRef.current !== null) {
+      setInput(lastSubmittedInputRef.current);
+      lastSubmittedInputRef.current = null;
+    }
+  }, [session.error]);
 
   useEffect(() => {
     dispatch(fetchModels());
@@ -75,6 +84,7 @@ const ChatInterfaceContents: React.FC<ChatInterfaceContentsProps> = ({
   };
 
   const handleSubmit = (prompt: string): void => {
+    lastSubmittedInputRef.current = prompt;
     onNewMessage(prompt);
     setInput("");
   };
