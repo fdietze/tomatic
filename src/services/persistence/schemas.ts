@@ -12,6 +12,8 @@ export const persistedSettingsStateSchema = z.object({
   autoScrollEnabled: z.boolean().optional(),
   selectedPromptName: z.string().nullable().optional(),
   initialChatPrompt: z.string().nullable().optional(),
+  allowChatTemplates: z.boolean().optional(),
+  allowSnippetTemplates: z.boolean().optional(),
   // Note: loading and saving states are not persisted as they are runtime-only
 });
 
