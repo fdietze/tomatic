@@ -8,6 +8,8 @@ export interface SettingsState {
   autoScrollEnabled: boolean;
   selectedPromptName: string | null;
   initialChatPrompt: string | null;
+  allowChatTemplates: boolean;
+  allowSnippetTemplates: boolean;
   loading: "idle" | "loading" | "failed";
   saving: "idle" | "saving" | "failed" | "saved";
 }
@@ -18,6 +20,8 @@ export const initialState: SettingsState = {
   autoScrollEnabled: true,
   selectedPromptName: null,
   initialChatPrompt: null,
+  allowChatTemplates: false,
+  allowSnippetTemplates: false,
   loading: "idle",
   saving: "idle",
 };
@@ -67,6 +71,12 @@ export const settingsSlice = createSlice({
     setInitialChatPrompt: (state, action: PayloadAction<string | null>) => {
       state.initialChatPrompt = action.payload;
     },
+    toggleAllowChatTemplates: (state) => {
+      state.allowChatTemplates = !state.allowChatTemplates;
+    },
+    toggleAllowSnippetTemplates: (state) => {
+      state.allowSnippetTemplates = !state.allowSnippetTemplates;
+    },
   },
 });
 
@@ -82,6 +92,8 @@ export const {
   toggleAutoScroll,
   setSelectedPromptName,
   setInitialChatPrompt,
+  toggleAllowChatTemplates,
+  toggleAllowSnippetTemplates,
 } = settingsSlice.actions;
 
 export const selectSettings = (state: RootState): SettingsState =>
