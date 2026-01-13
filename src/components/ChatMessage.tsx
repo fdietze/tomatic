@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { Message } from '@/types/chat';
 import Markdown from './Markdown';
 import CopyButton from './CopyButton';
@@ -53,6 +53,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   const contentForEditing = message.raw_content ?? message.content;
   const [isEditing, setIsEditing] = useState(false);
   const [editInput, setEditInput] = useState(contentForEditing);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // req:edit-autofocus: Automatically focus the edit textarea.
+  useEffect(() => {
+    if (isEditing) {
+      editInputRef.current?.focus();
+    }
+  }, [isEditing]);
 
   const isSystemMessage = message.role === 'system';
   const [collapsed, setCollapsed] = useState(isSystemMessage);
@@ -126,6 +134,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {isEditing ? (
           <>
             <textarea
+              ref={editInputRef}
               data-testid="edit-textarea"
               style={{ width: '100%' }}
               value={editInput}
