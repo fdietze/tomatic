@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import ChatPage from "@/pages/ChatPage";
+import ScratchpadPage from "@/pages/ScratchpadPage";
 import SettingsPage from "@/pages/SettingsPage";
 import { useSelector, useDispatch } from "react-redux";
 import { ROUTES } from "@/utils/routes";
@@ -48,8 +49,13 @@ const Header: React.FC = () => {
     void navigate(lastChatUrl);
   };
 
+  const onScratchpad = (): void => {
+    void navigate(ROUTES.scratchpad.new);
+  };
+
   const isChatActive = location.pathname.startsWith("/chat");
   const isSettingsActive = location.pathname.startsWith("/settings");
+  const isScratchpadActive = location.pathname.startsWith("/scratchpad");
 
   return (
     <header>
@@ -58,6 +64,13 @@ const Header: React.FC = () => {
           data-testid="tab-chat"
         >
           Chat
+        </button>
+        <button
+          onClick={onScratchpad}
+          data-active={isScratchpadActive}
+          data-testid="nav-scratchpad"
+        >
+          Scratchpad
         </button>
         <button
           onClick={onSettings}
@@ -115,6 +128,8 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/chat/:sessionId" element={<ChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/scratchpad/:sessionId" element={<ScratchpadPage />} />
+            <Route path="/scratchpad" element={<Navigate to="/scratchpad/new" replace />} />
             <Route path="*" element={<Navigate to="/chat/new" replace />} />
           </Routes>
         </main>
