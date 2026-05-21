@@ -63,3 +63,12 @@
 - req:system-prompt-navigation-sync: when navigating through chat history using prev/next buttons, the selected system prompt should automatically update to match the system prompt stored in the system message of the loaded chat history. If the session has no system message, no prompt should be selected, always reflecting what is persisted with the current session.
 - req:system-prompt-interactive-update: when a chat session is loaded (with or without system prompt) and the user selects a different system prompt, the system message must reflect what was selected (no selection -> no system message). This modified chat history is only persisted when an actual submission/regeneration happens.
 - when migrations fail, the user must see an error message.
+
+## Scratchpad Mode
+
+- req:scratchpad-mode: dedicated tab/route with aggregated single-user-message flow; assistant responses never feed back into the LLM.
+- req:scratchpad-aggregation: user inputs are joined with "\n\n" into a single user message at send/regen time.
+- req:scratchpad-staleness: edit/delete of an input chunk, or change of system prompt/model, marks the response stale without regenerating; explicit user action regenerates.
+- req:scratchpad-separate-sessions: scratchpad sessions live in their own IndexedDB store, separate from chat sessions.
+- req:scratchpad-snippet-resolution: snippet references in scratchpad inputs resolve identically to chat (same wait/error semantics).
+- req:scratchpad-auto-save-new: first send on /scratchpad/new persists and updates URL.
