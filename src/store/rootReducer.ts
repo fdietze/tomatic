@@ -5,6 +5,7 @@ import modelsReducer from "./features/models/modelsSlice";
 import promptsReducer from "./features/prompts/promptsSlice";
 import snippetsReducer from "./features/snippets/snippetsSlice";
 import appReducer from "./features/app/appSlice";
+import scratchpadReducer from "./features/scratchpad/scratchpadSlice";
 
 const rootReducer = combineReducers({
   settings: settingsReducer,
@@ -13,6 +14,7 @@ const rootReducer = combineReducers({
   prompts: promptsReducer,
   snippets: snippetsReducer,
   app: appReducer,
+  scratchpad: scratchpadReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
