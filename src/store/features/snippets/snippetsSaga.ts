@@ -31,7 +31,7 @@ import {
   buildReverseDependencyGraph,
   findTransitiveDependents,
   groupSnippetsIntoWaves,
-  resolveSnippetsWithTemplates,
+  resolveSnippetsWithTemplates as resolveSnippetsWithTemplatesUtil,
   getTopologicalSortForExecution,
   getReferencedSnippetNames,
 } from "@/utils/snippetUtils";
@@ -155,7 +155,7 @@ function* handleRegenerateSnippetSaga(
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet model for ${snippetToRegenerate.name}:`, snippetToRegenerate.model);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet prompt for ${snippetToRegenerate.name}:`, snippetToRegenerate.prompt);
     const resolvedPrompt: string = yield call(
-      resolveSnippetsWithTemplates,
+      resolveSnippetsWithTemplatesUtil,
       snippetToRegenerate.prompt,
       allSnippets,
     );
@@ -672,6 +672,23 @@ function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
     console.log("[DEBUG] importSnippetsSaga: failure", error);
     yield put(loadSnippetsFailure(createAppError.persistence("importSnippets", "Failed to import snippets.")));
   }
+}
+
+/**
+ * req:snippet-id-vs-name: Generator wrapper around resolveSnippetsWithTemplates from snippetUtils.
+ * Selects all snippets from state and resolves snippet references in the given text.
+ * Exported so other sagas (e.g. scratchpadSaga) can use it via `yield call`.
+ */
+export function* resolveSnippetsWithTemplates(text: string): Generator<unknown, string, unknown> {
+  const allSnippets = (yield select(
+    (state: RootState) => state.snippets.snippets,
+  )) as Snippet[];
+  const resolved = (yield call(
+    resolveSnippetsWithTemplatesUtil,
+    text,
+    allSnippets,
+  )) as string;
+  return resolved;
 }
 
 export function* snippetsSaga() {
