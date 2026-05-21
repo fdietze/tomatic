@@ -137,6 +137,17 @@ function openTomaticDB(): Promise<{
 export const dbPromise = openTomaticDB().then((result) => result.db);
 export const migrationPromise = openTomaticDB().then((result) => result.migrated);
 
+// Closes the active DB connection and resets the module-level singleton.
+// Only intended for use in tests that need to delete and re-create the database
+// between test runs (e.g., via fake-indexeddb/auto + idb's deleteDB).
+export async function closeDbForTesting(): Promise<void> {
+  if (dbInstancePromise) {
+    const { db } = await dbInstancePromise;
+    db.close();
+    dbInstancePromise = null;
+  }
+}
+
 // --- Snippet Functions ---
 
 export async function saveSnippet(snippet: Snippet): Promise<void> {
