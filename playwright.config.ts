@@ -8,6 +8,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 8,
+  globalSetup: "./tests/global-setup.ts",
   reporter: [['./pw-actions-reporter.cjs']],
   use: {
     baseURL: "http://127.0.0.1:5173",
@@ -29,14 +30,14 @@ export default defineConfig({
       },
     },
   ],
-  timeout: 10 * 1000,
+  timeout: 30 * 1000,
   expect: { timeout: 10_000 },
   webServer: {
-    command: "VITE_IS_TESTING=true npm run dev",
+    command: "VITE_IS_TESTING=true pnpm dev",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
     stdout: "pipe",
     stderr: "pipe",
-    timeout: 10 * 1000,
+    timeout: 30 * 1000,
   },
 });

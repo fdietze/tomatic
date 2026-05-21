@@ -6,11 +6,11 @@ _default:
 
 # start development environment
 dev:
-  npm run dev
+  pnpm dev
 
 check:
-  npm run typecheck && \
-  npm run lint && \
-  npm run test:unit && \
-  npm run test:e2e
+  pnpm typecheck && \
+  pnpm lint && \
+  pnpm test:unit && \
+  pnpm test:e2e
 

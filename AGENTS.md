@@ -20,7 +20,7 @@
 # General
 - trust the type checker.
 - with every step, consider different options and their tradeoffs
-- all plans must be guided by the type checker (`npm run typecheck`). Which order is best?
+- all plans must be guided by the type checker (`pnpm typecheck`). Which order is best?
 - prefer pure functions
 - design functions and datastructures that do one thing well. Follow SRP.
 - move code that is domain independent and is candidate for a library to separate files

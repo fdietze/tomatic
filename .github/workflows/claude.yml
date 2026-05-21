@@ -28,10 +28,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Install devbox
-        uses: jetify-com/devbox-install-action@v0.13.0
-        with:
-          enable-cache: 'true'
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Magic Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Cache Cargo registry and git dependencies
         uses: actions/cache@v4

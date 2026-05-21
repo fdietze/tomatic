@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build": "tsgo -b && vite build",
     "lint": "oxlint --type-aware",
     "preview": "vite preview",
-    "test": "npm run test:unit && npm run test:e2e",
-    "test:e2e": "npx playwright test | cat",
-    "typecheck": "tsc --noEmit",
+    "test": "pnpm run test:unit && pnpm run test:e2e",
+    "test:e2e": "pnpm exec playwright test | cat",
+    "typecheck": "tsgo --noEmit",
     "test:unit": "vitest run"
   },
   "dependencies": {
@@ -42,8 +42,7 @@
     "@vitejs/plugin-react-swc": "^4.1.0",
     "fake-indexeddb": "^6.2.2",
     "jsdom": "^27.0.0",
-    "oxlint": "^1.19.0",
-    "oxlint-tsgolint": "^0.2.0",
+    "oxlint-tsgolint": "^0.23.0",
     "redux-mock-store": "^1.5.5",
     "redux-saga-test-plan": "^4.0.6",
     "typescript": "^5.9.3",
@@ -53,4 +52,3 @@
     "web-streams-polyfill": "^4.2.0"
   }
 }
-

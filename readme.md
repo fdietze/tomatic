@@ -21,14 +21,14 @@ Openrouter based AI Chat Interface.
 
 ## Getting Started
 
-You can set up your development environment in two ways. We recommend using Devbox for a fully reproducible setup, but a standard Node.js environment works perfectly well.
+You can set up your development environment in two ways. We recommend using Nix for a fully reproducible setup, but a standard Node.js environment works perfectly well.
 
-### Recommended Setup (with Devbox)
+### Recommended Setup (with Nix)
 
-This approach uses [Devbox](https://www.jetpack.io/devbox) to create a consistent development environment. It automatically provides the correct versions of Node.js and other system-level dependencies like browser drivers for tests.
+This approach uses a [Nix flake](https://nixos.wiki/wiki/Flakes) to create a consistent development environment. It automatically provides the correct versions of Node.js, pnpm, and other system-level dependencies like browser drivers for tests.
 
 **Prerequisites:**
-- [Devbox](https://www.jetpack.io/devbox)
+- [Nix](https://nixos.org/download.html) with flakes enabled
 - (Optional) [direnv](https://direnv.net/) for automatic shell activation.
 
 **Steps:**
@@ -37,44 +37,40 @@ This approach uses [Devbox](https://www.jetpack.io/devbox) to create a consisten
     If you have `direnv` installed, `cd` into the project directory and run `direnv allow`.
     Otherwise, activate it manually:
     ```bash
-    devbox shell
+    nix develop
     ```
+    The shell hook automatically runs `pnpm install` on entry.
 
-2.  **Install project dependencies.**
-    Inside the shell, Devbox provides `npm`.
+2.  **Run the development server.**
     ```bash
-    npm install
-    ```
-
-3.  **Run the development server.**
-    ```bash
-    npm run dev
+    pnpm dev
     ```
     The app will be running at <http://localhost:5173>.
 
-### Alternative Setup (with npm)
+### Alternative Setup (with pnpm)
 
 This is a standard setup for a Vite React project. You will need to manage your own Node.js installation.
 
 **Prerequisites:**
-- [Node.js](httpss://nodejs.org/) (version 24 is recommended, see `devbox.json`)
+- [Node.js](https://nodejs.org/) (version 24 is recommended, see `flake.nix`)
+- [pnpm](https://pnpm.io/)
 
 **Steps:**
 
 1.  **Install project dependencies.**
     ```bash
-    npm install
+    pnpm install
     ```
 
 2.  **Install Playwright browsers.**
     Our end-to-end tests use Playwright, which requires separate browser binaries.
     ```bash
-    npx playwright install
+    pnpm exec playwright install
     ```
 
 3.  **Run the development server.**
     ```bash
-    npm run dev
+    pnpm dev
     ```
     The app will be running at <http://localhost:5173>.
 

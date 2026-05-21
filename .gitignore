@@ -30,3 +30,4 @@ target-rust-analyzer/
 /playwright-report/
 /test-results/
 /result
+.direnv/

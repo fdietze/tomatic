@@ -19,31 +19,31 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Install devbox
-        uses: jetify-com/devbox-install-action@v0.13.0
-        with:
-          enable-cache: 'true'
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Cache node modules
+      - name: Magic Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
-        id: npm-cache
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-pnpm-
 
       - name: Install Dependencies
-        run: devbox run -- npm ci
+        run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: devbox run -- npm run typecheck
+        run: nix develop --command pnpm typecheck
 
       - name: Lint
-        run: devbox run -- npm run lint
+        run: nix develop --command pnpm lint
 
       - name: Build
-        run: devbox run -- npm run build
+        run: nix develop --command pnpm build
 
       - name: Preview Deploy
         id: preview
