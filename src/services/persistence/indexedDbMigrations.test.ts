@@ -185,17 +185,59 @@ describe('IndexedDB Migration Data Validation', () => {
     it('should validate migration constants are consistent', async () => {
       // Purpose: This test ensures that migration-related constants are consistent
       // with our fixture data and expected behavior.
-      
+
       const { DB_VERSION } = await import('../persistence');
-      
-      expect(DB_VERSION).toBe(3); // Current version should be 3
-      
+
+      expect(DB_VERSION).toBe(4); // Current version should be 4
+
       // Validate that our fixtures cover the migration path (V2 deployed -> V3 current)
       const v2DeployedExists = fs.existsSync(path.join(__dirname, '../../..', 'tests/fixtures/indexeddb-v2.json'));
       const v3CurrentExists = fs.existsSync(path.join(__dirname, '../../..', 'tests/fixtures/indexeddb-v3.json'));
-      
+
       expect(v2DeployedExists).toBe(true);
       expect(v3CurrentExists).toBe(true);
     });
+  });
+});
+
+describe('v3 → v4 migration', () => {
+  it('creates an empty scratchpad_sessions store without touching existing data', async () => {
+    // Purpose: req:scratchpad-separate-sessions — v4 introduces a new store; existing chat data is preserved.
+    const { openDB, deleteDB } = await import('idb');
+    const DB_NAME = 'tomatic_migration_v3_v4_test';
+    await deleteDB(DB_NAME);
+
+    // Seed v3
+    const v3 = await openDB(DB_NAME, 3, {
+      upgrade(db) {
+        db.createObjectStore('chat_sessions', { keyPath: 'session_id' })
+          .createIndex('updated_at_ms', 'updated_at_ms');
+        db.createObjectStore('system_prompts', { keyPath: 'name' });
+        db.createObjectStore('snippets', { keyPath: 'id' })
+          .createIndex('name_idx', 'name', { unique: true });
+      },
+    });
+    await v3.put('chat_sessions', {
+      session_id: 'keep',
+      messages: [],
+      created_at_ms: 1,
+      updated_at_ms: 2,
+    });
+    v3.close();
+
+    // Open with v4 upgrade
+    const v4 = await openDB(DB_NAME, 4, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 4 && !db.objectStoreNames.contains('scratchpad_sessions')) {
+          const s = db.createObjectStore('scratchpad_sessions', { keyPath: 'session_id' });
+          s.createIndex('updated_at_ms', 'updated_at_ms');
+        }
+      },
+    });
+    expect(v4.objectStoreNames.contains('scratchpad_sessions')).toBe(true);
+    const kept = await v4.get('chat_sessions', 'keep');
+    expect(kept).toBeTruthy();
+    v4.close();
+    await deleteDB(DB_NAME);
   });
 });

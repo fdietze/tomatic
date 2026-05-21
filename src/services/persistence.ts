@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { ChatSession } from "@/types/chat";
+import type { ScratchpadSession } from "@/types/scratchpad";
 import type { Snippet, SystemPrompt } from "@/types/storage";
 import { z } from "zod";
 import { snippetSchema, systemPromptSchema } from "@/services/db/schemas";
@@ -15,6 +16,7 @@ export const DB_VERSION = CURRENT_INDEXEDDB_VERSION;
 export const SESSIONS_STORE_NAME = "chat_sessions";
 export const SYSTEM_PROMPTS_STORE_NAME = "system_prompts";
 export const SNIPPETS_STORE_NAME = "snippets";
+export const SCRATCHPAD_SESSIONS_STORE_NAME = "scratchpad_sessions";
 export const SESSION_ID_KEY_PATH = "session_id";
 export const NAME_KEY_PATH = "name";
 export const UPDATED_AT_INDEX = "updated_at_ms";
@@ -38,6 +40,13 @@ interface TomaticDB extends DBSchema {
     value: Snippet;
     indexes: {
       [SNIPPET_NAME_INDEX]: string;
+    };
+  };
+  [SCRATCHPAD_SESSIONS_STORE_NAME]: {
+    key: string;
+    value: ScratchpadSession;
+    indexes: {
+      [UPDATED_AT_INDEX]: number;
     };
   };
 }
@@ -109,6 +118,16 @@ function openTomaticDB(): Promise<{
         void migrationLogic().then(() => {
           dispatchEvent("db_migration_complete", { from: 2, to: 3 });
         });
+      }
+
+      // req:scratchpad-separate-sessions: v4 introduces scratchpad_sessions store
+      if (oldVersion < 4) {
+        if (!db.objectStoreNames.contains(SCRATCHPAD_SESSIONS_STORE_NAME)) {
+          const store = db.createObjectStore(SCRATCHPAD_SESSIONS_STORE_NAME, {
+            keyPath: SESSION_ID_KEY_PATH,
+          });
+          store.createIndex(UPDATED_AT_INDEX, "updated_at_ms");
+        }
       }
     },
   }).then((db) => ({ db, migrated }));

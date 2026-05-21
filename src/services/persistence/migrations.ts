@@ -4,7 +4,7 @@ import type { Snippet } from '@/types/storage';
 
 // --- Migration Version Constants ---
 export const CURRENT_LOCALSTORAGE_VERSION = 2; // Migrating from deployed V1 to new V2
-export const CURRENT_INDEXEDDB_VERSION = 3;    // Migrating from deployed V2 to new V3
+export const CURRENT_INDEXEDDB_VERSION = 4;    // Migrating from deployed V3 to new V4
 
 // --- localStorage Migration Types ---
 
@@ -104,6 +104,12 @@ export const MIGRATION_REGISTRY = {
         to: 3,
         description: 'Create snippets store with id-based keys and new schema fields',
         // IndexedDB migrations are handled in the upgrade callback in persistence.ts
+      },
+      {
+        from: 3,
+        to: 4,
+        description: 'Create scratchpad_sessions store for scratchpad mode',
+        // Handled in the upgrade callback in persistence.ts
       },
       // Future IndexedDB migrations go here
     ],
