@@ -4,6 +4,7 @@ import { settingsSaga } from "./features/settings/settingsSaga";
 import { sessionSaga } from "./features/session/sessionSaga";
 import { promptsSaga } from "./features/prompts/promptsSaga";
 import { snippetsSaga } from "./features/snippets/snippetsSaga";
+import { scratchpadSaga } from "./features/scratchpad/scratchpadSaga";
 import { appSaga } from "./features/app/appSaga";
 
 export default function* rootSaga() {
@@ -13,6 +14,7 @@ export default function* rootSaga() {
     fork(sessionSaga),
     fork(promptsSaga),
     fork(snippetsSaga),
+    fork(scratchpadSaga),
     fork(appSaga),
   ]);
 }
