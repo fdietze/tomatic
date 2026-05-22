@@ -1,51 +1,89 @@
 import React, { useState } from 'react';
 import Markdown from '@/components/Markdown';
+import CopyButton from '@/components/CopyButton';
 import { useDispatch } from 'react-redux';
 import { deleteInput, editInput } from '@/store/features/scratchpad/scratchpadSlice';
 import type { ScratchpadInput } from '@/types/scratchpad';
 
 interface Props {
   chunk: ScratchpadInput;
+  index: number;
 }
 
-const ScratchpadInputChunk: React.FC<Props> = ({ chunk }) => {
+const ScratchpadInputChunk: React.FC<Props> = ({ chunk, index }) => {
   const dispatch = useDispatch();
-  const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(chunk.raw_content);
 
-  if (editing) {
-    return (
-      <div className="scratchpad-chunk" data-testid={`scratchpad-chunk-${chunk.id}`}>
-        <textarea
-          data-testid={`scratchpad-chunk-textarea-${chunk.id}`}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <button
-          data-testid={`scratchpad-chunk-save-${chunk.id}`}
-          onClick={() => {
-            dispatch(editInput({ inputId: chunk.id, raw_content: draft }));
-            setEditing(false);
-          }}
-        >
-          Save
-        </button>
-        <button onClick={() => { setDraft(chunk.raw_content); setEditing(false); }}>
-          Cancel
-        </button>
-      </div>
-    );
-  }
+  const handleSave = (): void => {
+    dispatch(editInput({ inputId: chunk.id, raw_content: draft }));
+    setIsEditing(false);
+  };
+
+  const handleDiscard = (): void => {
+    setDraft(chunk.raw_content);
+    setIsEditing(false);
+  };
+
+  const textForCopy = isEditing ? draft : chunk.raw_content;
 
   return (
-    <div className="scratchpad-chunk" data-testid={`scratchpad-chunk-${chunk.id}`}>
-      <div onClick={() => setExpanded((v) => !v)} data-testid={`scratchpad-chunk-body-${chunk.id}`}>
-        {/* Toggling between plain text and markdown rendering on click */}
-        {expanded ? <Markdown markdownText={chunk.raw_content} /> : <pre>{chunk.raw_content}</pre>}
+    <div
+      className="chat-message"
+      data-role="user"
+      data-message-id={chunk.id}
+      data-testid={`scratchpad-chunk-${chunk.id}`}
+    >
+      <div style={{ display: 'flex' }}>
+        <div className="chat-message-role">{`input ${String(index + 1)}`}</div>
+        <div className="chat-message-buttons">
+          <CopyButton textToCopy={textForCopy} />
+          {!isEditing && (
+            <>
+              <button
+                data-size="compact"
+                data-testid={`scratchpad-chunk-edit-${chunk.id}`}
+                onClick={() => setIsEditing(true)}
+              >
+                edit
+              </button>
+              <button
+                data-size="compact"
+                data-role="destructive"
+                data-testid={`scratchpad-chunk-delete-${chunk.id}`}
+                onClick={() => dispatch(deleteInput(chunk.id))}
+              >
+                delete
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      <button data-testid={`scratchpad-chunk-edit-${chunk.id}`} onClick={() => setEditing(true)} aria-label="edit">✎</button>
-      <button data-testid={`scratchpad-chunk-delete-${chunk.id}`} onClick={() => dispatch(deleteInput(chunk.id))} aria-label="delete">🗑</button>
+      <div className="chat-message-content">
+        {isEditing ? (
+          <>
+            <textarea
+              data-testid={`scratchpad-chunk-textarea-${chunk.id}`}
+              style={{ width: '100%' }}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+              <button data-role="secondary" onClick={handleDiscard}>
+                Discard
+              </button>
+              <button
+                data-testid={`scratchpad-chunk-save-${chunk.id}`}
+                onClick={handleSave}
+              >
+                Save
+              </button>
+            </div>
+          </>
+        ) : (
+          <Markdown markdownText={chunk.raw_content} />
+        )}
+      </div>
     </div>
   );
 };

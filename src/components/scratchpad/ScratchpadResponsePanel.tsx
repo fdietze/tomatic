@@ -16,30 +16,57 @@ const ScratchpadResponsePanel: React.FC = () => {
 
   if (!response && !submitting) return null;
 
+  const roleLabel = response?.model_name
+    ? `assistant (${response.model_name})`
+    : 'assistant';
+
   return (
-    <section data-testid="scratchpad-response">
-      <header>
-        <span>Response</span>
-        {response?.is_stale && (
-          <span data-testid="scratchpad-stale-badge">stale</span>
-        )}
-        <button
-          data-testid="scratchpad-regenerate"
-          disabled={inputs.length === 0 || submitting}
-          onClick={() => dispatch(regenerateRequested({ modelName }))}
-        >
-          ⟳ regenerate
-        </button>
-      </header>
-      {response?.error ? (
-        <div data-testid="scratchpad-response-error">{getErrorMessage(response.error)}</div>
-      ) : (
-        <>
-          <Markdown markdownText={response?.content ?? ''} />
+    <div
+      className="chat-message"
+      data-role="assistant"
+      data-testid="scratchpad-response"
+    >
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div className="chat-message-role">
+          {roleLabel}
+          {response?.is_stale && (
+            <span
+              data-testid="scratchpad-stale-badge"
+              style={{
+                marginLeft: '8px',
+                padding: '0 6px',
+                borderRadius: '4px',
+                background: 'var(--base09)',
+                color: 'var(--base00)',
+                fontSize: 'smaller',
+              }}
+            >
+              stale
+            </span>
+          )}
+        </div>
+        <div className="chat-message-buttons">
           {response && <CopyButton textToCopy={response.content} />}
-        </>
-      )}
-    </section>
+          <button
+            data-size="compact"
+            data-testid="scratchpad-regenerate"
+            disabled={inputs.length === 0 || submitting}
+            onClick={() => dispatch(regenerateRequested({ modelName }))}
+          >
+            regenerate
+          </button>
+        </div>
+      </div>
+      <div className="chat-message-content">
+        {response?.error ? (
+          <div className="error-box" data-testid="scratchpad-response-error">
+            {getErrorMessage(response.error)}
+          </div>
+        ) : (
+          <Markdown markdownText={response?.content ?? ''} />
+        )}
+      </div>
+    </div>
   );
 };
 
