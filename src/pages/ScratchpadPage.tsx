@@ -19,6 +19,7 @@ import {
   goToPrevSession,
   goToNextSession,
   setSelectedPromptName,
+  setIncludeLastResponse,
   markResponseStale,
   selectScratchpad,
 } from '@/store/features/scratchpad/scratchpadSlice';
@@ -70,6 +71,20 @@ const ScratchpadPage: React.FC = () => {
           selectedPromptName={sp.selectedPromptName}
           onSelectPrompt={(name) => dispatch(setSelectedPromptName(name))}
         />
+        {/* req:scratchpad-include-last-response: header-level opt-in to feed the
+            last assistant response back as an assistant turn on next send/regen. */}
+        <label
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}
+          title="Feed the last assistant response back as context for the next send/regenerate"
+        >
+          <input
+            type="checkbox"
+            data-testid="scratchpad-include-last-response"
+            checked={sp.includeLastResponse}
+            onChange={(e) => dispatch(setIncludeLastResponse(e.target.checked))}
+          />
+          Include last response
+        </label>
       </ChatHeader>
       {sp.error && (
         <div className="error-box" data-testid="error-message">

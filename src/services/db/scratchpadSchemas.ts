@@ -31,6 +31,9 @@ export const scratchpadSessionSchema: z.ZodType<ScratchpadSession> = z.object({
   name: z.string().nullable().optional(),
   created_at_ms: z.number(),
   updated_at_ms: z.number(),
+  // req:scratchpad-include-last-response-persisted: default to false so v4 rows
+  // load cleanly (lazy v4 -> v5 backfill via schema; no eager migration needed).
+  include_last_response: z.boolean().default(false),
   // The cast below is intentional: Zod's transform pipeline produces a slightly
   // different inferred type, and we want the consumer-facing type to be the
   // domain type from scratchpad.ts.

@@ -4,7 +4,7 @@ import type { Snippet } from '@/types/storage';
 
 // --- Migration Version Constants ---
 export const CURRENT_LOCALSTORAGE_VERSION = 2; // Migrating from deployed V1 to new V2
-export const CURRENT_INDEXEDDB_VERSION = 4;    // Migrating from deployed V3 to new V4
+export const CURRENT_INDEXEDDB_VERSION = 5;    // V5 adds include_last_response on scratchpad sessions (lazy backfill via schema)
 
 // --- localStorage Migration Types ---
 
@@ -110,6 +110,12 @@ export const MIGRATION_REGISTRY = {
         to: 4,
         description: 'Create scratchpad_sessions store for scratchpad mode',
         // Handled in the upgrade callback in persistence.ts
+      },
+      {
+        from: 4,
+        to: 5,
+        // req:scratchpad-include-last-response-persisted
+        description: 'Add include_last_response to scratchpad sessions (lazy backfill via zod default; no eager rewrite)',
       },
       // Future IndexedDB migrations go here
     ],

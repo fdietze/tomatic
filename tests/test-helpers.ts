@@ -190,21 +190,27 @@ export interface IndexedDBDataV4 extends IndexedDBDataCurrent {
   scratchpad_sessions: ScratchpadSession[];
 }
 
+export interface IndexedDBDataV5 extends IndexedDBDataV4 {
+  // V5 adds include_last_response on scratchpad sessions; shape-wise the store
+  // is unchanged, so the type alias mirrors V4 (the field lives on ScratchpadSession).
+}
+
 /**
  * Injects strongly-typed data into IndexedDB.
- * Supports the v4 schema which includes the scratchpad_sessions store
- * (req:scratchpad-separate-sessions).
+ * Supports the v5 schema (req:scratchpad-include-last-response-persisted), which
+ * adds include_last_response on scratchpad sessions over the v4 store layout.
  */
 export async function seedIndexedDB(
   context: BrowserContext,
-  data: Partial<IndexedDBDataV4>,
+  data: Partial<IndexedDBDataV5>,
 ) {
   const injectedState: InjectedState = {
     localStorage: {},
     indexedDB: {
       dbName: "tomatic_chat_db",
-      // Use v4 schema so scratchpad_sessions store is created during upgrade
-      version: 4,
+      // Use v5 schema so scratchpad_sessions store is created and include_last_response
+      // is recognized by the loader.
+      version: 5,
       stores: [
         {
           storeName: "chat_sessions",

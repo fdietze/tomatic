@@ -86,28 +86,72 @@ function* goToNextWorker(): SagaIterator {
 }
 
 // req:scratchpad-auto-save-new: Build the messages array to send to the API.
-// System prompt (if any) is prepended; all inputs are joined into a single user message.
-function buildMessagesToSubmit(
+// Two shapes:
+//   - default (single-aggregated-user): all inputs joined into one user message
+//   - opt-in (multi-turn, req:scratchpad-include-last-response-shape):
+//       [system?, user(inputs[0..n-2] joined), assistant(last response), user(inputs[n-1])]
+//     Used only when includeLastResponse is on, the prior response is usable
+//     (non-null, no error, non-empty content), and at least 2 input chunks exist.
+//     Otherwise falls back silently to the single-aggregated shape
+//     (req:scratchpad-include-last-response-fallback).
+export function buildMessagesToSubmit(
   state: ScratchpadState,
   systemPromptText: string | null,
 ): Message[] {
-  const joined = state.inputs.map((i) => i.resolved_content).join('\n\n');
-  const msgs: Message[] = [];
-  if (systemPromptText) {
-    msgs.push({
-      id: 'sys',
-      role: 'system',
-      content: systemPromptText,
-      raw_content: systemPromptText,
-    });
+  const sys = systemPromptText
+    ? [{
+        id: 'sys',
+        role: 'system' as const,
+        content: systemPromptText,
+        raw_content: systemPromptText,
+      }]
+    : [];
+
+  const hasUsablePrior =
+    state.response != null &&
+    state.response.error == null &&
+    state.response.content.length > 0;
+  const canSplit = state.inputs.length >= 2;
+
+  if (state.includeLastResponse && hasUsablePrior && canSplit) {
+    const last = state.inputs[state.inputs.length - 1]!;
+    const earlier = state.inputs
+      .slice(0, -1)
+      .map((i) => i.resolved_content)
+      .join('\n\n');
+    return [
+      ...sys,
+      {
+        id: 'earlier-user',
+        role: 'user' as const,
+        content: earlier,
+        raw_content: earlier,
+      },
+      {
+        id: 'prior-assistant',
+        role: 'assistant' as const,
+        content: state.response!.content,
+        raw_content: state.response!.content,
+      },
+      {
+        id: 'new-user',
+        role: 'user' as const,
+        content: last.resolved_content,
+        raw_content: last.resolved_content,
+      },
+    ];
   }
-  msgs.push({
-    id: 'aggregate',
-    role: 'user',
-    content: joined,
-    raw_content: joined,
-  });
-  return msgs;
+
+  const joined = state.inputs.map((i) => i.resolved_content).join('\n\n');
+  return [
+    ...sys,
+    {
+      id: 'aggregate',
+      role: 'user' as const,
+      content: joined,
+      raw_content: joined,
+    },
+  ];
 }
 
 type ChatStreamEvent =
@@ -168,6 +212,7 @@ function* persistCurrent(): Generator<unknown, ScratchpadSession, unknown> {
     response: sp.response,
     created_at_ms: now,
     updated_at_ms: now,
+    include_last_response: sp.includeLastResponse,
   };
   yield call(saveScratchpadSession, session);
   return session;
@@ -226,12 +271,15 @@ export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator
       newSessionId = persisted.session_id;
     }
 
-    yield put(startGeneration(action.payload.modelName));
-    const { apiKey } = (yield select(selectSettings)) as ReturnType<typeof selectSettings>;
+    // Build the outgoing messages BEFORE startGeneration: that reducer resets
+    // response.content to '', which would make the multi-turn builder's
+    // "usable prior response" check fail (req:scratchpad-include-last-response-shape).
     const messagesToSubmit = buildMessagesToSubmit(
       (yield select(selectScratchpad)) as ScratchpadState,
       systemPromptText,
     );
+    yield put(startGeneration(action.payload.modelName));
+    const { apiKey } = (yield select(selectSettings)) as ReturnType<typeof selectSettings>;
     const channel: EventChannel<ChatStreamEvent> = (yield call(
       createChatStreamChannel,
       { messagesToSubmit, modelName: action.payload.modelName, apiKey },
@@ -261,12 +309,14 @@ export function* regenerateWorker(action: ReturnType<typeof regenerateRequested>
       yield put(setResolvedContent({ inputId: chunk.id, resolved_content: resolved }));
     }
     const systemPromptText = (yield call(resolveSystemPrompt)) as string | null;
-    yield put(startGeneration(action.payload.modelName));
-    const { apiKey } = (yield select(selectSettings)) as ReturnType<typeof selectSettings>;
+    // Build outgoing messages BEFORE startGeneration so the prior response.content
+    // remains visible to the multi-turn builder (see comment in sendWorker).
     const messagesToSubmit = buildMessagesToSubmit(
       (yield select(selectScratchpad)) as ScratchpadState,
       systemPromptText,
     );
+    yield put(startGeneration(action.payload.modelName));
+    const { apiKey } = (yield select(selectSettings)) as ReturnType<typeof selectSettings>;
     const channel: EventChannel<ChatStreamEvent> = (yield call(
       createChatStreamChannel,
       { messagesToSubmit, modelName: action.payload.modelName, apiKey },

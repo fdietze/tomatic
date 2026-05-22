@@ -57,6 +57,7 @@ describe('scratchpadSaga.loadSessionWorker', () => {
       response: null,
       created_at_ms: 1,
       updated_at_ms: 1,
+      include_last_response: false,
     });
     const { loadSessionWorker } = await import('./scratchpadSaga');
     const { loadSession } = await import('./scratchpadSlice');
@@ -85,6 +86,7 @@ describe('scratchpadSaga.loadSessionWorker', () => {
       response: null,
       created_at_ms: 1,
       updated_at_ms: 1,
+      include_last_response: false,
     });
     const { loadSessionWorker } = await import('./scratchpadSaga');
     const { loadSession } = await import('./scratchpadSlice');
@@ -103,6 +105,131 @@ describe('scratchpadSaga.loadSessionWorker', () => {
 
 type DispatchedAction = { type: string; payload: unknown };
 type ScratchpadInputMutable = { id: string; raw_content: string; resolved_content: string };
+
+describe('scratchpadSaga.buildMessagesToSubmit', () => {
+  type SP = import('./scratchpadSlice').ScratchpadState;
+  const baseState = (overrides: Partial<SP>): SP => ({
+    currentSessionId: null,
+    prevSessionId: null,
+    nextSessionId: null,
+    hasSessions: false,
+    selectedPromptName: null,
+    inputs: [],
+    response: null,
+    includeLastResponse: false,
+    loading: 'idle',
+    submitting: false,
+    error: null,
+    ...overrides,
+  });
+
+  it('produces a single aggregated user message when includeLastResponse is off', async () => {
+    // Purpose: default scratchpad behavior (req:scratchpad-mode) is unchanged when the flag is off.
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        inputs: [
+          { id: '1', raw_content: 'a', resolved_content: 'a' },
+          { id: '2', raw_content: 'b', resolved_content: 'b' },
+        ],
+      }),
+      null,
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({ role: 'user', content: 'a\n\nb' });
+  });
+
+  it('produces the 4-message multi-turn shape when flag on, prior usable, n>=2', async () => {
+    // Purpose: req:scratchpad-include-last-response-shape — multi-turn with
+    // [system?, user(earlier joined), assistant(last), user(new)].
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        includeLastResponse: true,
+        inputs: [
+          { id: '1', raw_content: 'old1', resolved_content: 'old1' },
+          { id: '2', raw_content: 'old2', resolved_content: 'old2' },
+          { id: '3', raw_content: 'new', resolved_content: 'new' },
+        ],
+        response: { content: 'prior!', model_name: 'm', is_stale: false, error: null },
+      }),
+      'SYS',
+    );
+    expect(msgs).toHaveLength(4);
+    expect(msgs[0]).toMatchObject({ role: 'system', content: 'SYS' });
+    expect(msgs[1]).toMatchObject({ role: 'user', content: 'old1\n\nold2' });
+    expect(msgs[2]).toMatchObject({ role: 'assistant', content: 'prior!' });
+    expect(msgs[3]).toMatchObject({ role: 'user', content: 'new' });
+  });
+
+  it('falls back to single message when prior response is null', async () => {
+    // Purpose: req:scratchpad-include-last-response-fallback — null prior response.
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        includeLastResponse: true,
+        inputs: [
+          { id: '1', raw_content: 'a', resolved_content: 'a' },
+          { id: '2', raw_content: 'b', resolved_content: 'b' },
+        ],
+        response: null,
+      }),
+      null,
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({ role: 'user', content: 'a\n\nb' });
+  });
+
+  it('falls back to single message when prior response has an error', async () => {
+    // Purpose: req:scratchpad-include-last-response-fallback — errored prior response.
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const { createAppError } = await import('@/types/errors');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        includeLastResponse: true,
+        inputs: [
+          { id: '1', raw_content: 'a', resolved_content: 'a' },
+          { id: '2', raw_content: 'b', resolved_content: 'b' },
+        ],
+        response: { content: 'x', model_name: 'm', is_stale: false, error: createAppError.unknown('boom') },
+      }),
+      null,
+    );
+    expect(msgs).toHaveLength(1);
+  });
+
+  it('falls back to single message when prior response content is empty', async () => {
+    // Purpose: req:scratchpad-include-last-response-fallback — empty prior content is unusable.
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        includeLastResponse: true,
+        inputs: [
+          { id: '1', raw_content: 'a', resolved_content: 'a' },
+          { id: '2', raw_content: 'b', resolved_content: 'b' },
+        ],
+        response: { content: '', model_name: 'm', is_stale: false, error: null },
+      }),
+      null,
+    );
+    expect(msgs).toHaveLength(1);
+  });
+
+  it('falls back to single message when only one input chunk exists', async () => {
+    // Purpose: req:scratchpad-include-last-response-fallback — n<2 cannot be split.
+    const { buildMessagesToSubmit } = await import('./scratchpadSaga');
+    const msgs = buildMessagesToSubmit(
+      baseState({
+        includeLastResponse: true,
+        inputs: [{ id: '1', raw_content: 'only', resolved_content: 'only' }],
+        response: { content: 'prior', model_name: 'm', is_stale: false, error: null },
+      }),
+      null,
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toMatchObject({ role: 'user', content: 'only' });
+  });
+});
 
 describe('scratchpadSaga.sendWorker', () => {
   beforeEach(async () => {
@@ -133,6 +260,7 @@ describe('scratchpadSaga.sendWorker', () => {
         inputs,
         response: null,
         selectedPromptName: null,
+        includeLastResponse: false,
         hasSessions: false,
         loading: 'idle' as const,
         submitting: false,

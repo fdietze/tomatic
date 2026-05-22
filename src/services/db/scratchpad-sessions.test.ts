@@ -8,6 +8,7 @@ const mk = (id: string, updated_at_ms: number): ScratchpadSession => ({
   response: null,
   created_at_ms: updated_at_ms,
   updated_at_ms,
+  include_last_response: false,
 });
 
 // Mock events module to avoid window-related errors in Node test environment

@@ -66,9 +66,14 @@
 
 ## Scratchpad Mode
 
-- req:scratchpad-mode: dedicated tab/route with aggregated single-user-message flow; assistant responses never feed back into the LLM.
+- req:scratchpad-mode: dedicated tab/route with aggregated single-user-message flow; assistant responses never feed back into the LLM (single opt-in exception: see req:scratchpad-include-last-response).
 - req:scratchpad-aggregation: user inputs are joined with "\n\n" into a single user message at send/regen time.
 - req:scratchpad-staleness: edit/delete of an input chunk, or change of system prompt/model, marks the response stale without regenerating; explicit user action regenerates.
 - req:scratchpad-separate-sessions: scratchpad sessions live in their own IndexedDB store, separate from chat sessions.
 - req:scratchpad-snippet-resolution: snippet references in scratchpad inputs resolve identically to chat (same wait/error semantics).
 - req:scratchpad-auto-save-new: first send on /scratchpad/new persists and updates URL.
+- req:scratchpad-include-last-response: per-session opt-in (header checkbox) to feed the last assistant response back as a real `assistant` turn between existing inputs and the new input. Default off. Single exception to `req:scratchpad-mode`'s "assistant responses never feed back" rule.
+- req:scratchpad-include-last-response-shape: when enabled and a usable prior response exists (non-null, no error, non-empty content) and at least 2 input chunks exist, the request is `[system?, user(inputs[0..n-2] joined with "\n\n"), assistant(response.content), user(inputs[n-1])]`. Both send and regenerate use this builder; on send, the just-typed composer text is `inputs[n-1]` after `appendInput`.
+- req:scratchpad-include-last-response-fallback: when enabled but no usable prior response exists (null, errored, or empty content) or fewer than 2 input chunks exist, fall back silently to the single-aggregated-user-message shape. The checkbox stays checked.
+- req:scratchpad-include-last-response-stale: toggling the checkbox marks the current response stale without regenerating (same pattern as model / system prompt change).
+- req:scratchpad-include-last-response-persisted: the setting is stored on `ScratchpadSession.include_last_response` in IndexedDB (v5) and round-trips through reload and session switch. v4 → v5 is a lazy backfill: the zod schema defaults missing fields to `false` at load time; no eager row rewrite.

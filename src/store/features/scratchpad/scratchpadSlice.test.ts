@@ -6,6 +6,7 @@ import scratchpadReducer, {
   deleteInput,
   setResolvedContent,
   setSelectedPromptName,
+  setIncludeLastResponse,
   markResponseStale,
   startGeneration,
   responseChunk,
@@ -107,6 +108,7 @@ describe('scratchpadSlice', () => {
         inputs: [{ id: 'i1', raw_content: 'a', resolved_content: 'a' }],
         response: { content: 'r', model_name: 'm', is_stale: false, error: null },
         created_at_ms: 1, updated_at_ms: 2,
+        include_last_response: false,
       },
       prevId: null,
       nextId: null,
@@ -114,6 +116,38 @@ describe('scratchpadSlice', () => {
     expect(after.currentSessionId).toBe('s1');
     expect(after.inputs).toHaveLength(1);
     expect(after.response?.content).toBe('r');
+  });
+
+  it('loadSessionSuccess hydrates includeLastResponse from session', () => {
+    // Purpose: req:scratchpad-include-last-response-persisted — reload restores the setting per-session.
+    const after = scratchpadReducer(init, loadSessionSuccess({
+      session: {
+        session_id: 's2',
+        inputs: [],
+        response: null,
+        created_at_ms: 1, updated_at_ms: 2,
+        include_last_response: true,
+      },
+      prevId: null, nextId: null,
+    }));
+    expect(after.includeLastResponse).toBe(true);
+  });
+
+  it('setIncludeLastResponse(true) marks response stale and updates flag', () => {
+    // Purpose: req:scratchpad-include-last-response-stale — toggling the checkbox marks stale (no regen).
+    const withResp = scratchpadReducer(init, responseDone({ model_name: 'm' }));
+    expect(withResp.includeLastResponse).toBe(false);
+    expect(withResp.response?.is_stale).toBe(false);
+    const after = scratchpadReducer(withResp, setIncludeLastResponse(true));
+    expect(after.includeLastResponse).toBe(true);
+    expect(after.response?.is_stale).toBe(true);
+  });
+
+  it('setIncludeLastResponse does not mark stale when value is unchanged', () => {
+    // Purpose: no-op toggle (same value) should not flip the stale flag spuriously.
+    const withResp = scratchpadReducer(init, responseDone({ model_name: 'm' }));
+    const after = scratchpadReducer(withResp, setIncludeLastResponse(false));
+    expect(after.response?.is_stale).toBe(false);
   });
 
   it('markResponseStale flips the flag', () => {

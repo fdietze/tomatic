@@ -23,6 +23,9 @@ export interface ScratchpadState {
   selectedPromptName: string | null;
   inputs: ScratchpadInput[];
   response: ScratchpadResponse | null;
+  // req:scratchpad-include-last-response: per-session opt-in to feed last
+  // assistant response back as an assistant turn on next send/regen.
+  includeLastResponse: boolean;
   loading: 'idle' | 'loading' | 'failed';
   submitting: boolean;
   error: AppError | null;
@@ -36,6 +39,7 @@ const initialState: ScratchpadState = {
   selectedPromptName: null,
   inputs: [],
   response: null,
+  includeLastResponse: false,
   loading: 'idle',
   submitting: false,
   error: null,
@@ -60,6 +64,7 @@ export const scratchpadSlice = createSlice({
       state.inputs = session.inputs;
       state.response = session.response;
       state.selectedPromptName = session.prompt_name ?? null;
+      state.includeLastResponse = session.include_last_response;
       state.prevSessionId = prevId;
       state.nextSessionId = nextId;
     },
@@ -83,6 +88,7 @@ export const scratchpadSlice = createSlice({
       state.nextSessionId = null;
       state.inputs = [];
       state.response = null;
+      state.includeLastResponse = false;
       state.error = null;
     },
     goToPrevSession: (state) => { void state; },
@@ -114,6 +120,12 @@ export const scratchpadSlice = createSlice({
     setSelectedPromptName: (state, action: PayloadAction<string | null>) => {
       if (state.selectedPromptName !== action.payload) markStale(state);
       state.selectedPromptName = action.payload;
+    },
+    // req:scratchpad-include-last-response-stale: toggling the checkbox marks
+    // the current response stale (same pattern as model / system prompt change).
+    setIncludeLastResponse: (state, action: PayloadAction<boolean>) => {
+      if (state.includeLastResponse !== action.payload) markStale(state);
+      state.includeLastResponse = action.payload;
     },
     markResponseStale: (state) => { markStale(state); },
 
@@ -190,6 +202,7 @@ export const {
   deleteInput,
   setResolvedContent,
   setSelectedPromptName,
+  setIncludeLastResponse,
   markResponseStale,
   sendRequested,
   regenerateRequested,

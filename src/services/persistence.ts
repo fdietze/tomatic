@@ -129,6 +129,13 @@ function openTomaticDB(): Promise<{
           store.createIndex(UPDATED_AT_INDEX, "updated_at_ms");
         }
       }
+
+      // req:scratchpad-include-last-response-persisted: v5 adds include_last_response
+      // to scratchpad sessions. No store/index changes; the zod schema lazily backfills
+      // `false` when loading older rows. Version bump alone is sufficient.
+      if (oldVersion < 5) {
+        // intentionally empty
+      }
     },
   }).then((db) => ({ db, migrated }));
   return dbInstancePromise;

@@ -24,4 +24,7 @@ export interface ScratchpadSession {
   name?: string | null;
   created_at_ms: number;
   updated_at_ms: number;
+  // req:scratchpad-include-last-response-persisted: per-session opt-in to feed
+  // the last assistant response back as an assistant turn on next send/regen.
+  include_last_response: boolean;
 }

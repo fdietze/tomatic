@@ -188,7 +188,7 @@ describe('IndexedDB Migration Data Validation', () => {
 
       const { DB_VERSION } = await import('../persistence');
 
-      expect(DB_VERSION).toBe(4); // Current version should be 4
+      expect(DB_VERSION).toBe(5); // Current version should be 5
 
       // Validate that our fixtures cover the migration path (V2 deployed -> V3 current)
       const v2DeployedExists = fs.existsSync(path.join(__dirname, '../../..', 'tests/fixtures/indexeddb-v2.json'));
@@ -238,6 +238,50 @@ describe('v3 → v4 migration', () => {
     const kept = await v4.get('chat_sessions', 'keep');
     expect(kept).toBeTruthy();
     v4.close();
+    await deleteDB(DB_NAME);
+  });
+});
+
+describe('v4 → v5 migration', () => {
+  it('preserves existing scratchpad rows without modifying them (lazy schema backfill)', async () => {
+    // Purpose: req:scratchpad-include-last-response-persisted — v5 bump does not
+    // rewrite scratchpad rows; rows without include_last_response remain intact on disk
+    // and the zod schema fills the default at load time.
+    const { openDB, deleteDB } = await import('idb');
+    const DB_NAME = 'tomatic_migration_v4_v5_test';
+    await deleteDB(DB_NAME);
+
+    const v4 = await openDB(DB_NAME, 4, {
+      upgrade(db) {
+        db.createObjectStore('chat_sessions', { keyPath: 'session_id' })
+          .createIndex('updated_at_ms', 'updated_at_ms');
+        db.createObjectStore('system_prompts', { keyPath: 'name' });
+        db.createObjectStore('snippets', { keyPath: 'id' })
+          .createIndex('name_idx', 'name', { unique: true });
+        db.createObjectStore('scratchpad_sessions', { keyPath: 'session_id' })
+          .createIndex('updated_at_ms', 'updated_at_ms');
+      },
+    });
+    await v4.put('scratchpad_sessions', {
+      session_id: 'legacy',
+      inputs: [],
+      response: null,
+      created_at_ms: 1,
+      updated_at_ms: 2,
+      // intentionally no include_last_response
+    });
+    v4.close();
+
+    const v5 = await openDB(DB_NAME, 5, {
+      upgrade(_db, oldVersion) {
+        // v5 bump is a no-op in terms of object stores; schema handles backfill
+        if (oldVersion < 5) { /* noop */ }
+      },
+    });
+    const row = await v5.get('scratchpad_sessions', 'legacy') as Record<string, unknown>;
+    expect(row).toBeTruthy();
+    expect('include_last_response' in row).toBe(false);
+    v5.close();
     await deleteDB(DB_NAME);
   });
 });

@@ -31,6 +31,7 @@ const SEEDED_SESSION: ScratchpadSession = {
   },
   created_at_ms: 1000,
   updated_at_ms: 1000,
+  include_last_response: false,
 };
 
 test.describe("Scratchpad: Staleness", () => {
