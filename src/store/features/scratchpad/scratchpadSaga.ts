@@ -196,7 +196,9 @@ function* consumeStreamChannel(
 }
 
 // req:scratchpad-auto-save-new: When the user sends the first message on a new session,
-// append the input, resolve snippets, persist, auto-save (updating the URL), then stream.
+// append the input, resolve snippets, persist, stream, then navigate to the new session URL.
+// Navigation happens AFTER streaming completes to prevent loadSession from firing mid-stream
+// and overwriting the in-progress response state (same pattern as sessionSaga).
 export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator<unknown, void, unknown> {
   try {
     yield put(appendInput({ raw_content: action.payload.raw_content }));
@@ -212,15 +214,16 @@ export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator
     sp = (yield select(selectScratchpad)) as ScratchpadState;
     const wasNew = !sp.currentSessionId;
     const persisted = (yield call(persistCurrent)) as ScratchpadSession;
+    let newSessionId: string | null = null;
     if (wasNew) {
       const nb = (yield call(findNeighbourScratchpadIds, persisted)) as {
         prevId: string | null;
         nextId: string | null;
       };
       yield put(sessionCreatedSuccess({ session: persisted, prevId: nb.prevId, nextId: nb.nextId }));
-      // Navigate synchronously using the navigation service (same pattern as goToPrevWorker)
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      void getNavigationService().navigate(ROUTES.scratchpad.session(persisted.session_id), { replace: true });
+      // Defer navigation until after streaming so that the loadSession triggered by the URL
+      // change does not overwrite the in-flight response state mid-stream.
+      newSessionId = persisted.session_id;
     }
 
     yield put(startGeneration(action.payload.modelName));
@@ -236,6 +239,13 @@ export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator
     yield call(consumeStreamChannel, channel);
     yield put(responseDone({ model_name: action.payload.modelName }));
     yield call(persistCurrent);
+
+    // Navigate to the persistent session URL now that streaming is complete.
+    // Using replace:true so the /scratchpad/new entry is removed from history.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    if (newSessionId) {
+      void getNavigationService().navigate(ROUTES.scratchpad.session(newSessionId), { replace: true });
+    }
   } catch (e) {
     yield put(responseFailed({ error: createAppError.unknown(String(e)) }));
   }
