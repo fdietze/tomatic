@@ -60,17 +60,20 @@ describe('scratchpadSaga.loadSessionWorker', () => {
     });
     const { loadSessionWorker } = await import('./scratchpadSaga');
     const { loadSession } = await import('./scratchpadSlice');
-    const dispatched: any[] = [];
+    const dispatched: unknown[] = [];
     await runSaga(
       { channel: stdChannel(), dispatch: (a) => dispatched.push(a), getState: () => ({}) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       loadSessionWorker as any,
       loadSession('x'),
     ).toPromise();
-    const success = dispatched.find((a) => a.type === loadSessionSuccess.type);
+    type LoadSuccessPayload = { session: { session_id: string }; prevId: string | null; nextId: string | null };
+    type Action = { type: string; payload: LoadSuccessPayload };
+    const success = (dispatched as Action[]).find((a) => a.type === loadSessionSuccess.type);
     expect(success).toBeTruthy();
-    expect(success.payload.session.session_id).toBe('x');
-    expect(success.payload.prevId).toBeNull();
-    expect(success.payload.nextId).toBeNull();
+    expect(success!.payload.session.session_id).toBe('x');
+    expect(success!.payload.prevId).toBeNull();
+    expect(success!.payload.nextId).toBeNull();
   });
 
   it('treats "new" as startNewSession and reports hasSessions', async () => {
@@ -85,13 +88,15 @@ describe('scratchpadSaga.loadSessionWorker', () => {
     });
     const { loadSessionWorker } = await import('./scratchpadSaga');
     const { loadSession } = await import('./scratchpadSlice');
-    const dispatched: any[] = [];
+    const dispatched: unknown[] = [];
     await runSaga(
       { channel: stdChannel(), dispatch: (a) => dispatched.push(a), getState: () => ({}) },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       loadSessionWorker as any,
       loadSession('new'),
     ).toPromise();
-    expect(dispatched.find((a) => a.type === startNewSession.type)).toBeTruthy();
+    const typed = dispatched as { type: string; payload: unknown }[];
+    expect(typed.find((a) => a.type === startNewSession.type)).toBeTruthy();
     expect(dispatched).toContainEqual(setHasSessions(true));
   });
 });

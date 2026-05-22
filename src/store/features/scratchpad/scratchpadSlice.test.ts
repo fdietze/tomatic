@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createAppError } from '@/types/errors';
 import scratchpadReducer, {
   appendInput,
   editInput,
@@ -75,7 +76,7 @@ describe('scratchpadSlice', () => {
   it('responseFailed records error and clears submitting', () => {
     // Purpose: errors land in response.error so the UI can surface them
     const a = scratchpadReducer(init, startGeneration('gpt-4'));
-    const fakeErr = { type: 'UNKNOWN_ERROR', message: 'boom' } as any;
+    const fakeErr = createAppError.unknown('boom');
     const c = scratchpadReducer(a, responseFailed({ error: fakeErr }));
     expect(c.submitting).toBe(false);
     expect(c.response?.error).toBeTruthy();

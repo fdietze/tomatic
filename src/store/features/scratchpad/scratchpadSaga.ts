@@ -65,13 +65,13 @@ function* goToPrevWorker(): SagaIterator {
   // Retrieve navigation service at call time (populated by NavigationProvider on mount)
   const navigationService = getNavigationService();
   if (s.prevSessionId) {
-    navigationService.navigate(ROUTES.scratchpad.session(s.prevSessionId));
+    void navigationService.navigate(ROUTES.scratchpad.session(s.prevSessionId));
     return;
   }
   if (!s.currentSessionId && s.hasSessions) {
     const id = (yield call(getMostRecentScratchpadId)) as string | null;
     if (id) {
-      navigationService.navigate(ROUTES.scratchpad.session(id));
+      void navigationService.navigate(ROUTES.scratchpad.session(id));
     }
   }
 }
@@ -81,7 +81,7 @@ function* goToNextWorker(): SagaIterator {
   // Retrieve navigation service at call time (populated by NavigationProvider on mount)
   const navigationService = getNavigationService();
   if (s.nextSessionId) {
-    navigationService.navigate(ROUTES.scratchpad.session(s.nextSessionId));
+    void navigationService.navigate(ROUTES.scratchpad.session(s.nextSessionId));
   }
 }
 
