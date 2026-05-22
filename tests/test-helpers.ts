@@ -166,6 +166,7 @@ import type {
   LocalStorageV1State,
   IndexedDBDataCurrent,
 } from "../src/types/storage";
+import type { ScratchpadSession } from "../src/types/scratchpad";
 
 interface InjectedState {
   localStorage: Record<string, string>;
@@ -180,23 +181,30 @@ interface InjectedState {
         keyPath: string;
         options?: IDBIndexParameters;
       }[];
-      data: (ChatSession | SystemPrompt | Snippet)[];
+      data: (ChatSession | SystemPrompt | Snippet | ScratchpadSession)[];
     }[];
   };
 }
 
+export interface IndexedDBDataV4 extends IndexedDBDataCurrent {
+  scratchpad_sessions: ScratchpadSession[];
+}
+
 /**
  * Injects strongly-typed data into IndexedDB.
+ * Supports the v4 schema which includes the scratchpad_sessions store
+ * (req:scratchpad-separate-sessions).
  */
 export async function seedIndexedDB(
   context: BrowserContext,
-  data: Partial<IndexedDBDataCurrent>,
+  data: Partial<IndexedDBDataV4>,
 ) {
   const injectedState: InjectedState = {
     localStorage: {},
     indexedDB: {
       dbName: "tomatic_chat_db",
-      version: 3,
+      // Use v4 schema so scratchpad_sessions store is created during upgrade
+      version: 4,
       stores: [
         {
           storeName: "chat_sessions",
@@ -211,8 +219,14 @@ export async function seedIndexedDB(
         },
         {
           storeName: "snippets",
-          keyPath: "name",
+          keyPath: "id",
           data: data.snippets || [],
+        },
+        {
+          storeName: "scratchpad_sessions",
+          keyPath: "session_id",
+          indexes: [{ name: "updated_at_ms", keyPath: "updated_at_ms" }],
+          data: (data.scratchpad_sessions || []) as ScratchpadSession[],
         },
       ],
     },

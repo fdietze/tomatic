@@ -3,12 +3,13 @@ import { testWithLogging } from './logging-fixture';
 import { testWithTestSideLogs } from './test-side-logging-fixture';
 import { networkSecurityTest } from './network-security-fixture';
 import { ROUTES } from '@/utils/routes';
-import { 
-  mockGlobalApis, 
-  OPENROUTER_API_KEY, 
-  seedLocalStorage, 
-  seedIndexedDB, 
-  waitForEvent 
+import {
+  mockGlobalApis,
+  OPENROUTER_API_KEY,
+  seedLocalStorage,
+  seedIndexedDB,
+  waitForEvent,
+  type IndexedDBDataV4,
 } from './test-helpers';
 import type { IndexedDBDataCurrent, LocalStorageV1State } from '../src/types/storage';
 
