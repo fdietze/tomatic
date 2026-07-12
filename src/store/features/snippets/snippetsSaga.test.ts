@@ -268,6 +268,8 @@ describe("snippetsSaga", () => {
           autoScrollEnabled: true,
           selectedPromptName: null,
           initialChatPrompt: null,
+          allowChatTemplates: false,
+          allowSnippetTemplates: false,
           loading: 'idle' as const,
           saving: 'idle' as const
         }

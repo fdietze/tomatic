@@ -181,6 +181,8 @@ describe('Settings with Migration Integration', () => {
         selectedPromptName: null,
         autoScrollEnabled: true,
         initialChatPrompt: null,
+        allowChatTemplates: false,
+        allowSnippetTemplates: false,
         loading: 'idle' as const,
         saving: 'idle' as const,
       };
@@ -210,6 +212,8 @@ describe('Settings with Migration Integration', () => {
         selectedPromptName: null,
         autoScrollEnabled: true,
         initialChatPrompt: null,
+        allowChatTemplates: false,
+        allowSnippetTemplates: false,
         loading: 'idle' as const,
         saving: 'idle' as const,
       };
@@ -243,6 +247,8 @@ describe('Settings with Migration Integration', () => {
         selectedPromptName: loadedSettings.selectedPromptName || null,
         autoScrollEnabled: loadedSettings.autoScrollEnabled ?? true,
         initialChatPrompt: loadedSettings.initialChatPrompt || null,
+        allowChatTemplates: loadedSettings.allowChatTemplates ?? false,
+        allowSnippetTemplates: loadedSettings.allowSnippetTemplates ?? false,
         loading: 'idle' as const,
         saving: 'idle' as const,
       };
@@ -256,6 +262,8 @@ describe('Settings with Migration Integration', () => {
       expect(reloadedSettings).toEqual({
         ...loadedSettings,
         initialChatPrompt: null, // This gets added during the round-trip
+        allowChatTemplates: false,
+        allowSnippetTemplates: false,
       });
       
       // Verify only one migration message (not on reload)

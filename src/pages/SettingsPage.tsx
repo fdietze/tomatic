@@ -9,6 +9,8 @@ import {
   selectSettings,
   setApiKey,
   toggleAutoScroll,
+  toggleAllowChatTemplates,
+  toggleAllowSnippetTemplates,
   loadSettings,
   saveSettings,
 } from "@/store/features/settings/settingsSlice";
@@ -30,7 +32,7 @@ const SettingsPage: React.FC = () => {
   const dispatch = useDispatch();
 
   // --- Redux State ---
-  const { apiKey, autoScrollEnabled, saving } = useSelector(selectSettings);
+  const { apiKey, autoScrollEnabled, allowChatTemplates, allowSnippetTemplates, saving } = useSelector(selectSettings);
   const { prompts: systemPromptsMap } = useSelector(selectPrompts);
   const { snippets, loading: snippetsLoading } = useSelector(selectSnippets);
 
@@ -66,6 +68,16 @@ const SettingsPage: React.FC = () => {
 
   const handleToggleAutoScroll = (): void => {
     dispatch(toggleAutoScroll());
+    dispatch(saveSettings({}));
+  };
+
+  const handleToggleAllowChatTemplates = (): void => {
+    dispatch(toggleAllowChatTemplates());
+    dispatch(saveSettings({}));
+  };
+
+  const handleToggleAllowSnippetTemplates = (): void => {
+    dispatch(toggleAllowSnippetTemplates());
     dispatch(saveSettings({}));
   };
 
@@ -201,6 +213,30 @@ const SettingsPage: React.FC = () => {
             />
             <span className="checkbox-custom"></span>
             Auto-scroll to bottom
+          </label>
+        </div>
+        <div className="settings-item">
+          <label htmlFor="allow-chat-templates-checkbox" className="checkbox-label">
+            <input
+              type="checkbox"
+              id="allow-chat-templates-checkbox"
+              checked={allowChatTemplates}
+              onChange={handleToggleAllowChatTemplates}
+            />
+            <span className="checkbox-custom"></span>
+            Enable Javascript templates in chat messages
+          </label>
+        </div>
+        <div className="settings-item">
+          <label htmlFor="allow-snippet-templates-checkbox" className="checkbox-label">
+            <input
+              type="checkbox"
+              id="allow-snippet-templates-checkbox"
+              checked={allowSnippetTemplates}
+              onChange={handleToggleAllowSnippetTemplates}
+            />
+            <span className="checkbox-custom"></span>
+            Enable Javascript templates in system prompts and snippets
           </label>
         </div>
       </div>

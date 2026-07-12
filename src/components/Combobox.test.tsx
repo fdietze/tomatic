@@ -207,6 +207,8 @@ describe('Combobox Component', () => {
                         autoScrollEnabled: true,
                         selectedPromptName: null,
                         initialChatPrompt: null,
+                        allowChatTemplates: false,
+                        allowSnippetTemplates: false,
                         loading: 'idle',
                         saving: 'idle',
                     } satisfies SettingsState
