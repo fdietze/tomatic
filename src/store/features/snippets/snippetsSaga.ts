@@ -31,13 +31,12 @@ import {
   buildReverseDependencyGraph,
   findTransitiveDependents,
   groupSnippetsIntoWaves,
-  resolveSnippetsWithTemplates as resolveSnippetsWithTemplatesUtil,
+  resolveSnippetReferences,
+  substituteSnippetReferences,
   getTopologicalSortForExecution,
-  getReferencedSnippetNames,
 } from "@/utils/snippetUtils";
 import { requestMessageContent } from "@/api/openrouter";
 import { RegenerationResult } from "@/types/payloads";
-import { evaluateTemplate } from "@/utils/templateUtils";
 
 function* loadSnippetsSaga() {
   console.log("[DEBUG] loadSnippetsSaga: starting to load snippets");
@@ -155,7 +154,7 @@ function* handleRegenerateSnippetSaga(
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet model for ${snippetToRegenerate.name}:`, snippetToRegenerate.model);
     console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet prompt for ${snippetToRegenerate.name}:`, snippetToRegenerate.prompt);
     const resolvedPrompt: string = yield call(
-      resolveSnippetsWithTemplatesUtil,
+      resolveSnippetReferences,
       snippetToRegenerate.prompt,
       allSnippets,
     );
@@ -484,29 +483,16 @@ export function* regenerateSnippetWorkerWithContext(
       throw new Error("Invalid snippet for regeneration.");
     }
 
-    // Pre-flight validation: Check if all dependencies exist in the resolver context
-    const dependencies = getReferencedSnippetNames(snippet.prompt);
-    for (const dep of dependencies) {
-      if (!resolverContext.has(dep)) {
-        throw new Error(`Upstream dependency @${dep} failed to generate.`);
+    // req:no-template-evaluation: plain substitution from the wave's resolver context.
+    // A missing name means its upstream wave failed to produce content.
+    const resolvedPrompt = substituteSnippetReferences(snippet.prompt, (name) => {
+      const content = resolverContext.get(name);
+      if (content === undefined) {
+        throw new Error(`Upstream dependency @${name} failed to generate.`);
       }
-    }
-    
-    // Resolve the prompt using the resolver context
-    const preprocessedPrompt = snippet.prompt.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
-    
-    // Convert ReadonlyMap to plain object for evaluateTemplate
-    const contextObj: Record<string, string> = {};
-    resolverContext.forEach((value, key) => {
-      contextObj[key] = value;
+      return content;
     });
-    
-    const resolvedPrompt = (yield call(
-      evaluateTemplate,
-      preprocessedPrompt,
-      contextObj
-    )) as string;
-    
+
     console.log(`[DEBUG] regenerateSnippetWorkerWithContext: resolved prompt for ${snippet.name}:`, resolvedPrompt);
 
     // Handle empty prompt
@@ -675,20 +661,15 @@ function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
 }
 
 /**
- * req:snippet-id-vs-name: Generator wrapper around resolveSnippetsWithTemplates from snippetUtils.
+ * req:snippet-id-vs-name: Generator wrapper around resolveSnippetReferences from snippetUtils.
  * Selects all snippets from state and resolves snippet references in the given text.
  * Exported so other sagas (e.g. scratchpadSaga) can use it via `yield call`.
  */
-export function* resolveSnippetsWithTemplates(text: string): Generator<unknown, string, unknown> {
+export function* resolveSnippetReferencesFromState(text: string): Generator<unknown, string, unknown> {
   const allSnippets = (yield select(
     (state: RootState) => state.snippets.snippets,
   )) as Snippet[];
-  const resolved = (yield call(
-    resolveSnippetsWithTemplatesUtil,
-    text,
-    allSnippets,
-  )) as string;
-  return resolved;
+  return resolveSnippetReferences(text, allSnippets);
 }
 
 export function* snippetsSaga() {

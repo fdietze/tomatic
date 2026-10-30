@@ -12,6 +12,7 @@
 - req:snippet-id-vs-name: snippets are identified by id (primary key), but referenced by their unique name.
 - req:snippet-wait-by-id: when waiting for individual snippets to finish, we'll identify them by id
 - req:snippet-error-propagation: an unresolved snippet should propagate an error.
+- req:no-template-evaluation: text is never evaluated as code. `@name` is the only reference syntax and is replaced by plain string substitution; `$`, `${...}`, backticks and backslashes stay literal. Standard snippet content is resolved recursively, generated snippet content is inserted literally. Only snippets referenced by the text are resolved.
 - req:test-no-page-goto: tests should not use page.goto to navigate between pages (that would trigger reseeding the database state). page.goto is only allowed on initial page load. use clicks instead.
 - req:dirty-loading-indicator: all snippets marked as dirty should show a loading indicator
 - req:error-warning-sign: all snippets with an error of any kind (cycle, invalid snippet references, failed generation etc) should show a warning sign.

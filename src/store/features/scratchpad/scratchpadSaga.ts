@@ -32,7 +32,7 @@ import {
 import { createAppError } from '@/types/errors';
 import { getNavigationService } from '@/services/NavigationProvider';
 import { ROUTES } from '@/utils/routes';
-import { resolveSnippetsWithTemplates } from '@/store/features/snippets/snippetsSaga';
+import { resolveSnippetReferencesFromState } from '@/store/features/snippets/snippetsSaga';
 import { streamChat, type StreamChatInput } from '@/services/chatService';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
@@ -195,7 +195,7 @@ function* resolveSystemPrompt(): Generator<unknown, string | null, unknown> {
     (p) => p.data.name === sp.selectedPromptName,
   );
   if (!found) return null;
-  const resolved = (yield call(resolveSnippetsWithTemplates, found.data.prompt)) as string;
+  const resolved = (yield call(resolveSnippetReferencesFromState, found.data.prompt)) as string;
   return resolved;
 }
 
@@ -251,7 +251,7 @@ export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator
     const newChunk = sp.inputs[sp.inputs.length - 1]!;
 
     // Resolve snippet references in the new input chunk
-    const resolved = (yield call(resolveSnippetsWithTemplates, newChunk.raw_content)) as string;
+    const resolved = (yield call(resolveSnippetReferencesFromState, newChunk.raw_content)) as string;
     yield put(setResolvedContent({ inputId: newChunk.id, resolved_content: resolved }));
 
     const systemPromptText = (yield call(resolveSystemPrompt)) as string | null;
@@ -305,7 +305,7 @@ export function* regenerateWorker(action: ReturnType<typeof regenerateRequested>
     const sp0 = (yield select(selectScratchpad)) as ScratchpadState;
     // Re-resolve all existing inputs in case snippets have changed since last send
     for (const chunk of sp0.inputs) {
-      const resolved = (yield call(resolveSnippetsWithTemplates, chunk.raw_content)) as string;
+      const resolved = (yield call(resolveSnippetReferencesFromState, chunk.raw_content)) as string;
       yield put(setResolvedContent({ inputId: chunk.id, resolved_content: resolved }));
     }
     const systemPromptText = (yield call(resolveSystemPrompt)) as string | null;

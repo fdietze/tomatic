@@ -17,12 +17,12 @@ vi.mock('@/utils/events', () => ({
   dispatchEvent: vi.fn(),
 }));
 
-// Mock resolveSnippetsWithTemplates so it returns the text unchanged (no snippet DB needed)
+// Mock resolveSnippetReferencesFromState so it returns the text unchanged (no snippet DB needed)
 vi.mock('@/store/features/snippets/snippetsSaga', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/store/features/snippets/snippetsSaga');
   return {
     ...actual,
-    resolveSnippetsWithTemplates: vi.fn(async (s: string) => s),
+    resolveSnippetReferencesFromState: vi.fn(function* (s: string) { return s; }),
   };
 });
 

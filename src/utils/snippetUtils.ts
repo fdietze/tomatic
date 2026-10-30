@@ -1,65 +1,47 @@
 import type { Snippet } from '@/types/storage';
-import { evaluateTemplate } from './templateUtils';
 
 /**
- * req:snippet-id-vs-name, req:snippet-error-propagation, req:cycle-detection, req:template-evaluation
- * Asynchronously resolves snippets and templates in a given text.
- *
- * This function evaluates snippets in topological order, allowing snippets to depend on each other.
- * It uses a template engine to execute JavaScript code within the snippets, including async operations.
- *
- * @param text The initial text containing snippet references (e.g., `@name` or `${name}`).
- * @param allSnippets A list of all available snippets.
- * @returns A promise that resolves to the final text with all snippets and templates evaluated.
- * @throws An error if a cycle is detected, a snippet is not found, or a template evaluation fails.
+ * req:no-template-evaluation: `@name` is the only reference syntax. Everything else,
+ * including `$`, `${...}` and backticks, is plain text (users paste arbitrary text).
  */
-export async function resolveSnippetsWithTemplates(
-  text: string,
-  allSnippets: Snippet[]
-): Promise<string> {
-  const { sorted, cyclic } = getTopologicalSortForExecution(allSnippets);
+const SNIPPET_REFERENCE_PATTERN = /@([a-zA-Z0-9_]+)/g;
 
-  if (cyclic.length > 0) {
-    // Cycle detected. Run validation from a cyclic node to get a detailed error message.
-    validateSnippetDependencies(`@${cyclic[0]}`, allSnippets);
-    // Fallback in case validateSnippetDependencies doesn't throw for some reason.
-    throw new Error(`Snippet cycle detected involving: @${cyclic.join(', @')}`);
-  }
+/**
+ * req:snippet-id-vs-name, req:snippet-error-propagation, req:cycle-detection, req:no-template-evaluation
+ * Replaces every `@name` reference in `text` with the snippet's content.
+ *
+ * Standard snippet content is resolved recursively; generated snippet content is
+ * model output and inserted literally. Only snippets reachable from `text` are
+ * touched, so a broken snippet elsewhere cannot break this text.
+ *
+ * @throws An error if a referenced snippet does not exist or a reference cycle is found.
+ */
+export function resolveSnippetReferences(text: string, allSnippets: Snippet[]): string {
+  const snippetsByName = new Map(allSnippets.map((s) => [s.name, s]));
 
-  const resolvedValues: Record<string, string> = {};
-
-  for (const snippet of sorted) {
-    const template = snippet.content || '';
-    const preprocessedTemplate = template.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
-
-    try {
-      const result = await evaluateTemplate(preprocessedTemplate, resolvedValues);
-      resolvedValues[snippet.name] = String(result); // Ensure result is a string
-    } catch (error) {
-      if (error instanceof ReferenceError) {
-        const varName = error.message.split(' ')[0];
-        throw new Error(`Error evaluating snippet '@${snippet.name}': it references snippet '@${varName}', which has not been resolved.`);
+  const resolve = (currentText: string, path: string[]): string =>
+    substituteSnippetReferences(currentText, (name) => {
+      if (path.includes(name)) {
+        const cyclePath = [...path, name].map((n) => `@${n}`).join(' -> ');
+        throw new Error(`Snippet cycle detected: ${cyclePath}`);
       }
-      throw new Error(`Error evaluating snippet '@${snippet.name}': ${(error as Error).message}`);
-    }
-  }
-
-  const preprocessedText = text.replace(/@([a-zA-Z0-9_]+)/g, '${$1}');
-
-  try {
-    const finalText = await evaluateTemplate(preprocessedText, resolvedValues);
-    return finalText;
-  } catch (error) {
-    if (error instanceof ReferenceError) {
-      const snippetName = error.message.split(' ')[0];
-      // Check if the referenced variable exists as a snippet. If not, it's a "not found" error.
-      if (!allSnippets.some(s => s.name === snippetName)) {
-        throw new Error(`Snippet '@${snippetName}' not found.`);
+      const snippet = snippetsByName.get(name);
+      if (!snippet) {
+        throw new Error(`Snippet '@${name}' not found.`);
       }
-    }
-    // Re-throw other errors, or ReferenceErrors for existing-but-unresolved snippets
-    throw error;
-  }
+      return snippet.isGenerated ? snippet.content : resolve(snippet.content, [...path, name]);
+    });
+
+  return resolve(text, []);
+}
+
+/**
+ * req:no-template-evaluation
+ * Replaces each `@name` in `text` with `lookup(name)`. Pure string substitution:
+ * a replacer function is used so `$&`, `$1` etc. in the inserted content stay literal.
+ */
+export function substituteSnippetReferences(text: string, lookup: (name: string) => string): string {
+  return text.replace(SNIPPET_REFERENCE_PATTERN, (_match, name: string) => lookup(name));
 }
 
 /**
@@ -129,18 +111,9 @@ export function findNonExistentSnippets(text: string, allSnippets: Snippet[]): s
  * @returns A Set of snippet names found in the text.
  */
 export function getReferencedSnippetNames(text: string): Set<string> {
-  if (!text) return new Set();
-  // This regex finds both @name and ${name} style references.
-  // It uses two capture groups.
-  const snippetRegex = /@([a-zA-Z0-9_]+)|\$\{([a-zA-Z0-9_]+)\}/g;
-  const matches = [...text.matchAll(snippetRegex)];
   const names = new Set<string>();
-  for (const match of matches) {
-    // The name will be in either the first or second capture group.
-    const name = match[1] || match[2];
-    if (name) {
-      names.add(name);
-    }
+  for (const [, name] of text.matchAll(SNIPPET_REFERENCE_PATTERN)) {
+    if (name) names.add(name);
   }
   return names;
 }

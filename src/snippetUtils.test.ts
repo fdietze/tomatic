@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSnippetsWithTemplates, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, getSnippetDisplayOrder, getTopologicalSortForExecution, groupSnippetsIntoWaves } from '@/utils/snippetUtils';
+import { resolveSnippetReferences, validateSnippetDependencies, findNonExistentSnippets, getReferencedSnippetNames, buildReverseDependencyGraph, findTransitiveDependents, getSnippetDisplayOrder, getTopologicalSortForExecution, groupSnippetsIntoWaves } from '@/utils/snippetUtils';
 import type { Snippet } from '@/types/storage';
 
 const createSnippet = (overrides: Partial<Snippet> & { name: string }): Snippet => ({
@@ -15,120 +15,86 @@ const createSnippet = (overrides: Partial<Snippet> & { name: string }): Snippet 
 });
 
 
-describe('resolveSnippetsWithTemplates', () => {
-  it('should resolve a simple template expression', async () => {
-    const text = 'Result: ${1 + 1}';
-    const allSnippets: Snippet[] = [];
-    const expected = 'Result: 2';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
+describe('resolveSnippetReferences', () => {
+  it('should return arbitrary pasted text with template-like syntax unchanged', () => {
+    // Purpose: req:no-template-evaluation - text is never evaluated as a JS template, so `$`, `${...}`, backticks, backslashes and replacement patterns pass through literally.
+    const text = 'cost: $5, ${HOME}, ${1 + 1}, `code`, C:\\path\\n, $& $1 $$';
+    expect(resolveSnippetReferences(text, [])).toBe(text);
   });
 
-  it('should handle async operations in templates', async () => {
-    const text = 'Data: ${await fetchData()}';
-    const allSnippets: Snippet[] = [];
-    // Mock a global async function for the test
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetchData = async () => 'async data';
-    const expected = 'Data: async data';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (global as any).fetchData;
+  it('should insert snippet content containing replacement patterns literally', () => {
+    // Purpose: req:no-template-evaluation - `$&`, `$1` and `${x}` inside snippet content are not interpreted by String.replace or a template engine.
+    const allSnippets: Snippet[] = [createSnippet({ name: 'a', content: '$& $1 ${x} `y`' })];
+    expect(resolveSnippetReferences('[@a]', allSnippets)).toBe('[$& $1 ${x} `y`]');
   });
 
-  it('should resolve snippets as variables in the template', async () => {
-    const text = 'Message: ${greet}';
-    const allSnippets: Snippet[] = [createSnippet({ name: 'greet', content: 'Hello, World!' })];
-    const expected = 'Message: Hello, World!';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
-  });
-
-  it('should handle backward compatibility with @-syntax', async () => {
-    const text = 'Message: @greet';
-    const allSnippets: Snippet[] = [createSnippet({ name: 'greet', content: 'Hello, World!' })];
-    const expected = 'Message: Hello, World!';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
-  });
-
-  it('should recursively resolve templates', async () => {
-    const text = 'Final: @a';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', content: 'Nested ${b}' }),
-      createSnippet({ name: 'b', content: 'Success' }),
-    ];
-    const expected = 'Final: Nested Success';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
-  });
-
-  it('should throw a "not found" error for an undefined variable that is not a snippet', async () => {
-    const text = 'Result: ${undefinedVariable}';
-    const allSnippets: Snippet[] = [];
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).rejects.toThrow("Snippet '@undefinedVariable' not found.");
-  });
-
-  it('should throw a cycle detection error for direct cycles', async () => {
-    const text = '@a';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', content: 'Cycle @a' }),
-    ];
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).rejects.toThrow('Snippet cycle detected: @a -> @a');
-  });
-
-  it('should throw a cycle detection error for indirect cycles', async () => {
-    const text = '@a';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', content: 'Cycle @b' }),
-      createSnippet({ name: 'b', content: 'Back to @a' }),
-    ];
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).rejects.toThrow('Snippet cycle detected: @a -> @b -> @a');
-  });
-
-  it('should handle a mix of @ and ${} syntax', async () => {
-    const text = 'Mix: @a and ${b}';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', content: 'A' }),
-      createSnippet({ name: 'b', content: 'B' }),
-    ];
-    const expected = 'Mix: A and B';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
-  });
-
-  it('should resolve a single, non-nested snippet', async () => {
-    const text = 'This contains @a.';
+  it('should resolve a single, non-nested snippet', () => {
+    // Purpose: an @name reference is replaced by the snippet content.
     const allSnippets: Snippet[] = [createSnippet({ name: 'a', content: 'a snippet' })];
-    const expected = 'This contains a snippet.';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
+    expect(resolveSnippetReferences('This contains @a.', allSnippets)).toBe('This contains a snippet.');
   });
 
-  it('should recursively resolve a snippet that contains another snippet', async () => {
-    const text = 'Resolve @a.';
+  it('should recursively resolve a standard snippet that contains another snippet', () => {
+    // Purpose: references inside standard snippet content are resolved transitively.
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: 'nested @b' }),
       createSnippet({ name: 'b', content: 'snippet' }),
     ];
-    const expected = 'Resolve nested snippet.';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
+    expect(resolveSnippetReferences('Resolve @a.', allSnippets)).toBe('Resolve nested snippet.');
   });
 
-  it('should resolve multiple references to the same and different snippets', async () => {
-    const text = 'One @a, two @a, and one @b.';
+  it('should insert the content of a generated snippet literally', () => {
+    // Purpose: generated content is model output, not a template; references in it stay as written.
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'gen', isGenerated: true, prompt: 'about @b', content: 'output mentions @b and ${b}' }),
+      createSnippet({ name: 'b', content: 'B' }),
+    ];
+    expect(resolveSnippetReferences('@gen', allSnippets)).toBe('output mentions @b and ${b}');
+  });
+
+  it('should resolve multiple references to the same and different snippets', () => {
+    // Purpose: every occurrence is replaced.
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a', content: 'A' }),
       createSnippet({ name: 'b', content: 'B' }),
     ];
-    const expected = 'One A, two A, and one B.';
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(expected);
+    expect(resolveSnippetReferences('One @a, two @a, and one @b.', allSnippets)).toBe('One A, two A, and one B.');
   });
 
-  it('should handle input text with no snippets, returning the original text', async () => {
-    const text = 'This text has no snippets.';
-    const allSnippets: Snippet[] = [];
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe(text);
+  it('should throw a "not found" error for a reference to a non-existent snippet', () => {
+    // Purpose: req:snippet-error-propagation - an unknown reference is reported.
+    expect(() => resolveSnippetReferences('Result: @missing', [])).toThrow("Snippet '@missing' not found.");
   });
 
-  it('should handle an empty string as input', async () => {
-    const text = '';
-    const allSnippets: Snippet[] = [];
-    await expect(resolveSnippetsWithTemplates(text, allSnippets)).resolves.toBe('');
+  it('should throw a cycle detection error for direct cycles', () => {
+    // Purpose: req:cycle-detection - a self-referencing snippet is rejected.
+    const allSnippets: Snippet[] = [createSnippet({ name: 'a', content: 'Cycle @a' })];
+    expect(() => resolveSnippetReferences('@a', allSnippets)).toThrow('Snippet cycle detected: @a -> @a');
+  });
+
+  it('should throw a cycle detection error for indirect cycles', () => {
+    // Purpose: req:cycle-detection - the error names the full cycle path.
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'a', content: 'Cycle @b' }),
+      createSnippet({ name: 'b', content: 'Back to @a' }),
+    ];
+    expect(() => resolveSnippetReferences('@a', allSnippets)).toThrow('Snippet cycle detected: @a -> @b -> @a');
+  });
+
+  it('should ignore broken snippets that the text does not reference', () => {
+    // Purpose: only referenced snippets are resolved, so an unrelated cycle or missing reference does not break the text.
+    const allSnippets: Snippet[] = [
+      createSnippet({ name: 'ok', content: 'fine' }),
+      createSnippet({ name: 'loop', content: '@loop' }),
+      createSnippet({ name: 'dangling', content: '@missing' }),
+    ];
+    expect(resolveSnippetReferences('@ok', allSnippets)).toBe('fine');
+  });
+
+  it('should return text without references and empty text unchanged', () => {
+    // Purpose: no references means no change.
+    expect(resolveSnippetReferences('This text has no snippets.', [])).toBe('This text has no snippets.');
+    expect(resolveSnippetReferences('', [])).toBe('');
   });
 });
 
@@ -140,15 +106,6 @@ describe('validateSnippetDependencies', () => {
       createSnippet({ name: 'b', content: 'No further references' }),
     ];
     expect(() => validateSnippetDependencies(text, allSnippets)).not.toThrow();
-  });
-
-  it('should detect cycles using ${name} syntax', () => {
-    const text = '@a';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', content: 'goes to ${b}' }),
-      createSnippet({ name: 'b', content: 'goes back to @a' }),
-    ];
-    expect(() => validateSnippetDependencies(text, allSnippets)).toThrow('Snippet cycle detected: @a -> @b -> @a');
   });
 
   it('should correctly trace dependencies from the content of standard snippets', () => {
@@ -196,16 +153,8 @@ describe('validateSnippetDependencies', () => {
 });
 
 describe('findNonExistentSnippets', () => {
-  it('should find non-existent snippets using ${name} syntax', () => {
-    const text = 'This references @a and ${nonexistent}.';
-    const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a' }),
-    ];
-    expect(findNonExistentSnippets(text, allSnippets)).toEqual(expect.arrayContaining(['nonexistent']));
-  });
-
   it('should return an empty array when all referenced snippets exist', () => {
-    const text = 'This references @a and ${b}.';
+    const text = 'This references @a and @b.';
     const allSnippets: Snippet[] = [
       createSnippet({ name: 'a' }),
       createSnippet({ name: 'b' }),
@@ -243,28 +192,10 @@ describe('getReferencedSnippetNames', () => {
     expect(getReferencedSnippetNames(text)).toEqual(expected);
   });
 
-  it('should extract snippet names from ${name} syntax', () => {
-    const text = 'This is a ${test} snippet.';
-    const expected = new Set(['test']);
-    expect(getReferencedSnippetNames(text)).toEqual(expected);
-  });
-
-  it('should extract unique names from a mix of @ and ${} syntax', () => {
-    const text = 'References @a, ${b}, and @a again, plus ${b}.';
-    const expected = new Set(['a', 'b']);
-    expect(getReferencedSnippetNames(text)).toEqual(expected);
-  });
-
-  it('should ignore complex expressions inside ${}', () => {
-    const text = 'This should be ignored: ${1 + 1} and ${await fn()}';
-    const expected = new Set();
-    expect(getReferencedSnippetNames(text)).toEqual(expected);
-  });
-
-  it('should correctly handle a mix of valid references and complex expressions', () => {
-    const text = 'Valid: @a and ${b}. Invalid: ${a + b}.';
-    const expected = new Set(['a', 'b']);
-    expect(getReferencedSnippetNames(text)).toEqual(expected);
+  it('should not treat ${name} as a reference', () => {
+    // Purpose: req:no-template-evaluation - only @name is reference syntax; `${HOME}` in pasted shell code is plain text.
+    const text = 'Shell: ${HOME} and ${1 + 1}, ref: @a';
+    expect(getReferencedSnippetNames(text)).toEqual(new Set(['a']));
   });
 
   it('should extract all unique snippet names from a text with multiple references', () => {
@@ -281,9 +212,9 @@ describe('getReferencedSnippetNames', () => {
 });
 
 describe('buildReverseDependencyGraph', () => {
-  it('should identify dependencies from ${name} syntax in prompts', () => {
+  it('should identify dependencies from @name syntax in prompts', () => {
     const allSnippets: Snippet[] = [
-      createSnippet({ name: 'a', isGenerated: true, prompt: '${b}' }),
+      createSnippet({ name: 'a', isGenerated: true, prompt: '@b' }),
       createSnippet({ name: 'b' }),
     ];
     const graph = buildReverseDependencyGraph(allSnippets);
@@ -543,19 +474,6 @@ describe('groupSnippetsIntoWaves', () => {
     expect(waves).toHaveLength(2);
     expect(waves[0]?.map(s => s.name)).toEqual(['A']);
     expect(waves[1]?.map(s => s.name)).toEqual(['B']);
-  });
-
-  it('should handle mixed ${} and @ syntax', () => {
-    // Purpose: Verify both reference syntaxes work correctly
-    const snippetA = createSnippet({ name: 'A', content: 'A content' });
-    const snippetB = createSnippet({ name: 'B', content: '${A}' });
-    const snippetC = createSnippet({ name: 'C', content: '@A' });
-
-    const waves = groupSnippetsIntoWaves([snippetA, snippetB, snippetC]);
-
-    expect(waves).toHaveLength(2);
-    expect(waves[0]?.map(s => s.name)).toEqual(['A']);
-    expect(new Set(waves[1]?.map(s => s.name))).toEqual(new Set(['B', 'C']));
   });
 });
 

@@ -43,7 +43,7 @@ import {
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
-import { findSnippetReferences, resolveSnippetsWithTemplates } from "@/utils/snippetUtils";
+import { findSnippetReferences, resolveSnippetReferences } from "@/utils/snippetUtils";
 import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import {
   batchRegenerateRequest,
@@ -84,7 +84,7 @@ function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
 
   try {
     // Resolve snippets in the system prompt
-    const resolvedPrompt: string = yield call(resolveSnippetsWithTemplates, systemPrompt.prompt, snippets.snippets);
+    const resolvedPrompt: string = yield call(resolveSnippetReferences, systemPrompt.prompt, snippets.snippets);
     console.log(`[DEBUG] resolveCurrentSystemPrompt: resolved to: "${resolvedPrompt}"`);
 
     return {
@@ -430,7 +430,7 @@ function* submitUserMessageSaga(
       if (messageToUpdate) {
         console.log(`[DEBUG] submitUserMessageSaga: resolving prompt "${prompt}" with ${snippets.snippets.length} snippets available`);
         try {
-          const resolvedContent: string = yield call(resolveSnippetsWithTemplates, prompt, snippets.snippets);
+          const resolvedContent: string = yield call(resolveSnippetReferences, prompt, snippets.snippets);
           console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
           // req:raw-content-preservation: Store raw content alongside resolved content
           const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
@@ -457,7 +457,7 @@ function* submitUserMessageSaga(
       if (newMessage && newMessage.role === 'user') {
         console.log(`[DEBUG] submitUserMessageSaga: resolving new message "${prompt}" with ${snippets.snippets.length} snippets available`);
         try {
-          const resolvedContent: string = yield call(resolveSnippetsWithTemplates, prompt, snippets.snippets);
+          const resolvedContent: string = yield call(resolveSnippetReferences, prompt, snippets.snippets);
           console.log(`[DEBUG] submitUserMessageSaga: resolved new message content: "${resolvedContent}"`);
           const updatedMessage = { ...newMessage, content: resolvedContent, raw_content: prompt };
           yield put(updateUserMessage({ index: newMessageIndex, message: updatedMessage }));
@@ -545,7 +545,7 @@ function* submitUserMessageSaga(
           if (msg.role === 'user') {
             const originalContent = msg.raw_content || msg.content;
             console.log(`[DEBUG] submitUserMessageSaga: resolving user message "${originalContent}"`);
-            const resolvedContent: string = yield call(resolveSnippetsWithTemplates, originalContent, snippetsState.snippets);
+            const resolvedContent: string = yield call(resolveSnippetReferences, originalContent, snippetsState.snippets);
             console.log(`[DEBUG] submitUserMessageSaga: resolved to "${resolvedContent}"`);
             newMessagesToSubmit.push({ ...msg, content: resolvedContent });
           } else {

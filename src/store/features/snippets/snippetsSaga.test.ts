@@ -286,13 +286,10 @@ describe("snippetsSaga", () => {
       let step = generator.next();
       expect(step.value).toBeDefined();
       
-      // Step 2: call evaluateTemplate - provide mock return
+      // Step 2: provide settings; the prompt is substituted synchronously and the API call is yielded
       step = generator.next(store.getState().settings);
       
-      // Step 3: call API - provide the resolved prompt value first
-      step = generator.next("Generate using fresh A content");
-      
-      // Step 4: get the API response
+      // Step 3: provide the API response
       step = generator.next("new B content");
       
       // Final result
@@ -361,7 +358,6 @@ describe("snippetsSaga", () => {
     const allSnippetsInStore = [snippetA, snippetB, snippetC, snippetD];
 
     const store = createTestStore();
-    store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     const regenerationLog: {name: string, prompt: string}[] = [];
     (requestMessageContent as Mock).mockReset(); // Ensure clean state
@@ -377,6 +373,9 @@ describe("snippetsSaga", () => {
       regenerationLog.push({ name, prompt });
       return Promise.resolve(`regenerated ${name}`);
     });
+
+    // Dispatch only after the API mock is in place; resolution is synchronous, so the first wave may call the API immediately.
+    store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     // Wait for batch regeneration to complete
     await new Promise(resolve => {
@@ -473,7 +472,6 @@ describe("snippetsSaga", () => {
     const allSnippetsInStore = [snippetA, snippetB, snippetC, snippetD];
 
     const store = createTestStore();
-    store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     const regenerationLog: {name: string, prompt: string}[] = [];
     (requestMessageContent as Mock).mockReset(); // Ensure clean state
@@ -489,6 +487,9 @@ describe("snippetsSaga", () => {
       regenerationLog.push({ name, prompt });
       return Promise.resolve(`regenerated ${name}`);
     });
+
+    // Dispatch only after the API mock is in place; resolution is synchronous, so the first wave may call the API immediately.
+    store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     // Wait for batch regeneration to complete
     await new Promise(resolve => {
