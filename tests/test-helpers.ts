@@ -164,6 +164,7 @@ import type {
   Snippet,
   SystemPrompt,
   LocalStorageV1State,
+  LocalStorageV2State,
   IndexedDBDataCurrent,
 } from "../src/types/storage";
 import type { ScratchpadSession } from "../src/types/scratchpad";
@@ -334,7 +335,7 @@ export async function seedIndexedDB(
  */
 export async function seedLocalStorage(
   context: BrowserContext,
-  data: { state?: Partial<LocalStorageV1State>; version?: number },
+  data: { state?: Partial<LocalStorageV1State> | Partial<LocalStorageV2State>; version?: number },
 ) {
   const finalData = {
     ...DEFAULT_LOCAL_STORAGE,

@@ -266,6 +266,7 @@ describe("snippetsSaga", () => {
           apiKey: '',
           modelName: 'mock-model/b',
           autoScrollEnabled: true,
+          chatSnippetResolutionEnabled: false,
           selectedPromptName: null,
           initialChatPrompt: null,
           loading: 'idle' as const,

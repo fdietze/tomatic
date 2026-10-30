@@ -205,6 +205,7 @@ describe('Combobox Component', () => {
                         modelName: 'item-1',
                         apiKey: '',
                         autoScrollEnabled: true,
+                        chatSnippetResolutionEnabled: false,
                         selectedPromptName: null,
                         initialChatPrompt: null,
                         loading: 'idle',

@@ -6,6 +6,9 @@ import {
 } from "./test-helpers";
 
 test.describe("Snippet Usage in Chat", () => {
+  // req:chat-snippet-resolution-setting: these tests exercise snippet resolution in chat, which is off by default.
+  test.use({ localStorageOverrides: { chatSnippetResolutionEnabled: true } });
+
   let chatPage: ChatPage;
   let chatMocker: ChatCompletionMocker;
 
@@ -155,5 +158,48 @@ test.describe("Snippet Usage in Chat", () => {
         chatMocker.verifyComplete();
       });
     });
+  });
+});
+
+test.describe("Feature: Chat snippet resolution disabled (default)", () => {
+  let chatPage: ChatPage;
+  let chatMocker: ChatCompletionMocker;
+
+  test.use({
+    dbSeed: {
+      snippets: [
+        { id: "1", name: "greet_simple", content: "Hello, world!", isGenerated: false, createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false },
+      ],
+    },
+  });
+
+  test.beforeEach(async ({ page }) => {
+    chatPage = new ChatPage(page);
+    chatMocker = new ChatCompletionMocker(page);
+    await chatMocker.setup();
+  });
+
+  test("sends pasted text verbatim, including @names and template syntax", async () => {
+    // Purpose: req:chat-snippet-resolution-setting, req:no-template-evaluation - with the default setting, arbitrary pasted
+    // text (existing and unknown @names, `${...}`, backticks, `$`) reaches the API unchanged and causes no error.
+    const pasted = "@greet_simple mail x@y.com @unknown ${HOME} `ls` $5";
+    chatMocker.mock({
+      request: {
+        model: "google/gemini-2.5-pro",
+        messages: [{ role: "user", content: pasted }],
+        stream: true,
+      },
+      response: { role: "assistant", content: "Verbatim received." },
+    });
+
+    const responsePromise = chatPage.page.waitForResponse(
+      "https://openrouter.ai/api/v1/chat/completions",
+    );
+    await chatPage.sendMessage(pasted);
+    await responsePromise;
+
+    await chatPage.expectMessage(1, "assistant", /Verbatim received/);
+    await expect(chatPage.page.getByTestId("error-message")).toHaveCount(0);
+    chatMocker.verifyComplete();
   });
 });

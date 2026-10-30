@@ -13,6 +13,7 @@
 - req:snippet-wait-by-id: when waiting for individual snippets to finish, we'll identify them by id
 - req:snippet-error-propagation: an unresolved snippet should propagate an error.
 - req:no-template-evaluation: text is never evaluated as code. `@name` is the only reference syntax and is replaced by plain string substitution; `$`, `${...}`, backticks and backslashes stay literal. Standard snippet content is resolved recursively, generated snippet content is inserted literally. Only snippets referenced by the text are resolved.
+- req:chat-snippet-resolution-setting: a settings checkbox (default off, persisted in localStorage v2 as optional `chatSnippetResolutionEnabled`, no migration) decides whether `@name` references in chat user messages are resolved. When off, user messages are sent exactly as typed: no waiting on dirty snippets, no resolution errors, and regeneration re-sends stored content. System prompts and scratchpad inputs always resolve.
 - req:test-no-page-goto: tests should not use page.goto to navigate between pages (that would trigger reseeding the database state). page.goto is only allowed on initial page load. use clicks instead.
 - req:dirty-loading-indicator: all snippets marked as dirty should show a loading indicator
 - req:error-warning-sign: all snippets with an error of any kind (cycle, invalid snippet references, failed generation etc) should show a warning sign.

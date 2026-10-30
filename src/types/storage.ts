@@ -70,6 +70,8 @@ export interface LocalStorageV2State {
   selectedPromptName: string | null;
   autoScrollEnabled: boolean;
   initialChatPrompt: string | null;
+  // req:chat-snippet-resolution-setting: added without a version bump; absent in older v2 data
+  chatSnippetResolutionEnabled?: boolean;
 }
 
 export type LocalStorageCurrent = LocalStoragePersistedState<LocalStorageV2State>;

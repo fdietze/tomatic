@@ -9,6 +9,7 @@ import {
   selectSettings,
   setApiKey,
   toggleAutoScroll,
+  toggleChatSnippetResolution,
   loadSettings,
   saveSettings,
 } from "@/store/features/settings/settingsSlice";
@@ -30,7 +31,7 @@ const SettingsPage: React.FC = () => {
   const dispatch = useDispatch();
 
   // --- Redux State ---
-  const { apiKey, autoScrollEnabled, saving } = useSelector(selectSettings);
+  const { apiKey, autoScrollEnabled, chatSnippetResolutionEnabled, saving } = useSelector(selectSettings);
   const { prompts: systemPromptsMap } = useSelector(selectPrompts);
   const { snippets, loading: snippetsLoading } = useSelector(selectSnippets);
 
@@ -66,6 +67,12 @@ const SettingsPage: React.FC = () => {
 
   const handleToggleAutoScroll = (): void => {
     dispatch(toggleAutoScroll());
+    dispatch(saveSettings({}));
+  };
+
+  // req:chat-snippet-resolution-setting
+  const handleToggleChatSnippetResolution = (): void => {
+    dispatch(toggleChatSnippetResolution());
     dispatch(saveSettings({}));
   };
 
@@ -201,6 +208,19 @@ const SettingsPage: React.FC = () => {
             />
             <span className="checkbox-custom"></span>
             Auto-scroll to bottom
+          </label>
+        </div>
+        <div className="settings-item">
+          <label htmlFor="chat-snippet-resolution-checkbox" className="checkbox-label">
+            <input
+              type="checkbox"
+              id="chat-snippet-resolution-checkbox"
+              data-testid="chat-snippet-resolution-checkbox"
+              checked={chatSnippetResolutionEnabled}
+              onChange={handleToggleChatSnippetResolution}
+            />
+            <span className="checkbox-custom"></span>
+            Resolve @snippet references in chat messages
           </label>
         </div>
       </div>

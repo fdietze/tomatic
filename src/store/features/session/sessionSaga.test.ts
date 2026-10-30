@@ -18,6 +18,7 @@ import { getNavigationService } from "@/services/NavigationProvider";
 import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import * as db from "@/services/db/chat-sessions";
 import type { ChatSession } from "@/types/chat";
+import type { Snippet } from "@/types/storage";
 
 // Mock the chat service to avoid real API calls
 vi.mock("@/services/chatService", () => ({
@@ -89,6 +90,7 @@ describe("sessionSaga", () => {
         apiKey: "test-api-key",
         modelName: "test-model",
         autoScrollEnabled: true,
+        chatSnippetResolutionEnabled: false,
         selectedPromptName: null,
         initialChatPrompt: null,
         loading: "idle",
@@ -148,6 +150,7 @@ describe("sessionSaga", () => {
         apiKey: "test-api-key",
         modelName: "test-model",
         autoScrollEnabled: true,
+        chatSnippetResolutionEnabled: false,
         selectedPromptName: null,
         initialChatPrompt: null,
         loading: "idle",
@@ -201,6 +204,7 @@ describe("sessionSaga", () => {
         apiKey: "test-api-key",
         modelName: "test-model",
         autoScrollEnabled: true,
+        chatSnippetResolutionEnabled: false,
         selectedPromptName: null,
         initialChatPrompt: null,
         loading: "idle",
@@ -358,4 +362,69 @@ describe("sessionSaga", () => {
       .run();
   });
 
+  describe("Feature: chat snippet resolution setting (req:chat-snippet-resolution-setting)", () => {
+    const settingsWith = (chatSnippetResolutionEnabled: boolean): RootState["settings"] => ({
+      apiKey: "test-api-key",
+      modelName: "test-model",
+      autoScrollEnabled: true,
+      chatSnippetResolutionEnabled,
+      selectedPromptName: null,
+      initialChatPrompt: null,
+      loading: "idle",
+      saving: "idle",
+    });
+    const snippetA: Snippet = {
+      id: "a-id", name: "a", content: "A", isGenerated: false, prompt: "",
+      createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: false,
+    };
+    const dirtyGenerated: Snippet = {
+      id: "gen-id", name: "gen", content: "old", isGenerated: true, prompt: "p", model: "m",
+      createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: true,
+    };
+
+    async function* emptyStream() {
+      yield { choices: [{ delta: { content: "ok" } }] };
+    }
+
+    test("when disabled, the user message is sent exactly as typed", async () => {
+      // Purpose: with the setting off, pasted text with @names (even of dirty or missing snippets), `${...}` and backticks
+      // is neither resolved nor waited on, and produces no error.
+      const store = createTestStore({
+        settings: settingsWith(false),
+        snippets: { snippets: [snippetA, dirtyGenerated], loading: "idle", error: null, regenerationStatus: {} },
+      });
+      (streamChat as Mock).mockResolvedValue(emptyStream());
+      const prompt = "mail x@a.com, @gen, @missing, ${HOME} `ls` $&";
+
+      const done = waitForSagaCompletion(store);
+      store.dispatch(submitUserMessage({ prompt, isRegeneration: false }));
+      await done;
+
+      const state = store.getState() as RootState;
+      expect(state.session.error).toBeNull();
+      expect(state.session.messages[0]).toEqual(expect.objectContaining({ role: "user", content: prompt, raw_content: prompt }));
+      expect(streamChat).toHaveBeenCalledWith(expect.objectContaining({
+        messagesToSubmit: [expect.objectContaining({ role: "user", content: prompt })],
+      }));
+    });
+
+    test("when enabled, @name references in the user message are resolved", async () => {
+      // Purpose: with the setting on, snippet references are substituted before sending while raw_content keeps the original.
+      const store = createTestStore({
+        settings: settingsWith(true),
+        snippets: { snippets: [snippetA], loading: "idle", error: null, regenerationStatus: {} },
+      });
+      (streamChat as Mock).mockResolvedValue(emptyStream());
+
+      const done = waitForSagaCompletion(store);
+      store.dispatch(submitUserMessage({ prompt: "say @a", isRegeneration: false }));
+      await done;
+
+      const state = store.getState() as RootState;
+      expect(state.session.messages[0]).toEqual(expect.objectContaining({ content: "say A", raw_content: "say @a" }));
+      expect(streamChat).toHaveBeenCalledWith(expect.objectContaining({
+        messagesToSubmit: [expect.objectContaining({ role: "user", content: "say A" })],
+      }));
+    });
+  });
 });

@@ -79,8 +79,10 @@ test.describe("Chat Editing with Snippets", () => {
             apiKey: OPENROUTER_API_KEY,
             modelName: "google/gemini-2.5-pro",
             autoScrollEnabled: false,
+            // req:chat-snippet-resolution-setting: this spec exercises snippet resolution in chat, which is off by default.
+            chatSnippetResolutionEnabled: true,
           },
-          version: 1,
+          version: 2,
         });
         await seedIndexedDB(context, {
           snippets: MOCK_SNIPPETS,

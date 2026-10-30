@@ -12,6 +12,7 @@ export interface LoadSettingsSuccessPayload {
   apiKey?: string;
   modelName?: string;
   autoScrollEnabled?: boolean;
+  chatSnippetResolutionEnabled?: boolean;
   selectedPromptName?: string | null;
   initialChatPrompt?: string | null;
 }
@@ -20,6 +21,7 @@ export interface SaveSettingsPayload {
   apiKey?: string;
   modelName?: string;
   autoScrollEnabled?: boolean;
+  chatSnippetResolutionEnabled?: boolean;
   selectedPromptName?: string | null;
   initialChatPrompt?: string | null;
 }

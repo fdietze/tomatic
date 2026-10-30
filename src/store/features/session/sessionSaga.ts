@@ -199,6 +199,11 @@ function* updateExistingSessionSaga(sessionId: string): SagaIterator {
   console.log(`[DEBUG] updateExistingSessionSaga: session ${sessionId} updated successfully`);
 }
 
+// req:chat-snippet-resolution-setting: the setting decides whether a chat user message is resolved or sent verbatim.
+function resolveChatUserText(text: string, resolutionEnabled: boolean, snippets: Snippet[]): string {
+  return resolutionEnabled ? resolveSnippetReferences(text, snippets) : text;
+}
+
 // --- Worker Sagas ---
 
 // Saga to handle system prompt setting with snippet resolution
@@ -368,13 +373,17 @@ function* submitUserMessageSaga(
 ) {
   try {
     const { isRegeneration, prompt, editMessageIndex } = action.payload;
+    // req:chat-snippet-resolution-setting: when off, user messages are sent as typed (no waiting, no resolution)
+    const { chatSnippetResolutionEnabled }: RootState["settings"] = yield select(
+      (state: RootState) => state.settings,
+    );
     console.log(`[DEBUG] submitUserMessageSaga: started with prompt="${prompt}", isRegeneration=${isRegeneration}, editMessageIndex=${editMessageIndex}`);
 
     // req:snippet-wait-before-submit: --- Await Dirty Snippets ---
     const { snippets: allSnippets }: { snippets: Snippet[] } = yield select(
       (state: RootState) => state.snippets,
     );
-    const snippetReferences = findSnippetReferences(prompt);
+    const snippetReferences = chatSnippetResolutionEnabled ? findSnippetReferences(prompt) : [];
     if (snippetReferences.length > 0) {
       const referencedSnippets = allSnippets.filter((s) =>
         snippetReferences.includes(s.name),
@@ -430,7 +439,7 @@ function* submitUserMessageSaga(
       if (messageToUpdate) {
         console.log(`[DEBUG] submitUserMessageSaga: resolving prompt "${prompt}" with ${snippets.snippets.length} snippets available`);
         try {
-          const resolvedContent: string = yield call(resolveSnippetReferences, prompt, snippets.snippets);
+          const resolvedContent = resolveChatUserText(prompt, chatSnippetResolutionEnabled, snippets.snippets);
           console.log(`[DEBUG] submitUserMessageSaga: resolved content: "${resolvedContent}"`);
           // req:raw-content-preservation: Store raw content alongside resolved content
           const updatedMessage = { ...messageToUpdate, content: resolvedContent, raw_content: prompt };
@@ -457,7 +466,7 @@ function* submitUserMessageSaga(
       if (newMessage && newMessage.role === 'user') {
         console.log(`[DEBUG] submitUserMessageSaga: resolving new message "${prompt}" with ${snippets.snippets.length} snippets available`);
         try {
-          const resolvedContent: string = yield call(resolveSnippetReferences, prompt, snippets.snippets);
+          const resolvedContent = resolveChatUserText(prompt, chatSnippetResolutionEnabled, snippets.snippets);
           console.log(`[DEBUG] submitUserMessageSaga: resolved new message content: "${resolvedContent}"`);
           const updatedMessage = { ...newMessage, content: resolvedContent, raw_content: prompt };
           yield put(updateUserMessage({ index: newMessageIndex, message: updatedMessage }));
@@ -529,7 +538,8 @@ function* submitUserMessageSaga(
 
 
     // For regenerations, resolve snippets in all user messages
-    if (isRegeneration) {
+    // Disabled: messages are re-sent with the content they were originally sent with.
+    if (isRegeneration && chatSnippetResolutionEnabled) {
       console.log(`[DEBUG] submitUserMessageSaga: handling regeneration, resolving snippets in messages`);
       
       // Resolve snippets in all user messages for regeneration

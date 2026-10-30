@@ -11,7 +11,7 @@ import {
   waitForEvent,
   type IndexedDBDataV4,
 } from './test-helpers';
-import type { IndexedDBDataCurrent, LocalStorageV1State } from '../src/types/storage';
+import type { IndexedDBDataCurrent, LocalStorageV2State } from '../src/types/storage';
 
 export interface ConsoleErrorOptions {
 	expectedConsoleErrors: (string | RegExp)[];
@@ -19,7 +19,7 @@ export interface ConsoleErrorOptions {
 
 export interface TestFixtures {
 	dbSeed: Partial<IndexedDBDataCurrent>;
-	localStorageOverrides?: Partial<LocalStorageV1State>;
+	localStorageOverrides?: Partial<LocalStorageV2State>;
 }
 
 export const testWithConsoleErrors = base.extend<ConsoleErrorOptions>({
@@ -110,13 +110,13 @@ export const testWithAutoInit = test.extend<TestFixtures>({
 		await mockGlobalApis(context);
 		
 		// Merge default localStorage settings with overrides
-		const defaultLocalStorageState: LocalStorageV1State = {
+		// Seeded in the current (v2) format so that v2-only fields such as chatSnippetResolutionEnabled survive loading.
+		const defaultLocalStorageState: LocalStorageV2State = {
 			apiKey: OPENROUTER_API_KEY,
 			modelName: "google/gemini-2.5-pro",
 			autoScrollEnabled: false,
-			cachedModels: [],
-			input: "",
 			selectedPromptName: null,
+			initialChatPrompt: null,
 		};
 		
 		const finalLocalStorageState = {
@@ -127,7 +127,7 @@ export const testWithAutoInit = test.extend<TestFixtures>({
 		// Seed localStorage with merged settings
 		await seedLocalStorage(context, {
 			state: finalLocalStorageState,
-			version: 1,
+			version: 2,
 		});
 		
 		// Seed IndexedDB with provided data or empty state

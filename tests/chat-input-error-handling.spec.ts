@@ -3,6 +3,9 @@ import { ChatPage } from "./pom/ChatPage";
 import { expect } from "./test-helpers";
 
 test.describe("Chat Input Error Handling", () => {
+  // req:chat-snippet-resolution-setting: these tests exercise snippet resolution in chat, which is off by default.
+  test.use({ localStorageOverrides: { chatSnippetResolutionEnabled: true } });
+
   let chatPage: ChatPage;
 
   test.beforeEach(async ({ page }) => {

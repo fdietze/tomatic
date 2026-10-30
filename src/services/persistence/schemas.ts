@@ -10,6 +10,8 @@ export const persistedSettingsStateSchema = z.object({
   apiKey: z.string().optional(),
   modelName: z.string().optional(), 
   autoScrollEnabled: z.boolean().optional(),
+  // req:chat-snippet-resolution-setting: optional, so stored v2 data without it loads with the initialState default (no migration)
+  chatSnippetResolutionEnabled: z.boolean().optional(),
   selectedPromptName: z.string().nullable().optional(),
   initialChatPrompt: z.string().nullable().optional(),
   // Note: loading and saving states are not persisted as they are runtime-only

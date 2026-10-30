@@ -7,6 +7,7 @@ import SettingsPage from "./SettingsPage";
 import {
   setApiKey,
   saveSettings,
+  toggleChatSnippetResolution,
 } from "@/store/features/settings/settingsSlice";
 import { MockStoreEnhanced } from "redux-mock-store";
 
@@ -21,6 +22,7 @@ describe("SettingsPage", () => {
       settings: {
         apiKey: "",
         autoScrollEnabled: false,
+        chatSnippetResolutionEnabled: false,
         saving: "idle",
       },
       prompts: {
@@ -57,6 +59,23 @@ describe("SettingsPage", () => {
 
     // 4. Assert that the correct actions were dispatched
     expect(store.dispatch).toHaveBeenCalledWith(setApiKey("test-api-key"));
+    expect(store.dispatch).toHaveBeenCalledWith(saveSettings({}));
+  });
+
+  test("should toggle and persist chat snippet resolution via its checkbox", () => {
+    // Purpose: req:chat-snippet-resolution-setting - the checkbox shows the (default off) state and toggles + saves the setting.
+    render(
+      <Provider store={store}>
+        <SettingsPage />
+      </Provider>,
+    );
+
+    const checkbox = screen.getByTestId("chat-snippet-resolution-checkbox");
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(checkbox);
+
+    expect(store.dispatch).toHaveBeenCalledWith(toggleChatSnippetResolution());
     expect(store.dispatch).toHaveBeenCalledWith(saveSettings({}));
   });
 });

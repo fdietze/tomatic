@@ -6,6 +6,8 @@ export interface SettingsState {
   apiKey: string;
   modelName: string;
   autoScrollEnabled: boolean;
+  // req:chat-snippet-resolution-setting: whether @name references in chat user messages are resolved
+  chatSnippetResolutionEnabled: boolean;
   selectedPromptName: string | null;
   initialChatPrompt: string | null;
   loading: "idle" | "loading" | "failed";
@@ -16,6 +18,8 @@ export const initialState: SettingsState = {
   apiKey: "",
   modelName: "google/gemini-2.5-pro",
   autoScrollEnabled: true,
+  // req:chat-snippet-resolution-setting: off by default so pasted text is sent exactly as typed
+  chatSnippetResolutionEnabled: false,
   selectedPromptName: null,
   initialChatPrompt: null,
   loading: "idle",
@@ -61,6 +65,9 @@ export const settingsSlice = createSlice({
     toggleAutoScroll: (state) => {
       state.autoScrollEnabled = !state.autoScrollEnabled;
     },
+    toggleChatSnippetResolution: (state) => {
+      state.chatSnippetResolutionEnabled = !state.chatSnippetResolutionEnabled;
+    },
     setSelectedPromptName: (state, action: PayloadAction<string | null>) => {
       state.selectedPromptName = action.payload;
     },
@@ -80,6 +87,7 @@ export const {
   setApiKey,
   setModelName,
   toggleAutoScroll,
+  toggleChatSnippetResolution,
   setSelectedPromptName,
   setInitialChatPrompt,
 } = settingsSlice.actions;

@@ -171,6 +171,18 @@ describe('Settings with Migration Integration', () => {
     });
   });
 
+  describe('chatSnippetResolutionEnabled', () => {
+    it('should load a stored value from v2 data', () => {
+      // Purpose: req:chat-snippet-resolution-setting - the optional field is persisted in v2 without a version bump.
+      localStorageMock.setItem('tomatic-storage', JSON.stringify({
+        state: { apiKey: 'k', modelName: 'm', selectedPromptName: null, autoScrollEnabled: true, initialChatPrompt: null, chatSnippetResolutionEnabled: true },
+        version: 2,
+      }));
+
+      expect(loadSettings().chatSnippetResolutionEnabled).toBe(true);
+    });
+  });
+
   describe('saveSettings', () => {
     it('should save settings with current version', () => {
       // Purpose: This test verifies that settings are saved with the current version number.
@@ -180,6 +192,7 @@ describe('Settings with Migration Integration', () => {
         modelName: 'test-model',
         selectedPromptName: null,
         autoScrollEnabled: true,
+        chatSnippetResolutionEnabled: false,
         initialChatPrompt: null,
         loading: 'idle' as const,
         saving: 'idle' as const,
@@ -209,6 +222,7 @@ describe('Settings with Migration Integration', () => {
         modelName: 'test-model',
         selectedPromptName: null,
         autoScrollEnabled: true,
+        chatSnippetResolutionEnabled: false,
         initialChatPrompt: null,
         loading: 'idle' as const,
         saving: 'idle' as const,
@@ -242,6 +256,7 @@ describe('Settings with Migration Integration', () => {
         modelName: loadedSettings.modelName || '',
         selectedPromptName: loadedSettings.selectedPromptName || null,
         autoScrollEnabled: loadedSettings.autoScrollEnabled ?? true,
+        chatSnippetResolutionEnabled: loadedSettings.chatSnippetResolutionEnabled ?? false,
         initialChatPrompt: loadedSettings.initialChatPrompt || null,
         loading: 'idle' as const,
         saving: 'idle' as const,
@@ -256,6 +271,7 @@ describe('Settings with Migration Integration', () => {
       expect(reloadedSettings).toEqual({
         ...loadedSettings,
         initialChatPrompt: null, // This gets added during the round-trip
+        chatSnippetResolutionEnabled: false, // Saved from the default, absent in the v1 fixture
       });
       
       // Verify only one migration message (not on reload)

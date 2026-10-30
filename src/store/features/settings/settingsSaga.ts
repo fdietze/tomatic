@@ -11,6 +11,7 @@ import {
   setApiKey,
   setModelName,
   toggleAutoScroll,
+  toggleChatSnippetResolution,
   setSelectedPromptName,
   setInitialChatPrompt,
 } from "./settingsSlice";
@@ -43,6 +44,7 @@ export function* settingsSaga() {
     setApiKey.type,
     setModelName.type,
     toggleAutoScroll.type,
+    toggleChatSnippetResolution.type,
     setSelectedPromptName.type,
     setInitialChatPrompt.type,
   ];
