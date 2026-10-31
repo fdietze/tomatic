@@ -113,6 +113,11 @@ export function describeError(error: unknown): string {
  * Convert a generic Error or unknown error to an AppError
  */
 export function toAppError(error: unknown): AppError {
+  // API helpers (src/api/openrouter.ts) throw AppError values; keep their type and details.
+  if (isAppError(error)) {
+    return error;
+  }
+
   if (error instanceof Error) {
     return createAppError.unknown(error.message, error);
   }
@@ -122,4 +127,25 @@ export function toAppError(error: unknown): AppError {
   }
   
   return createAppError.unknown('An unknown error occurred', error);
+}
+
+const APP_ERROR_TYPES: ReadonlySet<string> = new Set<AppError['type']>([
+  'API_ERROR',
+  'VALIDATION_ERROR',
+  'SNIPPET_REGENERATION_ERROR',
+  'NETWORK_ERROR',
+  'PERSISTENCE_ERROR',
+  'AUTHENTICATION_ERROR',
+  'UNKNOWN_ERROR',
+]);
+
+function isAppError(error: unknown): error is AppError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    !(error instanceof Error) &&
+    'type' in error &&
+    typeof error.type === 'string' &&
+    APP_ERROR_TYPES.has(error.type)
+  );
 }
