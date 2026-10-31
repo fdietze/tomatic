@@ -1,4 +1,6 @@
-import { call, put, takeLatest, all, select, takeEvery } from "redux-saga/effects";
+import { call, put, all, select } from "redux-saga/effects";
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest, takeEvery } from "@/store/supervisedEffects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";

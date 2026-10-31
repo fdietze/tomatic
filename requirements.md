@@ -79,3 +79,7 @@
 - req:scratchpad-include-last-response-fallback: when enabled but no usable prior response exists (null, errored, or empty content) or fewer than 2 input chunks exist, fall back silently to the single-aggregated-user-message shape. The checkbox stays checked.
 - req:scratchpad-include-last-response-stale: toggling the checkbox marks the current response stale without regenerating (same pattern as model / system prompt change).
 - req:scratchpad-include-last-response-persisted: the setting is stored on `ScratchpadSession.include_last_response` in IndexedDB (v5) and round-trips through reload and session switch. v4 → v5 is a lazy backfill: the zod schema defaults missing fields to `false` at load time; no eager row rewrite.
+
+## Robustness
+
+- req:saga-supervision: an unhandled exception in a saga worker is contained to that worker and reported via `console.error`; all watchers keep running. Watcher helpers (`takeEvery`, `takeLatest`, `debounce`) are imported from `src/store/supervisedEffects.ts`, enforced by `no-restricted-imports` in `.oxlintrc.json`.

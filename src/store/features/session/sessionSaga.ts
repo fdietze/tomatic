@@ -1,4 +1,6 @@
-import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
+import { all, call, put, select, take } from "redux-saga/effects";
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest } from "@/store/supervisedEffects";
 import { END, eventChannel, EventChannel } from "redux-saga";
 import { PayloadAction } from "@reduxjs/toolkit";
 import OpenAI from "openai";

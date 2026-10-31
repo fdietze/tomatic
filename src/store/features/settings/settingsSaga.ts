@@ -1,4 +1,6 @@
-import { call, put, takeLatest, select, debounce } from "redux-saga/effects";
+import { call, put, select } from "redux-saga/effects";
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest, debounce } from "@/store/supervisedEffects";
 import {
   loadSettings,
   loadSettingsSuccess,

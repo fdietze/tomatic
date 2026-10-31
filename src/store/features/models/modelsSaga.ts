@@ -1,4 +1,6 @@
-import { call, put, takeLatest } from "redux-saga/effects";
+import { call, put } from "redux-saga/effects";
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest } from "@/store/supervisedEffects";
 import { listAvailableModels } from "@/api/openrouter";
 import { DisplayModelInfo } from "@/types/storage";
 import {

@@ -10,11 +10,36 @@
         "typescript/no-unused-vars": "warn",
         "typescript/no-explicit-any": "error",
         "react-hooks/rules-of-hooks": "error",
-        "react-hooks/exhaustive-deps": "warn"
+        "react-hooks/exhaustive-deps": "warn",
+        "no-restricted-imports": [
+            "error",
+            {
+                "paths": [
+                    {
+                        "name": "redux-saga/effects",
+                        "importNames": [
+                            "takeEvery",
+                            "takeLatest",
+                            "takeLeading",
+                            "debounce",
+                            "throttle"
+                        ],
+                        "message": "req:saga-supervision: import watcher helpers from '@/store/supervisedEffects' so worker errors cannot kill the saga tree."
+                    }
+                ]
+            }
+        ]
     },
     "overrides": [
         {
-            "files": ["*.test.ts", "*.spec.ts", "*.test.tsx", "*.spec.tsx", "tests/**/*.ts", "tests/**/*.tsx"],
+            "files": [
+                "*.test.ts",
+                "*.spec.ts",
+                "*.test.tsx",
+                "*.spec.tsx",
+                "tests/**/*.ts",
+                "tests/**/*.tsx"
+            ],
             "plugins": [
                 "typescript",
                 "unicorn",
@@ -24,6 +49,15 @@
                 "react-hooks/rules-of-hooks": "off",
                 "react-hooks/exhaustive-deps": "off",
                 "jest/no-standalone-expect": "off"
+            }
+        },
+        {
+            "files": [
+                "src/store/supervisedEffects.ts",
+                "src/store/supervisedEffects.test.ts"
+            ],
+            "rules": {
+                "no-restricted-imports": "off"
             }
         }
     ]

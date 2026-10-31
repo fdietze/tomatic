@@ -1,4 +1,6 @@
-import { call, put, select, take, takeLatest } from 'redux-saga/effects';
+import { call, put, select, take } from 'redux-saga/effects';
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest } from '@/store/supervisedEffects';
 import { END, EventChannel, eventChannel, SagaIterator } from 'redux-saga';
 import type OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';

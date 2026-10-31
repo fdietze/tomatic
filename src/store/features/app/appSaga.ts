@@ -1,4 +1,6 @@
-import { call, put, takeLatest, select, take, all } from "redux-saga/effects";
+import { call, put, select, take, all } from "redux-saga/effects";
+// req:saga-supervision: watcher helpers that contain worker failures
+import { takeLatest } from "@/store/supervisedEffects";
 import { SagaIterator } from "redux-saga";
 import { initialize, initializationComplete, initializationFailed } from "./appSlice";
 import { getMostRecentSessionId } from "@/services/db/chat-sessions";
