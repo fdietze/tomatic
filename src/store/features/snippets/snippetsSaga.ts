@@ -39,20 +39,15 @@ import { requestMessageContent } from "@/api/openrouter";
 import { RegenerationResult } from "@/types/payloads";
 
 function* loadSnippetsSaga() {
-  console.log("[DEBUG] loadSnippetsSaga: starting to load snippets");
   try {
     const snippets: Snippet[] = yield call(db.loadAllSnippets);
-    console.log("[DEBUG] loadSnippetsSaga: loaded snippets from DB:", snippets.map(s => ({name: s.name, content: s.content})));
     yield put(loadSnippetsSuccess(snippets));
-    console.log("[DEBUG] loadSnippetsSaga: dispatched loadSnippetsSuccess");
   } catch (error) {
-    console.log("[DEBUG] loadSnippetsSaga: failed to load snippets:", error);
     yield put(loadSnippetsFailure(createAppError.persistence("loadSnippets", "Failed to load snippets.")));
   }
 }
 
 function* addSnippetSaga(action: PayloadAction<Snippet>) {
-  console.log("[DEBUG] addSnippetSaga: triggered", action.payload);
   try {
     const newSnippet = action.payload;
     yield call(db.saveSnippet, newSnippet);
@@ -60,18 +55,15 @@ function* addSnippetSaga(action: PayloadAction<Snippet>) {
     if (newSnippet.isGenerated) {
       yield put(regenerateSnippet(newSnippet));
     }
-    console.log("[DEBUG] addSnippetSaga: success", newSnippet);
   } catch (error) {
     const appError = toAppError(error);
     yield put(addSnippetFailure({ name: action.payload.name, error: appError }));
-    console.log("[DEBUG] addSnippetSaga: failure", error);
   }
 }
 
 function* updateSnippetSaga(
   action: PayloadAction<Snippet>,
 ) {
-  console.log("[DEBUG] updateSnippetSaga: triggered", action.payload);
   try {
     const updatedSnippet = action.payload;
     const oldSnippet: Snippet | undefined = yield select(
@@ -81,16 +73,11 @@ function* updateSnippetSaga(
     if (!oldSnippet) {
       throw new Error(`Snippet with id ${updatedSnippet.id} not found in state.`);
     }
-    
-    console.log("[DEBUG] updateSnippetSaga: calling db.saveSnippet");
     yield call(db.saveSnippet, updatedSnippet);
-    console.log("[DEBUG] updateSnippetSaga: db.saveSnippet completed, dispatching success");
     yield put(updateSnippetSuccess({ oldName: oldSnippet.name, snippet: updatedSnippet }));
-    console.log("[DEBUG] updateSnippetSaga: success dispatched", updatedSnippet);
   } catch (error) {
     const appError = toAppError(error);
     yield put(updateSnippetFailure({ id: action.payload.id, error: appError }));
-    console.log("[DEBUG] updateSnippetSaga: failure", error);
   }
 }
 
@@ -99,7 +86,6 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
     yield call(db.deleteSnippet, action.payload);
     yield put(deleteSnippetSuccess(action.payload));
   } catch (error) {
-    console.log("[DEBUG] deleteSnippetSaga: failure", error);
   }
 }
 
@@ -109,8 +95,6 @@ function* handleRegenerateSnippetSaga(
 ) {
   const snippetToRegenerate = action.payload;
   const snippetId = snippetToRegenerate.id;
-  console.log(`[DEBUG] handleRegenerateSnippetSaga: triggered for ${snippetToRegenerate.name}`);
-  
   // Dispatch event for test waiting
   window.dispatchEvent(
     new CustomEvent("app:snippet:regeneration:start", {
@@ -147,28 +131,21 @@ function* handleRegenerateSnippetSaga(
       );
       return;
     }
-    
     const allSnippets: Snippet[] = yield select(
       (state: RootState) => state.snippets.snippets,
     );
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet model for ${snippetToRegenerate.name}:`, snippetToRegenerate.model);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: snippet prompt for ${snippetToRegenerate.name}:`, snippetToRegenerate.prompt);
     const resolvedPrompt: string = yield call(
       resolveSnippetReferences,
       snippetToRegenerate.prompt,
       allSnippets,
     );
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt for ${snippetToRegenerate.name}:`, resolvedPrompt);
 
     // req:empty-prompt-handling: If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
-      console.log(`[DEBUG] handleRegenerateSnippetSaga: resolved prompt is empty for ${snippetToRegenerate.name}, skipping generation`);
       yield put(regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: "" }));
-      console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event for empty prompt`);
       window.dispatchEvent(
         new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
       );
-      console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event for empty prompt`);
       window.dispatchEvent(
         new CustomEvent("app:snippet:regeneration:complete", {
           detail: { id: snippetId, name: snippetToRegenerate.name },
@@ -179,8 +156,6 @@ function* handleRegenerateSnippetSaga(
 
     yield put({ type: "app/setBatchRegenerating", payload: true });
 
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: about to call API for ${snippetToRegenerate.name} with model:`, snippetToRegenerate.model);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: API request content:`, resolvedPrompt);
     const assistantResponse: string = yield call(() =>
       requestMessageContent(
         [{ id: crypto.randomUUID(), role: "user", content: resolvedPrompt, raw_content: resolvedPrompt }],
@@ -188,27 +163,20 @@ function* handleRegenerateSnippetSaga(
         settings.apiKey,
       ),
     );
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: got response for ${snippetToRegenerate.name}:`, assistantResponse);
 
     yield put(
       regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: assistantResponse }),
     );
   // req:snippet-wait-by-id: Dispatch events for individual snippet waiting by ID
-  console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete:${snippetId} event`);
   window.dispatchEvent(
     new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
   );
-  console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:complete event`);
   window.dispatchEvent(
     new CustomEvent("app:snippet:regeneration:complete", {
       detail: { id: snippetId, name: snippetToRegenerate.name },
     }),
   );
   } catch (error) {
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: caught error for ${snippetToRegenerate.name}:`, error);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: error type:`, typeof error);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: error has type property:`, error && typeof error === 'object' && 'type' in error);
-    
     // If it's already an AppError, use its message directly
     let errorMessage: string;
     if (error && typeof error === 'object' && 'type' in error) {
@@ -218,14 +186,9 @@ function* handleRegenerateSnippetSaga(
     } else {
       errorMessage = String(error);
     }
-    
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: converted error message:`, errorMessage);
     const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, errorMessage);
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching regenerateSnippetFailure with error:`, getErrorMessage(appError));
     yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: appError }));
-    
     // Dispatch failure event for batch orchestrator
-    console.log(`[DEBUG] handleRegenerateSnippetSaga: dispatching app:snippet:regeneration:failure:${snippetId} event`);
     window.dispatchEvent(
       new CustomEvent(`app:snippet:regeneration:failure:${snippetId}`)
     );
@@ -238,7 +201,6 @@ function* handleRegenerateSnippetSaga(
 function* markDependentsDirtySaga(
   action: PayloadAction<{ oldName: string; snippet: Snippet } | Snippet>,
 ) {
-  console.log("[DEBUG] markDependentsDirtySaga: triggered", action.payload);
   const allSnippets: Snippet[] = yield select(
     (state: RootState) => state.snippets.snippets,
   );
@@ -252,7 +214,6 @@ function* markDependentsDirtySaga(
     changedSnippetName,
     reverseGraph,
   );
-  console.log(`[DEBUG] markDependentsDirtySaga: found dependents for ${changedSnippetName}:`, Array.from(dependentNames));
 
   if (dependentNames.size === 0) {
     return;
@@ -272,28 +233,19 @@ if (dependentsToUpdate.length > 0) {
   // req:cycle-detection: Check for cycles before starting regeneration
   const { cyclic } = getTopologicalSortForExecution(allSnippets);
   if (cyclic.length > 0) {
-    console.log("[DEBUG] markDependentsDirtySaga: Cycle detected in snippet dependencies, count:", cyclic.length);
-    console.log("[DEBUG] markDependentsDirtySaga: Cyclic snippets:", cyclic);
-    console.log("[DEBUG] markDependentsDirtySaga: All snippets for context:", allSnippets.map(s => ({ name: s.name, content: s.content, prompt: s.prompt })));
     // Don't start regeneration if there's a cycle
     return;
   }
-  
   yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
 }
 }
 
 function* resumeDirtySnippetGenerationSaga() {
-  console.log("[DEBUG] resumeDirtySnippetGenerationSaga: triggered");
   const allSnippets: Snippet[] = yield select(
     (state: RootState) => state.snippets.snippets,
   );
   const dirtySnippets = allSnippets.filter((s) => s.isDirty);
   if (dirtySnippets.length > 0) {
-    console.log(
-      "[DEBUG] resumeDirtySnippetGenerationSaga: found dirty snippets",
-      dirtySnippets.map((s) => s.name),
-    );
     yield put(batchRegenerateRequest({ snippets: dirtySnippets }));
   }
 }
@@ -302,28 +254,17 @@ function* resumeDirtySnippetGenerationSaga() {
 function* persistSnippetAfterRegenerationSaga(
   action: PayloadAction<RegenerateSnippetSuccessPayload>,
 ) {
-  console.log("[DEBUG] persistSnippetAfterRegenerationSaga: triggered for snippet:", action.payload.name);
   try {
     // Get the updated snippet from Redux state
     const allSnippets: Snippet[] = yield select(
       (state: RootState) => state.snippets.snippets,
     );
     const updatedSnippet = allSnippets.find(s => s.id === action.payload.id);
-    
     if (updatedSnippet) {
-      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: saving snippet to IndexedDB:", {
-        id: updatedSnippet.id,
-        name: updatedSnippet.name,
-        content: updatedSnippet.content,
-        isDirty: updatedSnippet.isDirty
-      });
       yield call(db.saveSnippet, updatedSnippet);
-      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: successfully saved snippet to IndexedDB");
     } else {
-      console.log("[DEBUG] persistSnippetAfterRegenerationSaga: snippet not found in Redux state:", action.payload.id);
     }
   } catch (error) {
-    console.log("[DEBUG] persistSnippetAfterRegenerationSaga: failed to persist snippet:", error);
     // We don't want to fail the regeneration just because persistence failed
     // The content is still in Redux state and will work until page reload
   }
@@ -337,7 +278,6 @@ function* persistSnippetAfterRegenerationSaga(
 function* batchRegenerationOrchestratorSaga(
   action: PayloadAction<{ snippets: Snippet[] }>,
 ) {
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: triggered with dirty snippets", action.payload.snippets.map(s => s.name));
   const { snippets: dirtySnippets } = action.payload;
 
   // Get all snippets to build the resolver context
@@ -348,18 +288,15 @@ function* batchRegenerationOrchestratorSaga(
   // Check for cycles before starting
   const { cyclic } = getTopologicalSortForExecution(allSnippets);
   if (cyclic.length > 0) {
-    console.log("[DEBUG] batchRegenerationOrchestratorSaga: Cyclic dependency detected, stopping regeneration");
     return;
   }
 
   // Group dirty snippets into waves based on dependency levels
   const waves = groupSnippetsIntoWaves(dirtySnippets);
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: created", waves.length, "waves");
 
   // Initialize the resolver context with content from all non-dirty snippets
   const resolverContext = new Map<string, string>();
   const dirtySnippetNames = new Set(dirtySnippets.map(s => s.name));
-  
   for (const snippet of allSnippets) {
     if (!dirtySnippetNames.has(snippet.name)) {
       resolverContext.set(snippet.name, snippet.content);
@@ -370,14 +307,10 @@ function* batchRegenerationOrchestratorSaga(
   for (let waveIndex = 0; waveIndex < waves.length; waveIndex++) {
     const wave = waves[waveIndex];
     if (!wave) continue;
-    
-    console.log(`[DEBUG] batchRegenerationOrchestratorSaga: processing wave ${waveIndex}/${waves.length}:`, wave.map(s => s.name));
-    
     // Set status and dispatch start events for all snippets in this wave
     for (const snippet of wave) {
       // Set status to "in_progress" (for spinner display) without triggering the saga watcher
       yield put(setRegenerationStatus({ id: snippet.id, status: "in_progress" }));
-      
       // Dispatch start events for E2E test compatibility
       window.dispatchEvent(
         new CustomEvent("app:snippet:regeneration:start", {
@@ -390,7 +323,6 @@ function* batchRegenerationOrchestratorSaga(
         }),
       );
     }
-    
     // Regenerate all snippets in this wave in parallel
     const waveResults: Array<RegenerationResult | { error: string; snippet: Snippet }> = yield all(
       wave.map((snippet) =>
@@ -414,19 +346,16 @@ function* batchRegenerationOrchestratorSaga(
     for (let i = 0; i < waveResults.length; i++) {
       const result = waveResults[i];
       const snippet = wave[i];
-      
       if (!snippet || !result) continue;
 
       if ('error' in result) {
         // Handle error
-        console.log(`[DEBUG] batchRegenerationOrchestratorSaga: snippet ${snippet.name} failed:`, result.error);
         const appError = createAppError.snippetRegeneration(snippet.name, result.error);
         yield put(regenerateSnippetFailure({
           id: snippet.id,
           name: snippet.name,
           error: appError
         }));
-        
         // Dispatch failure event for E2E test compatibility
         window.dispatchEvent(
           new CustomEvent(`app:snippet:regeneration:failure:${snippet.id}`)
@@ -435,7 +364,6 @@ function* batchRegenerationOrchestratorSaga(
         // Success - update context and dispatch success
         resolverContext.set(snippet.name, result.content);
         yield put(regenerateSnippetSuccess(result));
-        
         // Dispatch completion events for E2E test compatibility
         window.dispatchEvent(
           new CustomEvent(`app:snippet:regeneration:complete:${snippet.id}`)
@@ -449,7 +377,6 @@ function* batchRegenerationOrchestratorSaga(
     }
   }
 
-  console.log("[DEBUG] batchRegenerationOrchestratorSaga: all waves completed");
   window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
 }
 
@@ -466,8 +393,6 @@ export function* regenerateSnippetWorkerWithContext(
   snippet: Snippet,
   resolverContext: ReadonlyMap<string, string>
 ): Generator<unknown, RegenerationResult, unknown> {
-  console.log(`[DEBUG] regenerateSnippetWorkerWithContext: starting regeneration for ${snippet.name}`);
-  
   try {
     // Get settings for API call
     const settings = (yield select(
@@ -493,16 +418,13 @@ export function* regenerateSnippetWorkerWithContext(
       return content;
     });
 
-    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: resolved prompt for ${snippet.name}:`, resolvedPrompt);
 
     // Handle empty prompt
     if (resolvedPrompt.trim() === "") {
-      console.log(`[DEBUG] regenerateSnippetWorkerWithContext: resolved prompt is empty for ${snippet.name}`);
       return { id: snippet.id, name: snippet.name, content: "" };
     }
 
     // Call the API
-    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: calling API for ${snippet.name}`);
     const assistantResponse = (yield call(() =>
       requestMessageContent(
         [{
@@ -515,8 +437,6 @@ export function* regenerateSnippetWorkerWithContext(
         settings.apiKey,
       ),
     )) as string;
-    
-    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: got response for ${snippet.name}:`, assistantResponse);
 
     return {
       id: snippet.id,
@@ -524,8 +444,6 @@ export function* regenerateSnippetWorkerWithContext(
       content: assistantResponse
     };
   } catch (error) {
-    console.log(`[DEBUG] regenerateSnippetWorkerWithContext: error for ${snippet.name}:`, error);
-    
     let errorMessage: string;
     if (error && typeof error === 'object' && 'type' in error) {
       errorMessage = getErrorMessage(error as AppError);
@@ -534,7 +452,6 @@ export function* regenerateSnippetWorkerWithContext(
     } else {
       errorMessage = String(error);
     }
-    
     throw new Error(errorMessage);
   }
 }
@@ -554,19 +471,15 @@ function* updateAndRegenerateSaga(
   action: PayloadAction<UpdateAndRegenerateSnippetPayload>
 ) {
   const { snippet: updatedSnippet } = action.payload;
-  
   try {
     // Step 1: Get the old snippet for comparison
     const oldSnippet: Snippet | undefined = yield select(
       (state: RootState) => state.snippets.snippets.find(s => s.id === updatedSnippet.id)
     );
-    
     if (!oldSnippet) {
       throw new Error(`Snippet with id ${updatedSnippet.id} not found in state.`);
     }
-    
     const promptChanged = oldSnippet.prompt !== updatedSnippet.prompt;
-    
     // Step 2: Find dependents EARLY and mark them as dirty
     // This ensures they show loading indicators immediately
     const allSnippets: Snippet[] = yield select(
@@ -575,7 +488,6 @@ function* updateAndRegenerateSaga(
     const reverseGraph = buildReverseDependencyGraph(allSnippets);
     const changedSnippetName = oldSnippet.name;
     const dependentNames = findTransitiveDependents(changedSnippetName, reverseGraph);
-    
     const dependentsToUpdate: Snippet[] = [];
     for (const name of dependentNames) {
       const dependentSnippet = allSnippets.find((s) => s.name === name);
@@ -586,34 +498,28 @@ function* updateAndRegenerateSaga(
         yield call([db, db.updateSnippetProperty], name, { isDirty: true });
       }
     }
-    
     // Step 3: Save to DB and update Redux state
     // CRITICAL: Use internal action to update state WITHOUT triggering markDependentsDirtySaga
     // The orchestrator handles dependents itself
     yield call(db.saveSnippet, updatedSnippet);
     yield put(updateSnippetSuccessInternal({ oldName: oldSnippet.name, snippet: updatedSnippet }));
-    
     // Step 4: If it's a generated snippet with a changed prompt, regenerate it NOW
     if (updatedSnippet.isGenerated && promptChanged) {
       // CRITICAL: Use 'call' to WAIT for the regeneration to complete
       // This ensures the snippet's content is fresh before dependents regenerate
       yield call(handleRegenerateSnippetSaga, { payload: updatedSnippet, type: regenerateSnippet.type });
     }
-    
     // Step 5: Trigger batch regeneration for dependents (now with fresh data)
     if (dependentsToUpdate.length > 0) {
       // Check for cycles
       const { cyclic } = getTopologicalSortForExecution(allSnippets);
       if (cyclic.length > 0) {
-        console.log("[DEBUG] updateAndRegenerateSaga: Cycle detected, stopping");
         return;
       }
-      
       yield put(batchRegenerateRequest({ snippets: dependentsToUpdate }));
     }
   } catch (error) {
     const appError = toAppError(error);
-    console.log("[DEBUG] updateAndRegenerateSaga: error", error);
     yield put(updateSnippetFailure({ id: updatedSnippet.id, error: appError }));
   }
 }
@@ -655,7 +561,6 @@ function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
 
     yield put(loadSnippets());
   } catch (error) {
-    console.log("[DEBUG] importSnippetsSaga: failure", error);
     yield put(loadSnippetsFailure(createAppError.persistence("importSnippets", "Failed to import snippets.")));
   }
 }

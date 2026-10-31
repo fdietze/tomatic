@@ -115,7 +115,6 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     if (error && typeof error === 'object' && 'type' in error) {
       throw error;
     }
-    
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw createAppError.api(`listAvailableModels error: ${errorMessage}`);
   }
@@ -131,9 +130,6 @@ export async function requestMessageContentStream(
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
 
-  console.log('[DEBUG] requestMessageContentStream: API request body:', JSON.stringify(body, null, 2));
-  console.log('[DEBUG] requestMessageContentStream: input messages count:', messages.length);
-  console.log('[DEBUG] requestMessageContentStream: input messages details:', messages.map(m => ({ role: m.role, content: m.content.substring(0, 50) + (m.content.length > 50 ? '...' : '') })));
   const openai = getOpenAIClient(apiKey);
 
   try {

@@ -64,10 +64,6 @@ export const snippetsSlice = createSlice({
     ) => {
       // In the future, we might want to show this error in the UI.
       // For now, we'll just log it.
-      console.log(
-        `[DEBUG] Failed to add snippet '${action.payload.name}':`,
-        action.payload.error
-      );
     },
     updateSnippet: (_state, _action: PayloadAction<Snippet>) => {
       // saga will handle the logic

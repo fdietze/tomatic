@@ -86,13 +86,11 @@ function openTomaticDB(): Promise<{
           });
         }
       }
-      
       // req:database-migrations: V3 introduces snippets
       if (oldVersion < 3) {
         // V3 introduces snippets. If the store exists from a pre-release version keyed by name,
         // we need to rebuild it to be keyed by a new `id` field.
         const storeExists = db.objectStoreNames.contains(SNIPPETS_STORE_NAME);
-        
         const migrationLogic = async () => {
           if (storeExists) {
             const oldSnippets = await tx.objectStore(SNIPPETS_STORE_NAME).getAll();
@@ -101,7 +99,6 @@ function openTomaticDB(): Promise<{
               keyPath: "id",
             });
             newStore.createIndex(SNIPPET_NAME_INDEX, "name", { unique: true });
-            
             // Use centralized migration logic
             const migratedSnippets = migrateV2SnippetsToV3(oldSnippets);
             migratedSnippets.forEach((snippet) => {
@@ -158,7 +155,6 @@ export async function closeDbForTesting(): Promise<void> {
 // --- Snippet Functions ---
 
 export async function saveSnippet(snippet: Snippet): Promise<void> {
-  console.log("[DEBUG] saveSnippet: starting save for snippet:", {id: snippet.id, name: snippet.name, content: snippet.content});
   const db = await dbPromise;
   const now = Date.now();
   const snippetToSave: Snippet = {
@@ -167,14 +163,10 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
     createdAt_ms: snippet.createdAt_ms || now,
     updatedAt_ms: now,
   };
-  console.log("[DEBUG] saveSnippet: prepared snippet for save:", {id: snippetToSave.id, name: snippetToSave.name, content: snippetToSave.content});
   try {
     const tx = db.transaction(SNIPPETS_STORE_NAME, "readwrite");
-    console.log("[DEBUG] saveSnippet: transaction created, putting snippet");
     await tx.store.put(snippetToSave);
-    console.log("[DEBUG] saveSnippet: put completed, waiting for transaction");
     await tx.done;
-    console.log("[DEBUG] saveSnippet: transaction completed successfully");
   } catch (e) {
     console.error("[DB|saveSnippet] Failed to save snippet:", e);
     throw new Error("Failed to save snippet.");
@@ -182,11 +174,9 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
 }
 
 export async function loadAllSnippets(): Promise<Snippet[]> {
-  console.log("[DEBUG] loadAllSnippets: starting load from database");
   const db = await dbPromise;
   try {
     const snippets = await db.getAll(SNIPPETS_STORE_NAME);
-    console.log("[DEBUG] loadAllSnippets: loaded raw snippets from DB:", snippets.map(s => ({id: s.id, name: s.name, content: s.content})));
     // Validate each snippet
     const validation = z.array(snippetSchema).safeParse(snippets);
     if (validation.success) {
@@ -273,14 +263,11 @@ export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
 export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
   const db = await dbPromise;
   try {
-    console.log('[DEBUG] loadAllSystemPrompts: starting load from database');
     const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
-    console.log('[DEBUG] loadAllSystemPrompts: found', prompts.length, 'prompts in database');
     const validation = z.array(systemPromptSchema).safeParse(prompts);
     if (validation.success) {
       return validation.data;
     } else {
-      console.log('[DEBUG] loadAllSystemPrompts: validation failed:', validation.error);
       console.error(
         "[DB] Load: Zod validation failed for system prompts:",
         validation.error,
@@ -288,7 +275,6 @@ export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
       return [];
     }
   } catch (error) {
-    console.log('[DEBUG] loadAllSystemPrompts: exception occurred:', error);
     console.error("[DB] Load: Failed to load system prompts:", error);
     throw new Error("Failed to load system prompts.");
   }

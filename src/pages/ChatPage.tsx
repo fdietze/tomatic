@@ -37,7 +37,6 @@ const ChatPage: React.FC = () => {
     hasSessions,
     selectedPromptName: sessionSelectedPromptName,
   } = useSelector(selectSession);
-  
   // Use session-specific prompt if available, otherwise fall back to global setting
   const selectedPromptName = sessionSelectedPromptName ?? globalSelectedPromptName;
 
@@ -77,8 +76,6 @@ const ChatPage: React.FC = () => {
 
   const systemPromptEntities = useMemo(() => {
     const entities = Object.values(systemPromptsMap);
-    console.log(`[DEBUG] ChatPage.systemPromptEntities: computed ${entities.length} entities`);
-    console.log(`[DEBUG] ChatPage.systemPromptEntities: entity names:`, entities.map(e => e.data.name));
     return entities;
   }, [systemPromptsMap]);
 
@@ -98,25 +95,17 @@ const ChatPage: React.FC = () => {
           systemPrompts={systemPromptEntities}
           selectedPromptName={selectedPromptName}
           onSelectPrompt={(name) => {
-            console.log(`[DEBUG] ChatPage.onSelectPrompt: called with name: "${name}"`);
-            console.log(`[DEBUG] ChatPage.onSelectPrompt: current selectedPromptName: "${selectedPromptName}"`);
-            console.log(`[DEBUG] ChatPage.onSelectPrompt: systemPromptEntities count: ${systemPromptEntities.length}`);
-            
             // Update both session-specific and global settings
             dispatch(setSessionSelectedPromptName(name));
             dispatch(setSelectedPromptName(name));
-            
             // req:system-prompt-interactive-update: Handle prompt selection/deselection
             if (name === null) {
-              console.log(`[DEBUG] ChatPage.onSelectPrompt: deselecting prompt - removing system message`);
               dispatch(removeSystemPrompt());
             } else {
               const selectedPromptEntity = systemPromptEntities.find(
                 (entity) => entity.data.name === name,
               );
-              console.log(`[DEBUG] ChatPage.onSelectPrompt: found selectedPromptEntity: ${!!selectedPromptEntity}`);
               if (selectedPromptEntity) {
-                console.log(`[DEBUG] ChatPage.onSelectPrompt: dispatching setSystemPromptRequested for: ${selectedPromptEntity.data.name}`);
                 dispatch(setSystemPromptRequested(selectedPromptEntity.data));
               }
             }
