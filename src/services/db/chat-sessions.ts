@@ -1,6 +1,6 @@
 import { dbPromise, SESSIONS_STORE_NAME, UPDATED_AT_INDEX } from '../persistence';
 import { chatSessionSchema } from './schemas';
-import type { ChatSession } from '@/types/chat';
+import type { ChatSession, Message } from '@/types/chat';
 import { describeError } from '@/types/errors';
 
 export async function saveSession(session: ChatSession): Promise<void> {
@@ -8,6 +8,25 @@ export async function saveSession(session: ChatSession): Promise<void> {
   try {
     const tx = db.transaction(SESSIONS_STORE_NAME, 'readwrite');
     await tx.store.put(session);
+    await tx.done;
+  } catch (error) {
+    throw new Error(`Failed to save session: ${describeError(error)}`);
+  }
+}
+
+/**
+ * Replaces the messages of a stored session and bumps updated_at_ms, keeping its other fields
+ * (created_at_ms, name). Read and write share one transaction, so concurrent writers cannot interleave.
+ */
+export async function updateSessionMessages(sessionId: string, messages: Message[], updated_at_ms: number): Promise<void> {
+  const db = await dbPromise;
+  try {
+    const tx = db.transaction(SESSIONS_STORE_NAME, 'readwrite');
+    const stored = await tx.store.get(sessionId);
+    if (!stored) {
+      throw new Error(`session '${sessionId}' does not exist`);
+    }
+    await tx.store.put({ ...stored, messages, updated_at_ms });
     await tx.done;
   } catch (error) {
     throw new Error(`Failed to save session: ${describeError(error)}`);

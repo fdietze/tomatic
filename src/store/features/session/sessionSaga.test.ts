@@ -5,7 +5,7 @@ import createSagaMiddleware from "redux-saga";
 import rootReducer from "@/store/rootReducer";
 import rootSaga from "@/store/rootSaga";
 import { streamChat } from "@/services/chatService";
-import { submitUserMessage } from "./sessionSlice";
+import { sendMessageRequested, editMessageRequested, cancelSubmission } from "./sessionSlice";
 import { type RootState } from "@/store/store";
 import type { Message } from "@/types/chat";
 import { expectSaga } from "redux-saga-test-plan";
@@ -19,6 +19,8 @@ import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/
 import * as db from "@/services/db/chat-sessions";
 import type { ChatSession } from "@/types/chat";
 import type { Snippet } from "@/types/storage";
+import { regenerateSnippetSuccess, regenerateSnippetFailure } from "@/store/features/snippets/snippetsSlice";
+import { createAppError, getErrorMessage } from "@/types/errors";
 
 // Mock the chat service to avoid real API calls
 vi.mock("@/services/chatService", () => ({
@@ -31,8 +33,9 @@ vi.mock("@/services/NavigationProvider", () => ({
 
 // Note: We don't mock the entire db module to avoid breaking existing tests
 
-// Mock crypto.randomUUID to have predictable IDs for test consistency
-const mockUUID = vi.fn(() => "test-id-123");
+// Mock crypto.randomUUID to have predictable, distinct IDs for test consistency
+let uuidCounter = 0;
+const mockUUID = vi.fn(() => `test-id-${++uuidCounter}`);
 vi.stubGlobal('crypto', {
   ...crypto,
   randomUUID: mockUUID,
@@ -112,7 +115,7 @@ describe("sessionSaga", () => {
     // 2. Dispatch Action
     const responsePromise = waitForSagaCompletion(store);
     store.dispatch(
-      submitUserMessage({ prompt: userMessageContent, isRegeneration: false }),
+      sendMessageRequested({ prompt: userMessageContent }),
     );
 
     // 3. Wait for saga to complete
@@ -139,6 +142,7 @@ describe("sessionSaga", () => {
       ],
       modelName: "test-model",
       apiKey: "test-api-key",
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -164,7 +168,7 @@ describe("sessionSaga", () => {
 
     const responsePromise = waitForSagaCompletion(store);
     store.dispatch(
-      submitUserMessage({ prompt: userMessageContent, isRegeneration: false }),
+      sendMessageRequested({ prompt: userMessageContent }),
     );
     await responsePromise;
 
@@ -212,6 +216,7 @@ describe("sessionSaga", () => {
       },
     });
 
+    await db.saveSession({ session_id: "edit-session", messages: initialMessages, name: null, created_at_ms: 1, updated_at_ms: 1 });
     const editedMessageContent = "Edited Initial Message";
     const newAssistantResponse = "Response to edited message.";
 
@@ -222,11 +227,7 @@ describe("sessionSaga", () => {
 
     const responsePromise = waitForSagaCompletion(store);
     store.dispatch(
-      submitUserMessage({
-        prompt: editedMessageContent,
-        isRegeneration: false,
-        editMessageIndex: 0, // Edit the first message
-      }),
+      editMessageRequested({ index: 0, newPrompt: editedMessageContent }),
     );
     await responsePromise;
 
@@ -248,6 +249,7 @@ describe("sessionSaga", () => {
       ],
       modelName: "test-model",
       apiKey: "test-api-key",
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -397,7 +399,7 @@ describe("sessionSaga", () => {
       const prompt = "mail x@a.com, @gen, @missing, ${HOME} `ls` $&";
 
       const done = waitForSagaCompletion(store);
-      store.dispatch(submitUserMessage({ prompt, isRegeneration: false }));
+      store.dispatch(sendMessageRequested({ prompt }));
       await done;
 
       const state = store.getState() as RootState;
@@ -417,7 +419,7 @@ describe("sessionSaga", () => {
       (streamChat as Mock).mockResolvedValue(emptyStream());
 
       const done = waitForSagaCompletion(store);
-      store.dispatch(submitUserMessage({ prompt: "say @a", isRegeneration: false }));
+      store.dispatch(sendMessageRequested({ prompt: "say @a" }));
       await done;
 
       const state = store.getState() as RootState;
@@ -425,6 +427,216 @@ describe("sessionSaga", () => {
       expect(streamChat).toHaveBeenCalledWith(expect.objectContaining({
         messagesToSubmit: [expect.objectContaining({ role: "user", content: "say A" })],
       }));
+    });
+  });
+
+  describe("Feature: chat turns are robust (req:submit-turn-atomic, req:stream-bound-to-message, req:turn-cancellation)", () => {
+    const settings: RootState["settings"] = {
+      apiKey: "test-api-key",
+      modelName: "test-model",
+      autoScrollEnabled: true,
+      chatSnippetResolutionEnabled: true,
+      selectedPromptName: null,
+      initialChatPrompt: null,
+      loading: "idle",
+      saving: "idle",
+    };
+    const sessionState = (sessionId: string, messages: Message[]): RootState["session"] => ({
+      messages,
+      currentSessionId: sessionId,
+      prevSessionId: null,
+      nextSessionId: null,
+      loading: "idle",
+      submitting: false,
+      error: null,
+      hasSessions: true,
+      selectedPromptName: null,
+    });
+    const storedSession = (session_id: string, messages: Message[]): ChatSession => ({
+      session_id, messages, name: "kept name", created_at_ms: 7, updated_at_ms: 7,
+    });
+
+    // A stream whose chunks are released manually, so tests can act in the middle of a reply.
+    function manualStream() {
+      const pending: string[] = [];
+      let wake: (() => void) | null = null;
+      async function* chunks() {
+        while (true) {
+          while (pending.length > 0) {
+            yield { choices: [{ delta: { content: pending.shift() } }] };
+          }
+          await new Promise<void>((resolve) => { wake = resolve; });
+        }
+      }
+      return {
+        stream: chunks(),
+        push: (chunk: string) => { pending.push(chunk); wake?.(); },
+      };
+    }
+
+    const waitUntil = (store: ReturnType<typeof createTestStore>, predicate: (state: RootState) => boolean) =>
+      new Promise<void>((resolve) => {
+        if (predicate(store.getState() as RootState)) return resolve();
+        const unsubscribe = store.subscribe(() => {
+          if (predicate(store.getState() as RootState)) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+
+    test("switching sessions mid-stream aborts the request and never writes into the other session", async () => {
+      // Purpose: regression for chunks being appended to "the last message" of whatever session is loaded,
+      // and the finished turn being saved under the newly loaded session's id.
+      const otherMessages: Message[] = [{ id: "o1", role: "user", content: "other", raw_content: "other" }];
+      await db.saveSession(storedSession("turn-session", []));
+      await db.saveSession(storedSession("other-session", otherMessages));
+      const store = createTestStore({ settings, session: sessionState("turn-session", []) });
+      const { stream, push } = manualStream();
+      (streamChat as Mock).mockResolvedValue(stream);
+
+      store.dispatch(sendMessageRequested({ prompt: "hi" }));
+      push("partial");
+      await waitUntil(store, (state) => state.session.messages[1]?.content === "partial");
+      const ended = waitForSagaCompletion(store);
+      store.dispatch(loadSession("other-session"));
+      await ended;
+      await waitUntil(store, (state) => state.session.currentSessionId === "other-session");
+      push(" late chunk");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const roleAndContent = (messages: Message[] | undefined) => messages?.map((m) => [m.role, m.content]);
+      expect(roleAndContent((store.getState() as RootState).session.messages)).toEqual([["user", "other"]]);
+      expect((streamChat as Mock).mock.calls[0]?.[0].signal.aborted).toBe(true);
+      const stored = await db.loadSession("turn-session");
+      expect(stored?.messages.map((m) => [m.role, m.content])).toEqual([["user", "hi"], ["assistant", "partial"]]);
+      expect(stored?.name).toBe("kept name");
+      expect(stored?.created_at_ms).toBe(7);
+      expect(roleAndContent((await db.loadSession("other-session"))?.messages)).toEqual([["user", "other"]]);
+    });
+
+    test("cancelling mid-stream aborts the request and keeps the partial reply", async () => {
+      // Purpose: regression for the cancel button only flipping `submitting` while the stream kept writing.
+      await db.saveSession(storedSession("cancel-session", []));
+      const store = createTestStore({ settings, session: sessionState("cancel-session", []) });
+      const { stream, push } = manualStream();
+      (streamChat as Mock).mockResolvedValue(stream);
+
+      store.dispatch(sendMessageRequested({ prompt: "hi" }));
+      push("partial");
+      await waitUntil(store, (state) => state.session.messages[1]?.content === "partial");
+      const ended = waitForSagaCompletion(store);
+      store.dispatch(cancelSubmission());
+      await ended;
+      push(" late chunk");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const state = store.getState() as RootState;
+      expect(state.session.messages.map((m) => [m.role, m.content])).toEqual([["user", "hi"], ["assistant", "partial"]]);
+      expect(state.session.error).toBeNull();
+      expect((streamChat as Mock).mock.calls[0]?.[0].signal.aborted).toBe(true);
+      expect((await db.loadSession("cancel-session"))?.messages).toHaveLength(2);
+    });
+
+    test("a failing edit leaves the whole history untouched", async () => {
+      // Purpose: regression for the edit reducer truncating history before resolution, with a rollback
+      // that only removed the new message, so a failed edit lost every message after the edited one.
+      const history: Message[] = [
+        { id: "1", role: "user", content: "first", raw_content: "first" },
+        { id: "2", role: "assistant", content: "answer", raw_content: "answer" },
+        { id: "3", role: "user", content: "second", raw_content: "second" },
+        { id: "4", role: "assistant", content: "answer 2", raw_content: "answer 2" },
+      ];
+      const store = createTestStore({ settings, session: sessionState("edit-fail-session", history) });
+
+      const done = waitForSagaCompletion(store);
+      store.dispatch(editMessageRequested({ index: 0, newPrompt: "use @missing" }));
+      await done;
+
+      const state = store.getState() as RootState;
+      expect(state.session.messages).toEqual(history);
+      expect(state.session.error).toEqual({ type: "UNKNOWN_ERROR", message: "Snippet '@missing' not found." });
+      expect(streamChat).not.toHaveBeenCalled();
+    });
+
+    test("a dirty snippet in a dependency cycle fails the submit instead of hanging", async () => {
+      // Purpose: regression for submit waiting on a window event that the regeneration batch never fired
+      // when it found a cycle, which left `submitting` true forever.
+      const generated = (name: string, prompt: string): Snippet => ({
+        id: `${name}-id`, name, content: "", isGenerated: true, prompt, model: "m",
+        createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: true,
+      });
+      const store = createTestStore({
+        settings,
+        snippets: { snippets: [generated("a", "@b"), generated("b", "@a")], loading: "idle", error: null, regenerationStatus: {} },
+      });
+
+      const done = waitForSagaCompletion(store);
+      store.dispatch(sendMessageRequested({ prompt: "use @a" }));
+      await done;
+
+      const state = store.getState() as RootState;
+      expect(state.session.error?.type).toBe("UNKNOWN_ERROR");
+      expect(state.session.error && "message" in state.session.error && state.session.error.message).toMatch(/cycle/);
+      expect(state.session.messages).toEqual([]);
+      expect(streamChat).not.toHaveBeenCalled();
+    });
+
+    describe("Scenario: a referenced snippet is already regenerating in the background", () => {
+      const regeneratingB: Snippet = {
+        id: "b-id", name: "B", content: "stale", isGenerated: true, prompt: "p", model: "m",
+        createdAt_ms: 0, updatedAt_ms: 0, generationError: null, isDirty: true,
+      };
+      const snippetsState: RootState["snippets"] = {
+        snippets: [regeneratingB], loading: "idle", error: null,
+        regenerationStatus: { "b-id": { status: "in_progress" } },
+      };
+
+      test("the turn waits for that generation and sends its result", async () => {
+        // Purpose: regression for the turn starting a second, duplicate generation of a snippet that was
+        // already in flight, instead of waiting for the running one.
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected network call"));
+        const store = createTestStore({ settings, snippets: snippetsState });
+        (streamChat as Mock).mockResolvedValue((async function* () {
+          yield { choices: [{ delta: { content: "ok" } }] };
+        })());
+
+        const done = waitForSagaCompletion(store);
+        store.dispatch(sendMessageRequested({ prompt: "use @B" }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(streamChat).not.toHaveBeenCalled();
+        store.dispatch(regenerateSnippetSuccess({ id: "b-id", name: "B", content: "fresh" }));
+        await done;
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+        const sent = (streamChat as Mock).mock.calls[0]?.[0].messagesToSubmit as Message[];
+        expect(sent.map((m) => m.content)).toEqual(["use fresh"]);
+        expect((store.getState() as RootState).session.error).toBeNull();
+        fetchSpy.mockRestore();
+      });
+
+      test("the turn fails with that generation's error", async () => {
+        // Purpose: a message must not be sent with stale content when the awaited background generation fails.
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected network call"));
+        const store = createTestStore({ settings, snippets: snippetsState });
+
+        const done = waitForSagaCompletion(store);
+        store.dispatch(sendMessageRequested({ prompt: "use @B" }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        store.dispatch(regenerateSnippetFailure({
+          id: "b-id", name: "B", error: createAppError.snippetRegeneration("B", "boom"),
+        }));
+        await done;
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+        const state = store.getState() as RootState;
+        expect(state.session.error && getErrorMessage(state.session.error)).toBe(
+          getErrorMessage(createAppError.snippetRegeneration("B", "boom")),
+        );
+        expect(state.session.messages).toEqual([]);
+        expect(streamChat).not.toHaveBeenCalled();
+        fetchSpy.mockRestore();
+      });
     });
   });
 });

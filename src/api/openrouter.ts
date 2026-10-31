@@ -120,6 +120,7 @@ export async function requestMessageContentStream(
   messages: Message[],
   model: string,
   apiKey: string,
+  signal: AbortSignal,
 ): Promise<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
   const body = {
     model: model,
@@ -134,7 +135,7 @@ export async function requestMessageContentStream(
       model: body.model,
       messages: body.messages,
       stream: true,
-    });
+    }, { signal });
   } catch (e) {
     if (e instanceof APIError) {
       throw createAppError.api(e.message, e.status, "chat.completions.create");

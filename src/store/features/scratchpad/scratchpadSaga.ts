@@ -1,9 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects';
 // req:saga-supervision: watcher helpers that contain worker failures
 import { takeLatest } from '@/store/supervisedEffects';
-import { END, EventChannel, eventChannel, SagaIterator } from 'redux-saga';
-import type OpenAI from 'openai';
-import type { Stream } from 'openai/streaming';
+import { EventChannel, SagaIterator } from 'redux-saga';
 import {
   loadSession,
   loadSessionSuccess,
@@ -35,7 +33,7 @@ import { createAppError } from '@/types/errors';
 import { getNavigationService } from '@/services/NavigationProvider';
 import { ROUTES } from '@/utils/routes';
 import { resolveSnippetReferencesFromState } from '@/store/features/snippets/snippetsSaga';
-import { streamChat, type StreamChatInput } from '@/services/chatService';
+import { ChatStreamEvent, createChatStreamChannel } from '@/services/chatStreamChannel';
 import { selectSettings } from '@/store/features/settings/settingsSlice';
 import { selectPrompts } from '@/store/features/prompts/promptsSlice';
 import type { ScratchpadSession } from '@/types/scratchpad';
@@ -154,37 +152,6 @@ export function buildMessagesToSubmit(
       raw_content: joined,
     },
   ];
-}
-
-type ChatStreamEvent =
-  | { chunk: string }
-  | { done: true }
-  | { error: Error };
-
-// Bridge an async iterable stream into a redux-saga EventChannel.
-// This follows the same pattern used in sessionSaga to handle streaming inside generators.
-function createChatStreamChannel(
-  input: StreamChatInput,
-): EventChannel<ChatStreamEvent> {
-  return eventChannel((emitter) => {
-    const processStream = async () => {
-      try {
-        const stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk> =
-          await streamChat(input);
-        for await (const ch of stream) {
-          const content = ch.choices[0]?.delta?.content ?? '';
-          if (content) emitter({ chunk: content });
-        }
-        emitter({ done: true });
-      } catch (error) {
-        emitter({ error: error instanceof Error ? error : new Error(String(error)) });
-      } finally {
-        emitter(END);
-      }
-    };
-    void processStream();
-    return () => { /* no cleanup needed for this stream */ };
-  });
 }
 
 // Resolves the selected system prompt text through snippet references.

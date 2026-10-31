@@ -7,7 +7,7 @@
 
 - req:chat-stream-true: the chat requests have stream=true, while the snippets use stream=false.
 - req:snippet-wait-individual: it must be possible to wait on individual snippet generations, as well as for the whole generation process to finish
-- req:snippet-wait-before-submit: when a snippet is referenced in a chat message and submittet, we must first wait for referenced snippets to finish generating
+- req:snippet-wait-before-submit: when a snippet is referenced in a chat message and submittet, we must first wait for referenced snippets to finish generating. A generation that is already running is awaited, never started a second time; if it fails, the message is not sent
 - req:snippet-dirty-indexeddb: snippets are marked as isDirty in indexeddb, so that generations resume on browser reload
 - req:snippet-id-vs-name: snippets are identified by id (primary key), but referenced by their unique name.
 - req:snippet-wait-by-id: when waiting for individual snippets to finish, we'll identify them by id
@@ -84,3 +84,6 @@
 
 - req:saga-supervision: an unhandled exception in a saga worker is contained to that worker and reported via `console.error`; all watchers keep running. Watcher helpers (`takeEvery`, `takeLatest`, `debounce`) are imported from `src/store/supervisedEffects.ts`, enforced by `no-restricted-imports` in `.oxlintrc.json`.
 - req:snippet-storage-errors-visible: storage failures of snippets and system prompts (load, add, delete, saving regenerated content) are shown in their section of the settings page with the underlying cause; invalid IndexedDB records fail the load instead of being hidden as an empty list or a missing session. Handled errors are logged with `console.log`, never `console.error`.
+- req:submit-turn-atomic: a chat turn (send, edit, regenerate) first computes its conversation (waiting for referenced dirty snippets, resolving references), then commits it to the session in one step. A failure before the commit leaves the session untouched; the error is shown and the typed input is restored.
+- req:stream-bound-to-message: streamed chunks are addressed to the reply's message id, and the turn stores its conversation under the session id it started in. Switching sessions while a reply streams aborts the request; the partial reply is stored in its own session and never appears in another one.
+- req:turn-cancellation: cancelling a streaming reply aborts the HTTP request and keeps the text received so far.

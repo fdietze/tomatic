@@ -66,14 +66,8 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         manualTrigger: true,
       });
       
-      // 3. User-triggered B regeneration (when user sends message while B is still dirty)
-      chatMocker.mock({
-        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
-        response: { role: "assistant", content: "Content from A_v1_regenerated" },
-        manualTrigger: true,
-      });
-      
-      // 4. Final chat message (auto-resolved)
+      // 3. Final chat message (auto-resolved). The send awaits the running background generation of B
+      // instead of requesting B a second time.
       chatMocker.mock({
         request: {
           model: "google/gemini-2.5-pro",
@@ -172,7 +166,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         /Internal Server Error/,
       );
       
-      // Mock for the first regeneration (on page load)
+      // The only generation of B: the background one on page load, which the send awaits
       chatMocker.mock({
         request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
         response: {
@@ -183,16 +177,6 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
         manualTrigger: true,
       });
       
-      // Mock for the second regeneration (when sending message)
-      chatMocker.mock({
-        request: { model: "mock-model/mock-model", messages: [{ role: "user", content: "Prompt for B using v1" }], stream: false },
-        response: {
-          role: "assistant",
-          content: "",
-          error: { status: 500, message: "Internal Server Error" },
-        },
-        manualTrigger: true,
-      });
 
       await chatPage.goto();
       await waitForEvent(page, "app_initialized");
@@ -203,7 +187,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
       await expect(chatPage.errorMessage).toBeVisible();
       await expect(
         chatPage.page.getByTestId("error-message").locator("p"),
-      ).toHaveText(/Snippet '@multiple' failed: Snippet '@B' failed: API Error: 500 Internal Server Error/);
+      ).toHaveText(/^Snippet '@B' failed: API Error: 500 Internal Server Error$/);
       // Assert that the UI did not add the user's message optimistically
       await chatPage.expectMessageCount(0);
       chatMocker.verifyComplete();

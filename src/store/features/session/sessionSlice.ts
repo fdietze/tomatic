@@ -6,13 +6,12 @@ import { AppError } from "@/types/errors";
 import {
   LoadSessionSuccessPayload,
   SessionCreatedSuccessPayload,
-  SessionUpdatedPayload,
   SendMessageRequestPayload,
   EditMessageRequestPayload,
   RegenerateResponseRequestPayload,
-  UpdateUserMessagePayload,
-  AppendChunkPayload,
-  SubmitUserMessageSuccessPayload,
+  TurnCommittedPayload,
+  ReplyChunkReceivedPayload,
+  TurnEndedPayload,
 } from "@/types/payloads";
 
 export interface SessionState {
@@ -63,19 +62,11 @@ export const sessionSlice = createSlice({
     ) => {
       state.loading = "idle";
       state.currentSessionId = action.payload.sessionId;
-      state.messages = action.payload.messages;
       state.prevSessionId = action.payload.prevId;
       state.nextSessionId = action.payload.nextId;
       state.hasSessions = true; // A new session now exists
     },
 
-    sessionUpdated: (
-      _state,
-      _action: PayloadAction<SessionUpdatedPayload>,
-    ) => {
-      // This is just a confirmation that the session was updated in the database
-      // No state changes needed since the messages are already in Redux state
-    },
     loadSessionFailure: (state, action: PayloadAction<AppError>) => {
       state.loading = "failed";
       state.error = action.payload;
@@ -96,9 +87,8 @@ export const sessionSlice = createSlice({
     setHasSessions: (state, action: PayloadAction<boolean>) => {
       state.hasSessions = action.payload;
     },
-    // New "Command" actions following CQRS pattern
+    // Commands handled by sessionSaga (submitTurnSaga.ts); the reducers only flag the running turn.
     sendMessageRequested: (state, _action: PayloadAction<SendMessageRequestPayload>) => {
-      // Saga will intercept this. We can set loading state here.
       state.submitting = true;
       state.error = null;
     },
@@ -111,63 +101,33 @@ export const sessionSlice = createSlice({
       state.error = null;
     },
 
-    /** @deprecated Use specific command actions instead */
-    // req:message-edit-fork, req:regenerate-context
-    submitUserMessage: (
-      state,
-      action: PayloadAction<{
-        prompt: string;
-        isRegeneration: boolean;
-        editMessageIndex?: number;
-      }>,
-    ) => {
-      state.submitting = true;
-      state.error = null;
-      const { prompt, isRegeneration, editMessageIndex } = action.payload;
-
-      if (
-        editMessageIndex !== undefined &&
-        editMessageIndex >= 0 &&
-        editMessageIndex < state.messages.length
-      ) {
-        if (isRegeneration) {
-          // req:regenerate-context: For regeneration, keep the message at editMessageIndex and remove only messages after it
-          state.messages.splice(editMessageIndex + 1);
-        } else {
-          // req:message-edit-fork: For editing, remove the message at editMessageIndex and all messages after it
-          state.messages.splice(editMessageIndex);
-        }
+    // req:submit-turn-atomic: the turn's conversation is computed first, then committed in one step.
+    // On failure before this point the session is untouched, so no rollback is needed.
+    turnCommitted: (state, action: PayloadAction<TurnCommittedPayload>) => {
+      state.messages = action.payload.messages;
+    },
+    // req:stream-bound-to-message: chunks address their reply by id. After a session switch the id is
+    // absent from state.messages and the chunk is ignored, so a stream can never write into another session.
+    replyChunkReceived: (state, action: PayloadAction<ReplyChunkReceivedPayload>) => {
+      const reply = state.messages.find((message) => message.id === action.payload.messageId);
+      if (!reply) return;
+      reply.content += action.payload.chunk;
+      reply.raw_content += action.payload.chunk;
+    },
+    turnEnded: (state, action: PayloadAction<TurnEndedPayload>) => {
+      state.submitting = false;
+      // Without an error of its own the turn keeps any error set meanwhile (e.g. by loadSessionFailure).
+      if (action.payload.error) {
+        state.error = action.payload.error;
       }
-
-      if (!isRegeneration) {
-        // Add the new/edited user message.
-        state.messages.push({
-          id: crypto.randomUUID(),
-          role: "user",
-          content: prompt, // Initially, content is the same as raw_content
-          raw_content: prompt,
-        });
+      // An empty reply carries no information (failed or cancelled before the first chunk).
+      const replyIndex = state.messages.findIndex((message) => message.id === action.payload.replyMessageId);
+      if (replyIndex !== -1 && state.messages[replyIndex]?.content === "") {
+        state.messages.splice(replyIndex, 1);
       }
     },
-    updateUserMessage: (state, action: PayloadAction<UpdateUserMessagePayload>) => {
-      const oldMessage = state.messages[action.payload.index];
-      if (oldMessage) {
-        state.messages[action.payload.index] = action.payload.message;
-      } else {
-      }
-    },
-    addAssistantMessagePlaceholder: (state) => {
-      state.messages.push({
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "",
-        raw_content: "",
-      });
-    },
-    addSystemMessage: (state, action: PayloadAction<Message>) => {
-      // Add system message at the beginning
-      state.messages.unshift(action.payload);
-    },
+    // Command: stop the running turn. sessionSaga aborts the stream and ends the turn.
+    cancelSubmission: () => {},
     setSystemPromptRequested: (_state, _action: PayloadAction<SystemPrompt>) => {
       // This action will be intercepted by the saga for snippet resolution
       // No state changes here - the saga will handle it
@@ -209,65 +169,6 @@ export const sessionSlice = createSlice({
       } else {
       }
     },
-    appendChunkToLatestMessage: (
-      state,
-      action: PayloadAction<AppendChunkPayload>,
-    ) => {
-      const lastMessage = state.messages[state.messages.length - 1];
-
-      if (lastMessage?.role === "assistant") {
-        const isFirstChunk = lastMessage.content === "";
-        const newChunk = action.payload.chunk;
-
-        // For assistant messages, content and raw_content must be kept in sync.
-        if (isFirstChunk) {
-          // On the first chunk, we overwrite any stale data from a previous run.
-          lastMessage.content = newChunk;
-          lastMessage.raw_content = newChunk;
-        } else {
-          // On subsequent chunks, we append to both.
-          lastMessage.content += newChunk;
-          lastMessage.raw_content += newChunk;
-        }
-      } else {
-      }
-    },
-    submitUserMessageSuccess: (
-      state,
-      action: PayloadAction<SubmitUserMessageSuccessPayload>,
-    ) => {
-      state.submitting = false;
-      state.error = null;
-      const lastMessage = state.messages[state.messages.length - 1];
-      if (lastMessage?.role === "assistant") {
-        lastMessage.model_name = action.payload.model;
-      }
-    },
-    submitUserMessageFailure: (state, action: PayloadAction<AppError>) => {
-      state.submitting = false;
-      state.error = action.payload;
-      // Clean up by removing the empty assistant placeholder if it exists
-      const lastMessage = state.messages[state.messages.length - 1];
-      if (lastMessage?.role === "assistant" && lastMessage.content === "") {
-        state.messages.pop();
-      }
-      // For regular chat API failures, we keep the user message (existing behavior)
-      // For snippet regeneration failures, we use setSessionError instead
-    },
-    cancelSubmission: (state) => {
-      state.submitting = false;
-      // Remove the last message if it was just added but failed to send
-      const lastMessage = state.messages[state.messages.length - 1];
-      // Remove user message that failed to send
-      if (lastMessage?.role === "user") {
-        state.messages.pop();
-      }
-      // Also remove any empty assistant placeholder
-      const newLastMessage = state.messages[state.messages.length - 1];
-      if (newLastMessage?.role === "assistant" && newLastMessage.content === "") {
-        state.messages.pop();
-      }
-    },
     goToPrevSession: () => {
       // No state change, this is handled by a saga
     },
@@ -275,21 +176,7 @@ export const sessionSlice = createSlice({
       // No state change, this is handled by a saga
     },
     setSessionError: (state, action: PayloadAction<AppError | null>) => {
-      state.submitting = false;
       state.error = action.payload;
-      // If this is a snippet regeneration error, clean up the optimistic message
-      if (action.payload && action.payload.type === 'SNIPPET_REGENERATION_ERROR') {
-        // Remove the empty assistant placeholder if it exists
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (lastMessage?.role === "assistant" && lastMessage.content === "") {
-          state.messages.pop();
-        }
-        // Also remove the user message for snippet regeneration failures
-        const secondLastMessage = state.messages[state.messages.length - 1];
-        if (secondLastMessage?.role === "user") {
-          state.messages.pop();
-        }
-      }
     },
   },
 });
@@ -298,7 +185,6 @@ export const {
   loadSession,
   loadSessionSuccess,
   sessionCreatedSuccess,
-  sessionUpdated,
   loadSessionFailure,
   loadInitialSessionSaga,
   startNewSession,
@@ -307,18 +193,13 @@ export const {
   sendMessageRequested,
   editMessageRequested,
   regenerateResponseRequested,
-  // Deprecated
-  submitUserMessage,
-  updateUserMessage,
-  addAssistantMessagePlaceholder,
-  addSystemMessage,
+  turnCommitted,
+  replyChunkReceived,
+  turnEnded,
   setSystemPromptRequested,
   setSelectedPromptName,
   setSystemPrompt,
   removeSystemPrompt,
-  appendChunkToLatestMessage,
-  submitUserMessageSuccess,
-  submitUserMessageFailure,
   cancelSubmission,
   goToPrevSession,
   goToNextSession,

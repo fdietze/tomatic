@@ -36,13 +36,8 @@ export interface LoadSessionSuccessPayload {
 
 export interface SessionCreatedSuccessPayload {
   sessionId: string;
-  messages: Message[];
   prevId: string | null;
   nextId: string | null;
-}
-
-export interface SessionUpdatedPayload {
-  sessionId: string;
 }
 
 export interface SendMessageRequestPayload {
@@ -58,17 +53,18 @@ export interface RegenerateResponseRequestPayload {
   index: number;
 }
 
-export interface UpdateUserMessagePayload {
-  index: number;
-  message: Message;
+export interface TurnCommittedPayload {
+  messages: Message[];
 }
 
-export interface AppendChunkPayload {
+export interface ReplyChunkReceivedPayload {
+  messageId: string;
   chunk: string;
 }
 
-export interface SubmitUserMessageSuccessPayload {
-  model: string;
+export interface TurnEndedPayload {
+  replyMessageId: string;
+  error: AppError | null;
 }
 
 // Snippets-related payloads

@@ -271,25 +271,40 @@ function* persistSnippetAfterRegenerationSaga(
   }
 }
 
-/**
- * Wave-based batch regeneration orchestrator.
- * Processes snippets in topological waves, ensuring each wave completes before the next begins.
- * This eliminates the race condition where dependent snippets use stale data.
- */
 function* batchRegenerationOrchestratorSaga(
   action: PayloadAction<{ snippets: Snippet[] }>,
 ) {
-  const { snippets: dirtySnippets } = action.payload;
+  try {
+    yield call(regenerateSnippetsInWaves, action.payload.snippets);
+  } catch (error) {
+    // Handled: a dependency cycle is reported in the snippet editor (req:cycle-detection); background regeneration just skips it.
+    console.log("[snippetsSaga] Batch regeneration skipped:", describeError(error));
+  } finally {
+    // Signal for unit tests that observe background batches (snippetsSaga.test.ts).
+    window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
+  }
+}
+
+/**
+ * Wave-based batch regeneration: processes snippets in topological waves, so each wave
+ * completes before dependents use its content. Callable with `yield call` so callers that
+ * need the regenerated content (sessionSaga submit) wait for exactly this batch.
+ * Returns the failures; throws if the snippets contain a dependency cycle.
+ */
+export function* regenerateSnippetsInWaves(
+  dirtySnippets: Snippet[],
+): Generator<unknown, AppError[], unknown> {
+  const failures: AppError[] = [];
 
   // Get all snippets to build the resolver context
-  const allSnippets: Snippet[] = yield select(
+  const allSnippets = (yield select(
     (state: RootState) => state.snippets.snippets,
-  );
+  )) as Snippet[];
 
-  // Check for cycles before starting
+  // req:cycle-detection: a cycle has no valid regeneration order
   const { cyclic } = getTopologicalSortForExecution(allSnippets);
   if (cyclic.length > 0) {
-    return;
+    throw new Error(`Snippet dependency cycle: ${cyclic.map((name) => `@${name}`).join(", ")}`);
   }
 
   // Group dirty snippets into waves based on dependency levels
@@ -325,7 +340,7 @@ function* batchRegenerationOrchestratorSaga(
       );
     }
     // Regenerate all snippets in this wave in parallel
-    const waveResults: Array<RegenerationResult | { error: string; snippet: Snippet }> = yield all(
+    const waveResults = (yield all(
       wave.map((snippet) =>
         call(function* () {
           try {
@@ -341,7 +356,7 @@ function* batchRegenerationOrchestratorSaga(
           }
         })
       )
-    );
+    )) as Array<RegenerationResult | { error: string; snippet: Snippet }>;
 
     // Update resolver context and dispatch actions for this wave
     for (let i = 0; i < waveResults.length; i++) {
@@ -352,6 +367,7 @@ function* batchRegenerationOrchestratorSaga(
       if ('error' in result) {
         // Handle error
         const appError = createAppError.snippetRegeneration(snippet.name, result.error);
+        failures.push(appError);
         yield put(regenerateSnippetFailure({
           id: snippet.id,
           name: snippet.name,
@@ -378,7 +394,7 @@ function* batchRegenerationOrchestratorSaga(
     }
   }
 
-  window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
+  return failures;
 }
 
 
