@@ -7,7 +7,6 @@ export interface AppState {
   activeChatSessionId: string | null;
   sidebarOpen: boolean;
   isMaximized: boolean;
-  isBatchRegenerating: boolean;
   initializationError: string | null;
 }
 
@@ -16,7 +15,6 @@ const initialState: AppState = {
   activeChatSessionId: null,
   sidebarOpen: true,
   isMaximized: false,
-  isBatchRegenerating: false, // req:global-loading-spinner: Track global batch regeneration state
   initializationError: null,
 };
 
@@ -45,10 +43,6 @@ export const appSlice = createSlice({
     setIsMaximized: (state, action: PayloadAction<boolean>) => {
       state.isMaximized = action.payload;
     },
-    // req:global-loading-spinner: Action to set global batch regeneration state
-    setBatchRegenerating: (state, action: PayloadAction<boolean>) => {
-      state.isBatchRegenerating = action.payload;
-    },
   },
 });
 
@@ -59,7 +53,6 @@ export const {
   setActiveChatSessionId,
   setSidebarOpen,
   setIsMaximized,
-  setBatchRegenerating,
 } = appSlice.actions;
 
 export const selectApp = (state: RootState) => state.app;

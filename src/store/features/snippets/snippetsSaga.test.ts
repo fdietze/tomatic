@@ -44,6 +44,18 @@ const createTestStore = (initialState?: Partial<RootState>) => {
   return store;
 };
 
+// Waits until each named snippet's latest regeneration has finished (success or error).
+// Background batches have no completion signal; the per-snippet status in the store is the observable outcome.
+const waitUntilRegenerationSettled = (store: ReturnType<typeof createTestStore>, names: string[]) =>
+  vi.waitFor(() => {
+    const { snippets, regenerationStatus } = store.getState().snippets;
+    const statuses = names.map((name) => {
+      const id = snippets.find((snippet) => snippet.name === name)?.id;
+      return id ? regenerationStatus[id]?.status : undefined;
+    });
+    expect(statuses.every((status) => status === "success" || status === "error")).toBe(true);
+  });
+
 describe("snippetsSaga", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -440,9 +452,7 @@ describe("snippetsSaga", () => {
     store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     // Wait for batch regeneration to complete
-    await new Promise(resolve => {
-      window.addEventListener("app:snippet:regeneration:batch:complete", resolve, { once: true });
-    });
+    await waitUntilRegenerationSettled(store, ["B", "C", "D"]);
 
     // Verify the correct number of regenerations
     expect(regenerationLog).toHaveLength(3);
@@ -554,9 +564,7 @@ describe("snippetsSaga", () => {
     store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     // Wait for batch regeneration to complete
-    await new Promise(resolve => {
-      window.addEventListener("app:snippet:regeneration:batch:complete", resolve, { once: true });
-    });
+    await waitUntilRegenerationSettled(store, ["B", "C", "D"]);
 
     // Verify the correct number of regenerations
     expect(regenerationLog).toHaveLength(3);
@@ -671,9 +679,7 @@ describe("snippetsSaga", () => {
     store.dispatch(updateAndRegenerateSnippetRequested({ snippet: updatedA }));
 
     // Wait for the batch regeneration to complete
-    await new Promise(resolve => {
-      window.addEventListener("app:snippet:regeneration:batch:complete", resolve, { once: true });
-    });
+    await waitUntilRegenerationSettled(store, ["A", "B", "C"]);
 
     // A is regenerated via the orchestrator, B and C via batch orchestrator
     // All three should be in the log
@@ -766,9 +772,7 @@ describe("snippetsSaga", () => {
     store.dispatch(loadSnippetsSuccess(allSnippetsInStore));
 
     // Wait for batch regeneration to complete
-    await new Promise(resolve => {
-      window.addEventListener("app:snippet:regeneration:batch:complete", resolve, { once: true });
-    });
+    await waitUntilRegenerationSettled(store, ["A", "B", "C"]);
 
     // Verify all three were regenerated
     expect(regenerationLog).toHaveLength(3);

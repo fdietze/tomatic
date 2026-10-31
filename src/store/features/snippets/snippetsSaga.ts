@@ -38,6 +38,7 @@ import {
   getTopologicalSortForExecution,
 } from "@/utils/snippetUtils";
 import { requestMessageContent } from "@/api/openrouter";
+import { dispatchEvent } from "@/utils/events";
 import { RegenerationResult } from "@/types/payloads";
 
 function* loadSnippetsSaga() {
@@ -97,17 +98,7 @@ function* handleRegenerateSnippetSaga(
 ) {
   const snippetToRegenerate = action.payload;
   const snippetId = snippetToRegenerate.id;
-  // Dispatch event for test waiting
-  window.dispatchEvent(
-    new CustomEvent("app:snippet:regeneration:start", {
-      detail: { id: snippetId, name: snippetToRegenerate.name },
-    }),
-  );
-  window.dispatchEvent(
-    new CustomEvent("snippet_regeneration_started", {
-      detail: { id: snippetId, name: snippetToRegenerate.name },
-    }),
-  );
+  dispatchEvent("app:snippet:regeneration:start", { id: snippetId, name: snippetToRegenerate.name });
   try {
     const {
       settings,
@@ -145,18 +136,9 @@ function* handleRegenerateSnippetSaga(
     // req:empty-prompt-handling: If the prompt is empty, we don't need to do anything else.
     if (resolvedPrompt.trim() === "") {
       yield put(regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: "" }));
-      window.dispatchEvent(
-        new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
-      );
-      window.dispatchEvent(
-        new CustomEvent("app:snippet:regeneration:complete", {
-          detail: { id: snippetId, name: snippetToRegenerate.name },
-        }),
-      );
+      dispatchEvent("app:snippet:regeneration:complete", { id: snippetId, name: snippetToRegenerate.name });
       return;
     }
-
-    yield put({ type: "app/setBatchRegenerating", payload: true });
 
     const assistantResponse: string = yield call(() =>
       requestMessageContent(
@@ -169,15 +151,7 @@ function* handleRegenerateSnippetSaga(
     yield put(
       regenerateSnippetSuccess({ id: snippetId, name: snippetToRegenerate.name, content: assistantResponse }),
     );
-  // req:snippet-wait-by-id: Dispatch events for individual snippet waiting by ID
-  window.dispatchEvent(
-    new CustomEvent(`app:snippet:regeneration:complete:${snippetId}`),
-  );
-  window.dispatchEvent(
-    new CustomEvent("app:snippet:regeneration:complete", {
-      detail: { id: snippetId, name: snippetToRegenerate.name },
-    }),
-  );
+    dispatchEvent("app:snippet:regeneration:complete", { id: snippetId, name: snippetToRegenerate.name });
   } catch (error) {
     // If it's already an AppError, use its message directly
     let errorMessage: string;
@@ -190,12 +164,6 @@ function* handleRegenerateSnippetSaga(
     }
     const appError = createAppError.snippetRegeneration(snippetToRegenerate.name, errorMessage);
     yield put(regenerateSnippetFailure({ id: snippetId, name: snippetToRegenerate.name, error: appError }));
-    // Dispatch failure event for batch orchestrator
-    window.dispatchEvent(
-      new CustomEvent(`app:snippet:regeneration:failure:${snippetId}`)
-    );
-  } finally {
-    yield put({ type: "app/setBatchRegenerating", payload: false });
   }
 }
 
@@ -279,16 +247,13 @@ function* batchRegenerationOrchestratorSaga(
   } catch (error) {
     // Handled: a dependency cycle is reported in the snippet editor (req:cycle-detection); background regeneration just skips it.
     console.log("[snippetsSaga] Batch regeneration skipped:", describeError(error));
-  } finally {
-    // Signal for unit tests that observe background batches (snippetsSaga.test.ts).
-    window.dispatchEvent(new CustomEvent("app:snippet:regeneration:batch:complete"));
   }
 }
 
 /**
  * Wave-based batch regeneration: processes snippets in topological waves, so each wave
  * completes before dependents use its content. Callable with `yield call` so callers that
- * need the regenerated content (sessionSaga submit) wait for exactly this batch.
+ * need the regenerated content (submitTurnSaga.ts) wait for exactly this batch.
  * Returns the failures; throws if the snippets contain a dependency cycle.
  */
 export function* regenerateSnippetsInWaves(
@@ -323,21 +288,10 @@ export function* regenerateSnippetsInWaves(
   for (let waveIndex = 0; waveIndex < waves.length; waveIndex++) {
     const wave = waves[waveIndex];
     if (!wave) continue;
-    // Set status and dispatch start events for all snippets in this wave
     for (const snippet of wave) {
       // Set status to "in_progress" (for spinner display) without triggering the saga watcher
       yield put(setRegenerationStatus({ id: snippet.id, status: "in_progress" }));
-      // Dispatch start events for E2E test compatibility
-      window.dispatchEvent(
-        new CustomEvent("app:snippet:regeneration:start", {
-          detail: { id: snippet.id, name: snippet.name },
-        }),
-      );
-      window.dispatchEvent(
-        new CustomEvent("snippet_regeneration_started", {
-          detail: { id: snippet.id, name: snippet.name },
-        }),
-      );
+      dispatchEvent("app:snippet:regeneration:start", { id: snippet.id, name: snippet.name });
     }
     // Regenerate all snippets in this wave in parallel
     const waveResults = (yield all(
@@ -373,23 +327,11 @@ export function* regenerateSnippetsInWaves(
           name: snippet.name,
           error: appError
         }));
-        // Dispatch failure event for E2E test compatibility
-        window.dispatchEvent(
-          new CustomEvent(`app:snippet:regeneration:failure:${snippet.id}`)
-        );
       } else {
         // Success - update context and dispatch success
         resolverContext.set(snippet.name, result.content);
         yield put(regenerateSnippetSuccess(result));
-        // Dispatch completion events for E2E test compatibility
-        window.dispatchEvent(
-          new CustomEvent(`app:snippet:regeneration:complete:${snippet.id}`)
-        );
-        window.dispatchEvent(
-          new CustomEvent("app:snippet:regeneration:complete", {
-            detail: { id: snippet.id, name: snippet.name },
-          }),
-        );
+        dispatchEvent("app:snippet:regeneration:complete", { id: snippet.id, name: snippet.name });
       }
     }
   }

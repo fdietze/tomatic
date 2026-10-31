@@ -180,7 +180,7 @@ test.describe("Snippet Chat with Regeneration Wait", () => {
 
       await chatPage.goto();
       await waitForEvent(page, "app_initialized");
-      await waitForEvent(page, "snippet_regeneration_started");
+      await waitForEvent(page, "app:snippet:regeneration:start");
       await chatPage.sendMessage("Hello @B");
       // Manually trigger the 500 error response for the snippet regeneration
       await chatMocker.resolveNextCompletion();
