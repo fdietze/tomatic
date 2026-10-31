@@ -269,7 +269,8 @@ function* loadInitialSessionSaga(): SagaIterator {
     const hasSessions: boolean = yield call(db.hasSessions);
     yield put(setHasSessions(hasSessions));
   } catch (error) {
-    // Handle potential errors if necessary
+    // Handled degradation: hasSessions keeps its initial value, which only affects session navigation.
+    console.log("[sessionSaga] Failed to check for stored sessions:", error);
   }
 }
 

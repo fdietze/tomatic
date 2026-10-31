@@ -4,14 +4,14 @@ import { takeLatest, takeEvery } from "@/store/supervisedEffects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
-import { createAppError, toAppError, getErrorMessage, AppError } from "@/types/errors";
+import { createAppError, toAppError, getErrorMessage, AppError, describeError } from "@/types/errors";
 import {
   loadSnippets,
   loadSnippetsSuccess,
   loadSnippetsFailure,
   addSnippet,
   addSnippetSuccess,
-  addSnippetFailure,
+  snippetStorageFailed,
   updateSnippet,
   updateSnippetSuccess,
   updateSnippetFailure,
@@ -45,7 +45,7 @@ function* loadSnippetsSaga() {
     const snippets: Snippet[] = yield call(db.loadAllSnippets);
     yield put(loadSnippetsSuccess(snippets));
   } catch (error) {
-    yield put(loadSnippetsFailure(createAppError.persistence("loadSnippets", "Failed to load snippets.")));
+    yield put(loadSnippetsFailure(createAppError.persistence("loadSnippets", `Failed to load snippets: ${describeError(error)}`)));
   }
 }
 
@@ -58,8 +58,7 @@ function* addSnippetSaga(action: PayloadAction<Snippet>) {
       yield put(regenerateSnippet(newSnippet));
     }
   } catch (error) {
-    const appError = toAppError(error);
-    yield put(addSnippetFailure({ name: action.payload.name, error: appError }));
+    yield put(snippetStorageFailed(createAppError.persistence("addSnippet", `Failed to save snippet '@${action.payload.name}': ${describeError(error)}`)));
   }
 }
 
@@ -88,6 +87,7 @@ function* deleteSnippetSaga(action: PayloadAction<string>) {
     yield call(db.deleteSnippet, action.payload);
     yield put(deleteSnippetSuccess(action.payload));
   } catch (error) {
+    yield put(snippetStorageFailed(createAppError.persistence("deleteSnippet", `Failed to delete snippet: ${describeError(error)}`)));
   }
 }
 
@@ -264,11 +264,10 @@ function* persistSnippetAfterRegenerationSaga(
     const updatedSnippet = allSnippets.find(s => s.id === action.payload.id);
     if (updatedSnippet) {
       yield call(db.saveSnippet, updatedSnippet);
-    } else {
     }
   } catch (error) {
-    // We don't want to fail the regeneration just because persistence failed
-    // The content is still in Redux state and will work until page reload
+    // The regenerated content stays usable in Redux state, but is lost on reload unless saved.
+    yield put(snippetStorageFailed(createAppError.persistence("saveRegeneratedSnippet", `Failed to save regenerated snippet: ${describeError(error)}`)));
   }
 }
 
@@ -563,7 +562,7 @@ function* importSnippetsSaga(action: PayloadAction<Snippet[]>) {
 
     yield put(loadSnippets());
   } catch (error) {
-    yield put(loadSnippetsFailure(createAppError.persistence("importSnippets", "Failed to import snippets.")));
+    yield put(loadSnippetsFailure(createAppError.persistence("importSnippets", `Failed to import snippets: ${describeError(error)}`)));
   }
 }
 

@@ -78,4 +78,45 @@ describe("SettingsPage", () => {
     expect(store.dispatch).toHaveBeenCalledWith(toggleChatSnippetResolution());
     expect(store.dispatch).toHaveBeenCalledWith(saveSettings({}));
   });
+
+  test("shows the snippet storage error", () => {
+    // Purpose: req:snippet-storage-errors-visible - snippet persistence failures are rendered in the snippets section.
+    const storeWithError = mockStore({
+      settings: { apiKey: "", autoScrollEnabled: false, chatSnippetResolutionEnabled: false, saving: "idle" },
+      prompts: { prompts: {} },
+      snippets: {
+        snippets: [],
+        loading: "idle",
+        error: { type: "PERSISTENCE_ERROR", operation: "deleteSnippet", message: "disk full" },
+      },
+    });
+
+    render(
+      <Provider store={storeWithError}>
+        <SettingsPage />
+      </Provider>,
+    );
+
+    expect(screen.getByTestId("snippets-error")).toHaveTextContent("disk full");
+  });
+
+  test("shows the system prompt storage error", () => {
+    // Purpose: req:snippet-storage-errors-visible - system prompt load/save failures are rendered in the prompts section.
+    const storeWithError = mockStore({
+      settings: { apiKey: "", autoScrollEnabled: false, chatSnippetResolutionEnabled: false, saving: "idle" },
+      prompts: {
+        prompts: {},
+        error: { type: "PERSISTENCE_ERROR", operation: "loadPrompts", message: "Stored system prompts are invalid" },
+      },
+      snippets: { snippets: [], loading: "idle" },
+    });
+
+    render(
+      <Provider store={storeWithError}>
+        <SettingsPage />
+      </Provider>,
+    );
+
+    expect(screen.getByTestId("prompts-error")).toHaveTextContent("Stored system prompts are invalid");
+  });
 });

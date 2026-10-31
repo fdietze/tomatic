@@ -3,7 +3,6 @@ import { Snippet } from "@/types/storage";
 import { RootState } from "../../store";
 import { AppError } from "@/types/errors";
 import {
-  AddSnippetFailurePayload,
   UpdateSnippetSuccessPayload,
   UpdateSnippetFailurePayload,
   RegenerateSnippetSuccessPayload,
@@ -56,14 +55,13 @@ export const snippetsSlice = createSlice({
       // saga will handle the logic
     },
     addSnippetSuccess: (state, action: PayloadAction<Snippet>) => {
+      state.error = null;
       state.snippets.push(action.payload);
     },
-    addSnippetFailure: (
-      state,
-      action: PayloadAction<AddSnippetFailurePayload>
-    ) => {
-      // In the future, we might want to show this error in the UI.
-      // For now, we'll just log it.
+    // req:snippet-storage-errors-visible: storage failures of snippet operations are shown in the
+    // snippets section (src/pages/SettingsPage.tsx) until the next successful storage operation.
+    snippetStorageFailed: (state, action: PayloadAction<AppError>) => {
+      state.error = action.payload;
     },
     updateSnippet: (_state, _action: PayloadAction<Snippet>) => {
       // saga will handle the logic
@@ -93,6 +91,7 @@ export const snippetsSlice = createSlice({
       // saga will handle the logic
     },
     deleteSnippetSuccess: (state, action: PayloadAction<string>) => {
+      state.error = null;
       state.snippets = state.snippets.filter((s) => s.id !== action.payload);
     },
     regenerateSnippet(state, action: PayloadAction<Snippet>) {
@@ -205,7 +204,7 @@ export const {
   loadSnippetsFailure,
   addSnippet,
   addSnippetSuccess,
-  addSnippetFailure,
+  snippetStorageFailed,
   updateSnippet,
   updateSnippetSuccess,
   updateSnippetFailure,

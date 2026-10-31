@@ -59,6 +59,7 @@ export const promptsSlice = createSlice({
       // Saga will handle this
     },
     addPromptSuccess: (state, action: PayloadAction<SystemPrompt>) => {
+      state.error = null;
       const newPrompt = action.payload;
       state.prompts[newPrompt.name] = {
         data: newPrompt,
@@ -66,11 +67,12 @@ export const promptsSlice = createSlice({
         error: null,
       };
     },
+    // req:snippet-storage-errors-visible: shown in the system prompts section (src/pages/SettingsPage.tsx).
     addPromptFailure: (
-      _state,
-      _action: PayloadAction<AddPromptFailurePayload>,
+      state,
+      action: PayloadAction<AddPromptFailurePayload>,
     ) => {
-      // Optional: Handle failure, e.g., show a global error
+      state.error = action.payload.error;
     },
     // Update
     updatePromptRequest: (

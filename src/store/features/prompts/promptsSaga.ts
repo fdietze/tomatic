@@ -4,7 +4,7 @@ import { takeLatest } from "@/store/supervisedEffects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { SystemPrompt } from "@/types/storage";
 import * as db from "@/services/persistence";
-import { createAppError, toAppError } from "@/types/errors";
+import { createAppError, toAppError, describeError } from "@/types/errors";
 import {
   loadPrompts,
   loadPromptsSuccess,
@@ -25,7 +25,7 @@ function* loadPromptsSaga() {
     const prompts: SystemPrompt[] = yield call(db.loadAllSystemPrompts);
     yield put(loadPromptsSuccess(prompts));
   } catch (error) {
-    yield put(loadPromptsFailure(createAppError.persistence("loadPrompts", "Failed to load prompts.")));
+    yield put(loadPromptsFailure(createAppError.persistence("loadPrompts", `Failed to load prompts: ${describeError(error)}`)));
   }
 }
 

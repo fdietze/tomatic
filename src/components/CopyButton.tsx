@@ -28,7 +28,8 @@ const CopyButton: React.FC<CopyButtonProps> = ({ textToCopy }) => {
       await navigator.clipboard.writeText(textToCopy);
       setButtonText(COPIED_LABEL);
     } catch (err) {
-      console.error('[CopyButton] Error copying to clipboard:', err);
+      // Handled: the button label tells the user; the log keeps the cause.
+      console.log('[CopyButton] Error copying to clipboard:', err);
       setButtonText(ERROR_LABEL);
     } finally {
       timeoutRef.current = window.setTimeout(resetText, FEEDBACK_DURATION_MS);

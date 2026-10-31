@@ -1,6 +1,7 @@
 import { dbPromise, SESSIONS_STORE_NAME, UPDATED_AT_INDEX } from '../persistence';
 import { chatSessionSchema } from './schemas';
 import type { ChatSession } from '@/types/chat';
+import { describeError } from '@/types/errors';
 
 export async function saveSession(session: ChatSession): Promise<void> {
   const db = await dbPromise;
@@ -9,31 +10,21 @@ export async function saveSession(session: ChatSession): Promise<void> {
     await tx.store.put(session);
     await tx.done;
   } catch (error) {
-    console.error('[DB] Save: Failed to save session:', error);
-    throw new Error('Failed to save session.');
+    throw new Error(`Failed to save session: ${describeError(error)}`);
   }
 }
 
 export async function loadSession(sessionId: string): Promise<ChatSession | null> {
   const db = await dbPromise;
-  try {
-    const session = await db.get(SESSIONS_STORE_NAME, sessionId);
-    if (!session) return null;
+  const session = await db.get(SESSIONS_STORE_NAME, sessionId);
+  if (!session) return null;
 
-    // Validate data from DB against our schema at runtime
-    const validation = chatSessionSchema.safeParse(session);
-    if (validation.success) {
-      return validation.data;
-    } else {
-      console.error('[DB] Load: Zod validation failed for session:', validation.error);
-      // Optional: Could try to delete the corrupted session
-      // await deleteSession(sessionId);
-      return null;
-    }
-  } catch (error) {
-    console.error(`[DB] Load: Failed to load session '${sessionId}':`, error);
-    throw new Error('Failed to load session.');
+  // Parse, Don't Validate: a corrupted session is an error, not a missing one.
+  const validation = chatSessionSchema.safeParse(session);
+  if (!validation.success) {
+    throw new Error(`Stored session '${sessionId}' is invalid: ${validation.error.message}`);
   }
+  return validation.data;
 }
 
 export async function findNeighbourSessionIds(
@@ -63,10 +54,8 @@ export async function findNeighbourSessionIds(
     await tx.done;
     return { prevId, nextId };
   } catch (error) {
-    console.error(
-      `[DB] findNeighbourSessionIds: Failed to find neighbors for '${currentSession.session_id}':`,
-      error,
-    );
+    // Handled degradation: without neighbours only the prev/next navigation is unavailable.
+    console.log(`[DB] findNeighbourSessionIds: no neighbours for '${currentSession.session_id}':`, error);
     return { prevId: null, nextId: null };
   }
 }
@@ -81,7 +70,8 @@ export async function getMostRecentSessionId(): Promise<string | null> {
 
     return cursor ? cursor.primaryKey : null;
   } catch (error) {
-    console.error('[DB] getMostRecentSessionId: Failed to get most recent session key:', error);
+    // Handled degradation: the app starts with a new chat instead of the most recent one.
+    console.log('[DB] getMostRecentSessionId: failed to get most recent session key:', error);
     return null;
   }
 }
@@ -93,8 +83,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
     await tx.store.delete(sessionId);
     await tx.done;
   } catch (error) {
-    console.error(`[DB] Delete: Failed to delete session '${sessionId}':`, error);
-    throw new Error('Failed to delete session.');
+    throw new Error(`Failed to delete session '${sessionId}': ${describeError(error)}`);
   }
 }
 

@@ -14,6 +14,8 @@ import rootReducer from "@/store/rootReducer";
 import rootSaga from "@/store/rootSaga";
 import { requestMessageContent } from "@/api/openrouter";
 import {
+  addSnippet,
+  deleteSnippet,
   loadSnippetsSuccess,
   regenerateSnippet,
   updateAndRegenerateSnippetRequested,
@@ -23,6 +25,7 @@ import { type RootState } from "@/store/store";
 import { type Snippet } from "@/types/storage";
 import * as db from "@/services/persistence";
 import { type Message } from "@/types/chat";
+import { getErrorMessage } from "@/types/errors";
 
 // Helper to create a fully configured store for each test
 const createTestStore = (initialState?: Partial<RootState>) => {
@@ -133,6 +136,64 @@ describe("snippetsSaga", () => {
     );
     
     saveSnippetSpy.mockRestore();
+  });
+
+  describe("Feature: snippet storage errors are surfaced", () => {
+    const snippetA: Snippet = {
+      id: "snippet-a-id",
+      name: "A",
+      content: "content",
+      isGenerated: false,
+      createdAt_ms: 1,
+      updatedAt_ms: 1,
+      generationError: null,
+      isDirty: false,
+    };
+
+    function snippetsErrorMessage(store: ReturnType<typeof createTestStore>): string | null {
+      const { error } = store.getState().snippets;
+      return error ? getErrorMessage(error) : null;
+    }
+
+    test("a failed add is shown with its cause", async () => {
+      // Purpose: req:snippet-storage-errors-visible - a snippet that cannot be saved must not vanish silently.
+      const store = createTestStore();
+      vi.spyOn(db, "saveSnippet").mockRejectedValueOnce(new Error("disk full"));
+
+      store.dispatch(addSnippet(snippetA));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(snippetsErrorMessage(store)).toContain("disk full");
+    });
+
+    test("a failed delete is shown with its cause", async () => {
+      // Purpose: req:snippet-storage-errors-visible - a snippet that cannot be deleted must report why.
+      const store = createTestStore();
+      store.dispatch(loadSnippetsSuccess([snippetA]));
+      vi.spyOn(db, "deleteSnippet").mockRejectedValueOnce(new Error("disk full"));
+
+      store.dispatch(deleteSnippet(snippetA.id));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(snippetsErrorMessage(store)).toContain("disk full");
+      expect(store.getState().snippets.snippets).toEqual([snippetA]);
+    });
+
+    test("a failed save of regenerated content is shown with its cause", async () => {
+      // Purpose: req:snippet-storage-errors-visible - regenerated content that is not persisted would be lost on
+      // reload, so the user must be told.
+      const generated: Snippet = { ...snippetA, isGenerated: true, prompt: "p", model: "mock-model/a" };
+      const store = createTestStore();
+      store.dispatch(loadSnippetsSuccess([generated]));
+      (requestMessageContent as Mock).mockResolvedValueOnce("new content");
+      vi.spyOn(db, "saveSnippet").mockRejectedValue(new Error("disk full"));
+
+      store.dispatch(regenerateSnippet(generated));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(snippetsErrorMessage(store)).toContain("disk full");
+      vi.mocked(db.saveSnippet).mockRestore();
+    });
   });
 
   describe("importSnippetsSaga", () => {

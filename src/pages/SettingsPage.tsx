@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import SystemPromptItem from "@/components/SystemPromptItem";
 import SnippetItem from "@/components/SnippetItem";
+import { getErrorMessage } from "@/types/errors";
 import type { Snippet, SystemPrompt } from "@/types/storage";
 import type { PromptEntity } from "@/store/features/prompts/promptsSlice";
 import { getSnippetDisplayOrder } from "@/utils/snippetUtils";
@@ -32,8 +33,8 @@ const SettingsPage: React.FC = () => {
 
   // --- Redux State ---
   const { apiKey, autoScrollEnabled, chatSnippetResolutionEnabled, saving } = useSelector(selectSettings);
-  const { prompts: systemPromptsMap } = useSelector(selectPrompts);
-  const { snippets, loading: snippetsLoading } = useSelector(selectSnippets);
+  const { prompts: systemPromptsMap, error: promptsError } = useSelector(selectPrompts);
+  const { snippets, loading: snippetsLoading, error: snippetsError } = useSelector(selectSnippets);
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [editingPromptName, setEditingPromptName] = useState<string | null>(
@@ -236,6 +237,12 @@ const SettingsPage: React.FC = () => {
         >
           New
         </button>
+        {/* req:snippet-storage-errors-visible */}
+        {promptsError && (
+          <div className="error-message" data-testid="prompts-error">
+            <p>{getErrorMessage(promptsError)}</p>
+          </div>
+        )}
         <div className="system-prompt-list">
           {editingPromptName === "__new__" && (
             <SystemPromptItem
@@ -311,6 +318,12 @@ const SettingsPage: React.FC = () => {
             Import Snippets
           </button>
         </div>
+        {/* req:snippet-storage-errors-visible */}
+        {snippetsError && (
+          <div className="error-message" data-testid="snippets-error">
+            <p>{getErrorMessage(snippetsError)}</p>
+          </div>
+        )}
         <div className="snippet-list">
           {isCreatingNewSnippet && (
             <SnippetItem

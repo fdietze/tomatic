@@ -5,6 +5,7 @@ import type { Snippet, SystemPrompt } from "@/types/storage";
 import { z } from "zod";
 import { snippetSchema, systemPromptSchema } from "@/services/db/schemas";
 import { dispatchEvent } from "@/utils/events";
+import { describeError } from "@/types/errors";
 import { 
   CURRENT_INDEXEDDB_VERSION,
   migrateV2SnippetsToV3,
@@ -168,25 +169,20 @@ export async function saveSnippet(snippet: Snippet): Promise<void> {
     await tx.store.put(snippetToSave);
     await tx.done;
   } catch (e) {
-    console.error("[DB|saveSnippet] Failed to save snippet:", e);
-    throw new Error("Failed to save snippet.");
+    throw new Error(`Failed to save snippet: ${describeError(e)}`);
   }
 }
 
 export async function loadAllSnippets(): Promise<Snippet[]> {
   const db = await dbPromise;
-  try {
-    const snippets = await db.getAll(SNIPPETS_STORE_NAME);
-    // Validate each snippet
-    const validation = z.array(snippetSchema).safeParse(snippets);
-    if (validation.success) {
-      return validation.data;
-    } else {
-      return [];
-    }
-  } catch {
-    throw new Error("Failed to load snippets.");
+  const snippets = await db.getAll(SNIPPETS_STORE_NAME);
+  // req:snippet-storage-errors-visible: Parse, Don't Validate - an invalid record fails the load
+  // visibly instead of hiding every snippet behind an empty list.
+  const validation = z.array(snippetSchema).safeParse(snippets);
+  if (!validation.success) {
+    throw new Error(`Stored snippets are invalid: ${validation.error.message}`);
   }
+  return validation.data;
 }
 
 export async function deleteSnippet(id: string): Promise<void> {
@@ -196,8 +192,7 @@ export async function deleteSnippet(id: string): Promise<void> {
     await tx.store.delete(id);
     await tx.done;
   } catch (e) {
-    console.error("[DB|deleteSnippet] Failed to delete snippet:", e);
-    throw new Error("Failed to delete snippet.");
+    throw new Error(`Failed to delete snippet: ${describeError(e)}`);
   }
 }
 
@@ -214,8 +209,8 @@ export async function saveSnippets(snippets: Snippet[]): Promise<void> {
     });
     await Promise.all(putPromises);
     await tx.done;
-  } catch {
-    throw new Error("Failed to save snippets.");
+  } catch (e) {
+    throw new Error(`Failed to save snippets: ${describeError(e)}`);
   }
 }
 
@@ -226,8 +221,7 @@ export async function clearAllSnippets(): Promise<void> {
     await tx.store.clear();
     await tx.done;
   } catch (e) {
-    console.error("[DB|clearAllSnippets] Failed to clear snippets:", e);
-    throw new Error("Failed to clear snippets.");
+    throw new Error(`Failed to clear snippets: ${describeError(e)}`);
   }
 }
 
@@ -255,29 +249,19 @@ export async function saveSystemPrompt(prompt: SystemPrompt): Promise<void> {
     await tx.store.put(prompt);
     await tx.done;
   } catch (error) {
-    console.error("[DB] Save: Failed to save system prompt:", error);
-    throw new Error("Failed to save system prompt.");
+    throw new Error(`Failed to save system prompt: ${describeError(error)}`);
   }
 }
 
 export async function loadAllSystemPrompts(): Promise<SystemPrompt[]> {
   const db = await dbPromise;
-  try {
-    const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
-    const validation = z.array(systemPromptSchema).safeParse(prompts);
-    if (validation.success) {
-      return validation.data;
-    } else {
-      console.error(
-        "[DB] Load: Zod validation failed for system prompts:",
-        validation.error,
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error("[DB] Load: Failed to load system prompts:", error);
-    throw new Error("Failed to load system prompts.");
+  const prompts = await db.getAll(SYSTEM_PROMPTS_STORE_NAME);
+  // Parse, Don't Validate: an invalid record fails the load visibly instead of returning an empty list.
+  const validation = z.array(systemPromptSchema).safeParse(prompts);
+  if (!validation.success) {
+    throw new Error(`Stored system prompts are invalid: ${validation.error.message}`);
   }
+  return validation.data;
 }
 
 export async function deleteSystemPrompt(promptName: string): Promise<void> {
@@ -287,10 +271,6 @@ export async function deleteSystemPrompt(promptName: string): Promise<void> {
     await tx.store.delete(promptName);
     await tx.done;
   } catch (error) {
-    console.error(
-      `[DB] Delete: Failed to delete system prompt '${promptName}':`,
-      error,
-    );
-    throw new Error("Failed to delete system prompt.");
+    throw new Error(`Failed to delete system prompt '${promptName}': ${describeError(error)}`);
   }
 }

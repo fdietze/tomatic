@@ -96,11 +96,7 @@ export async function listAvailableModels(): Promise<DisplayModelInfo[]> {
     // Validate the structure of the full API response.
     const validation = apiModelsResponseSchema.safeParse(jsonResponse);
     if (!validation.success) {
-      console.error(
-        "[API] Zod validation failed for model list:",
-        validation.error.format(),
-      );
-      throw createAppError.validation("api_response", "Received invalid data structure for model list.");
+      throw createAppError.validation("api_response", `Received invalid data structure for model list: ${validation.error.message}`);
     }
 
     // Map the full, validated ModelInfo into the simpler DisplayModelInfo for the UI

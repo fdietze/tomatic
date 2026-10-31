@@ -72,11 +72,6 @@ export interface SubmitUserMessageSuccessPayload {
 }
 
 // Snippets-related payloads
-export interface AddSnippetFailurePayload {
-  name: string;
-  error: AppError;
-}
-
 export interface UpdateSnippetSuccessPayload {
   oldName: string;
   snippet: import('./storage').Snippet;

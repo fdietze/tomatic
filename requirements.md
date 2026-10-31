@@ -83,3 +83,4 @@
 ## Robustness
 
 - req:saga-supervision: an unhandled exception in a saga worker is contained to that worker and reported via `console.error`; all watchers keep running. Watcher helpers (`takeEvery`, `takeLatest`, `debounce`) are imported from `src/store/supervisedEffects.ts`, enforced by `no-restricted-imports` in `.oxlintrc.json`.
+- req:snippet-storage-errors-visible: storage failures of snippets and system prompts (load, add, delete, saving regenerated content) are shown in their section of the settings page with the underlying cause; invalid IndexedDB records fail the load instead of being hidden as an empty list or a missing session. Handled errors are logged with `console.log`, never `console.error`.

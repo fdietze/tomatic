@@ -103,6 +103,13 @@ export function getErrorMessage(error: AppError): string {
 }
 
 /**
+ * Message of a caught value, for embedding the cause into a higher-level error message.
+ */
+export function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
  * Convert a generic Error or unknown error to an AppError
  */
 export function toAppError(error: unknown): AppError {
