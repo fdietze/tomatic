@@ -5,7 +5,7 @@ import type { SessionState } from "./sessionSlice";
 describe("sessionSlice", () => {
   test("should remove system prompt from messages when removeSystemPrompt is dispatched", () => {
     // Purpose: This test verifies that the removeSystemPrompt action correctly
-    // removes the system message from the messages array and sets selectedPromptName to null
+    // removes the system message from the messages array
     // req:system-prompt-interactive-update
     const initialState: SessionState = {
       messages: [
@@ -30,12 +30,10 @@ describe("sessionSlice", () => {
       loading: "idle",
       submitting: false,
       error: null,
-      selectedPromptName: "assistant",
     };
 
     const newState = sessionSlice.reducer(initialState, removeSystemPrompt());
 
-    expect(newState.selectedPromptName).toBeNull();
     expect(newState.messages).toHaveLength(1);
     expect(newState.messages[0]?.role).toBe("user");
     expect(newState.messages[0]?.content).toBe("Hello");
@@ -60,12 +58,10 @@ describe("sessionSlice", () => {
       loading: "idle",
       submitting: false,
       error: null,
-      selectedPromptName: "assistant",
     };
 
     const newState = sessionSlice.reducer(initialState, removeSystemPrompt());
 
-    expect(newState.selectedPromptName).toBeNull();
     expect(newState.messages).toHaveLength(1);
     expect(newState.messages[0]?.role).toBe("user");
   });

@@ -6,10 +6,8 @@ import ChatInterface from "@/components/ChatInterface";
 import SystemPromptBar from "@/components/SystemPromptBar";
 import { SystemPrompt } from "@/types/storage";
 import { getErrorMessage } from "@/types/errors";
-import {
-  selectSettings,
-  setSelectedPromptName,
-} from "@/store/features/settings/settingsSlice";
+import { setSelectedPromptName } from "@/store/features/settings/settingsSlice";
+import { selectChatSystemPromptName } from "@/store/features/session/selectChatSystemPromptName";
 import { selectPrompts } from "@/store/features/prompts/promptsSlice";
 import {
   selectSession,
@@ -19,7 +17,6 @@ import {
   setSessionError,
   setSystemPromptRequested,
   removeSystemPrompt,
-  setSelectedPromptName as setSessionSelectedPromptName,
 } from "@/store/features/session/sessionSlice";
 
 const ChatPage: React.FC = () => {
@@ -27,7 +24,6 @@ const ChatPage: React.FC = () => {
   const { sessionId: sessionIdFromUrl } = useParams<{ sessionId: string }>();
 
   // --- Redux State ---
-  const { selectedPromptName: globalSelectedPromptName } = useSelector(selectSettings);
   const { prompts: systemPromptsMap } = useSelector(selectPrompts);
   const {
     prevSessionId,
@@ -35,10 +31,8 @@ const ChatPage: React.FC = () => {
     error,
     currentSessionId,
     hasSessions,
-    selectedPromptName: sessionSelectedPromptName,
   } = useSelector(selectSession);
-  // Use session-specific prompt if available, otherwise fall back to global setting
-  const selectedPromptName = sessionSelectedPromptName ?? globalSelectedPromptName;
+  const selectedPromptName = useSelector(selectChatSystemPromptName);
 
   const activeSystemPrompt: SystemPrompt | undefined = useMemo(() => {
     if (!selectedPromptName) return undefined;
@@ -95,8 +89,7 @@ const ChatPage: React.FC = () => {
           systemPrompts={systemPromptEntities}
           selectedPromptName={selectedPromptName}
           onSelectPrompt={(name) => {
-            // Update both session-specific and global settings
-            dispatch(setSessionSelectedPromptName(name));
+            // The picked prompt becomes the default for new chats (req:system-prompt-single-source).
             dispatch(setSelectedPromptName(name));
             // req:system-prompt-interactive-update: Handle prompt selection/deselection
             if (name === null) {

@@ -5,13 +5,14 @@ import createSagaMiddleware from "redux-saga";
 import rootReducer from "@/store/rootReducer";
 import rootSaga from "@/store/rootSaga";
 import { streamChat } from "@/services/chatService";
-import { sendMessageRequested, editMessageRequested, cancelSubmission } from "./sessionSlice";
+import { sendMessageRequested, editMessageRequested, cancelSubmission, setSystemPromptRequested } from "./sessionSlice";
+import { selectChatSystemPromptName } from "./selectChatSystemPromptName";
 import { type RootState } from "@/store/store";
 import type { Message } from "@/types/chat";
 import { expectSaga } from "redux-saga-test-plan";
 import { select, call } from "redux-saga/effects";
 
-import { goToPrevSession, selectSession, loadSession, loadSessionSuccess, setSelectedPromptName } from "./sessionSlice";
+import { goToPrevSession, selectSession, loadSession, loadSessionSuccess } from "./sessionSlice";
 import { sessionSaga } from "./sessionSaga";
 import { ROUTES } from "@/utils/routes";
 import { getNavigationService } from "@/services/NavigationProvider";
@@ -202,7 +203,6 @@ describe("sessionSaga", () => {
         submitting: false,
         error: null,
         hasSessions: false,
-        selectedPromptName: null,
       },
       settings: {
         apiKey: "test-api-key",
@@ -316,7 +316,6 @@ describe("sessionSaga", () => {
         [call(db.findNeighbourSessionIds, mockSession), mockNeighbors],
       ])
       .dispatch(loadSession("test-session"))
-      .put(setSelectedPromptName("assistant"))
       .put(setSettingsSelectedPromptName("assistant"))
       .put(loadSessionSuccess({
         messages: mockSession.messages,
@@ -353,7 +352,6 @@ describe("sessionSaga", () => {
         [call(db.findNeighbourSessionIds, mockSession), mockNeighbors],
       ])
       .dispatch(loadSession("test-session"))
-      .put(setSelectedPromptName(null))
       .put(setSettingsSelectedPromptName(null))
       .put(loadSessionSuccess({
         messages: mockSession.messages,
@@ -450,7 +448,6 @@ describe("sessionSaga", () => {
       submitting: false,
       error: null,
       hasSessions: true,
-      selectedPromptName: null,
     });
     const storedSession = (session_id: string, messages: Message[]): ChatSession => ({
       session_id, messages, name: "kept name", created_at_ms: 7, updated_at_ms: 7,
@@ -580,6 +577,23 @@ describe("sessionSaga", () => {
       expect(state.session.error && "message" in state.session.error && state.session.error.message).toMatch(/cycle/);
       expect(state.session.messages).toEqual([]);
       expect(streamChat).not.toHaveBeenCalled();
+    });
+
+    test("a system prompt that fails to resolve leaves the chat's prompt unchanged", async () => {
+      // Purpose: req:system-prompt-single-source regression; the selected name used to be stored before
+      // resolution, so a failed resolution left the selection pointing at a prompt the chat did not have.
+      const history: Message[] = [
+        { id: "s", role: "system", content: "pirate", raw_content: "pirate", prompt_name: "Pirate" },
+        { id: "u", role: "user", content: "hi", raw_content: "hi" },
+      ];
+      const store = createTestStore({ settings, session: sessionState("prompt-session", history) });
+
+      store.dispatch(setSystemPromptRequested({ name: "Chef", prompt: "use @missing" }));
+
+      const state = store.getState() as RootState;
+      expect(state.session.messages).toEqual(history);
+      expect(selectChatSystemPromptName(state)).toBe("Pirate");
+      expect(state.session.error && "message" in state.session.error && state.session.error.message).toMatch(/@missing/);
     });
 
     describe("Scenario: a referenced snippet is already regenerating in the background", () => {

@@ -23,7 +23,6 @@ export interface SessionState {
   loading: "idle" | "loading" | "failed";
   submitting: boolean;
   error: AppError | null;
-  selectedPromptName: string | null;
 }
 
 const initialState: SessionState = {
@@ -35,7 +34,6 @@ const initialState: SessionState = {
   loading: "idle",
   submitting: false,
   error: null,
-  selectedPromptName: null,
 };
 
 export const sessionSlice = createSlice({
@@ -81,8 +79,6 @@ export const sessionSlice = createSlice({
       state.prevSessionId = null;
       state.nextSessionId = null;
       state.error = null;
-      // Keep the selected prompt name when starting a new session
-      // state.selectedPromptName = null; // Commented out to preserve system prompt selection
     },
     setHasSessions: (state, action: PayloadAction<boolean>) => {
       state.hasSessions = action.payload;
@@ -132,13 +128,8 @@ export const sessionSlice = createSlice({
       // This action will be intercepted by the saga for snippet resolution
       // No state changes here - the saga will handle it
     },
-    setSelectedPromptName: (state, action: PayloadAction<string | null>) => {
-      state.selectedPromptName = action.payload;
-    },
     setSystemPrompt: (state, action: PayloadAction<{ name: string; rawPrompt: string; resolvedPrompt: string }>) => {
       const { name, rawPrompt, resolvedPrompt } = action.payload;
-      // Update the selected prompt name reference
-      state.selectedPromptName = name;
       // Check if the first message is already a system message
       const firstMessage = state.messages[0];
       if (firstMessage && firstMessage.role === "system") {
@@ -160,8 +151,6 @@ export const sessionSlice = createSlice({
     },
     // req:system-prompt-interactive-update: Remove system message when no prompt is selected
     removeSystemPrompt: (state) => {
-      // Update the selected prompt name reference
-      state.selectedPromptName = null;
       // Remove the first message if it's a system message
       const firstMessage = state.messages[0];
       if (firstMessage && firstMessage.role === "system") {
@@ -197,7 +186,6 @@ export const {
   replyChunkReceived,
   turnEnded,
   setSystemPromptRequested,
-  setSelectedPromptName,
   setSystemPrompt,
   removeSystemPrompt,
   cancelSubmission,

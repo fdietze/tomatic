@@ -4,8 +4,8 @@ import { takeLatest } from "@/store/supervisedEffects";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { SagaIterator } from "redux-saga";
 
-import { ChatSession, Message } from "@/types/chat";
-import { SystemPrompt } from "@/types/storage";
+import { ChatSession } from "@/types/chat";
+import { Snippet, SystemPrompt } from "@/types/storage";
 import * as db from "@/services/db/chat-sessions";
 import { RootState } from "../../store";
 
@@ -21,7 +21,6 @@ import {
   regenerateResponseRequested,
   setSystemPromptRequested,
   setSystemPrompt,
-  setSelectedPromptName,
   selectSession,
   setHasSessions,
   loadInitialSessionSaga as loadInitialSessionSagaAction,
@@ -30,9 +29,9 @@ import {
 } from "./sessionSlice";
 import { getNavigationService } from "@/services/NavigationProvider";
 import { ROUTES } from "@/utils/routes";
-import { setSelectedPromptName as setSettingsSelectedPromptName } from "@/store/features/settings/settingsSlice";
+import { setSelectedPromptName } from "@/store/features/settings/settingsSlice";
 import { toAppError, createAppError } from "@/types/errors";
-import { resolveCurrentSystemPrompt } from "./resolveCurrentSystemPrompt";
+import { resolveSnippetReferences } from "@/utils/snippetUtils";
 import { submitTurnSaga, TurnCommandAction } from "./submitTurnSaga";
 
 // --- Helper Functions ---
@@ -60,20 +59,11 @@ function* initializeNewSessionWithGlobalPrompt(): SagaIterator {
 // Saga to handle system prompt setting with snippet resolution
 function* setSystemPromptRequestedSaga(action: PayloadAction<SystemPrompt>): SagaIterator {
   try {
-    const { name } = action.payload;
-    // Simply set the selected prompt name - the actual resolution will happen dynamically when needed
-    yield put(setSelectedPromptName(name));
-    // For backward compatibility, also resolve and set the system message in the messages array
-    // This ensures the UI still displays the system prompt correctly
-    const systemMessage: Message | null = yield call(resolveCurrentSystemPrompt);
-    if (systemMessage) {
-      const systemPromptData = {
-        name: systemMessage.prompt_name!,
-        rawPrompt: systemMessage.raw_content!,
-        resolvedPrompt: systemMessage.content,
-      };
-      yield put(setSystemPrompt(systemPromptData));
-    }
+    const prompt = action.payload;
+    const snippets: Snippet[] = yield select((state: RootState) => state.snippets.snippets);
+    // Resolve before touching state: if a snippet is missing, the chat keeps its previous system prompt.
+    const resolvedPrompt = resolveSnippetReferences(prompt.prompt, snippets);
+    yield put(setSystemPrompt({ name: prompt.name, rawPrompt: prompt.prompt, resolvedPrompt }));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const appError = createAppError.unknown(`Failed to resolve system prompt: ${errorMessage}`);
@@ -127,16 +117,8 @@ function* loadSessionSaga(action: PayloadAction<string>) {
     if (session) {
       // req:system-prompt-navigation-sync: Extract prompt_name from system message and update selected prompt
       const systemMessage = session.messages.find(m => m.role === "system");
-      if (systemMessage?.prompt_name) {
-        // Update both session-specific and global selected prompt name
-        yield put(setSelectedPromptName(systemMessage.prompt_name));
-        // Also update settings to maintain consistency
-        yield put(setSettingsSelectedPromptName(systemMessage.prompt_name));
-      } else {
-        // Deselect prompt to reflect that this session has no system prompt
-        yield put(setSelectedPromptName(null));
-        yield put(setSettingsSelectedPromptName(null));
-      }
+      // The opened chat's prompt becomes the default for new chats.
+      yield put(setSelectedPromptName(systemMessage?.prompt_name ?? null));
       const { prevId, nextId } = yield call(
         db.findNeighbourSessionIds,
         session,

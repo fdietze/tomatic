@@ -1,33 +1,32 @@
-import { call, select } from "redux-saga/effects";
+import { select } from "redux-saga/effects";
 import { SagaIterator } from "redux-saga";
 import { Message } from "@/types/chat";
+import { Snippet, SystemPrompt } from "@/types/storage";
 import { RootState } from "@/store/store";
 import { resolveSnippetReferences } from "@/utils/snippetUtils";
+import { selectChatSystemPromptName } from "./selectChatSystemPromptName";
 
-/** The selected system prompt as a message, with snippet references resolved against the current snippets. */
+/** The chat's selected system prompt as a message, with snippet references resolved against the current snippets. */
 export function* resolveCurrentSystemPrompt(): SagaIterator<Message | null> {
-  const { session, prompts, snippets }: RootState = yield select(
-    (state: RootState) => state,
-  );
-
-  const selectedPromptName = session.selectedPromptName;
-  if (!selectedPromptName) {
+  const state: RootState = yield select((s: RootState) => s);
+  const promptName = selectChatSystemPromptName(state);
+  if (!promptName) {
     return null;
   }
-
-  const promptEntity = prompts.prompts[selectedPromptName];
+  const promptEntity = state.prompts.prompts[promptName];
   if (!promptEntity) {
     return null;
   }
+  return systemMessageFor(promptEntity.data, state.snippets.snippets);
+}
 
-  const systemPrompt = promptEntity.data;
-  const resolvedPrompt: string = yield call(resolveSnippetReferences, systemPrompt.prompt, snippets.snippets);
-
+/** A system message for `prompt`; throws if a snippet reference cannot be resolved. */
+function systemMessageFor(prompt: SystemPrompt, snippets: Snippet[]): Message {
   return {
-    id: `system-${selectedPromptName}`,
-    role: "system" as const,
-    content: resolvedPrompt, // For API calls
-    raw_content: systemPrompt.prompt, // For UI display
-    prompt_name: selectedPromptName,
+    id: `system-${prompt.name}`,
+    role: "system",
+    content: resolveSnippetReferences(prompt.prompt, snippets), // For API calls
+    raw_content: prompt.prompt, // For UI display
+    prompt_name: prompt.name,
   };
 }
