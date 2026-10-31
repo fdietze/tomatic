@@ -9,7 +9,6 @@ import {
   seedLocalStorage,
   seedIndexedDB,
   waitForEvent,
-  type IndexedDBDataV4,
 } from './test-helpers';
 import type { IndexedDBDataCurrent, LocalStorageV2State } from '../src/types/storage';
 

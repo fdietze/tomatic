@@ -21,8 +21,8 @@ const md = new MarkdownIt({
           language: lang,
           ignoreIllegals: true,
         }).value;
-      } catch (__) {
-        // ignore
+      } catch {
+        // A grammar that fails on this input falls back to markdown-it's default escaping below.
       }
     }
     return ''; // use external default escaping

@@ -22,7 +22,8 @@ vi.mock('@/store/features/snippets/snippetsSaga', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/store/features/snippets/snippetsSaga');
   return {
     ...actual,
-    resolveSnippetReferencesFromState: vi.fn(function* (s: string) { return s; }),
+    // A plain function suffices: scratchpadSaga.ts invokes it via `yield call(...)`.
+    resolveSnippetReferencesFromState: vi.fn((s: string) => s),
   };
 });
 

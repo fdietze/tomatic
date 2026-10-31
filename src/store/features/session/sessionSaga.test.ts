@@ -36,11 +36,10 @@ vi.mock("@/services/NavigationProvider", () => ({
 
 // Mock crypto.randomUUID to have predictable, distinct IDs for test consistency
 let uuidCounter = 0;
-const mockUUID = vi.fn(() => `test-id-${++uuidCounter}`);
-vi.stubGlobal('crypto', {
-  ...crypto,
-  randomUUID: mockUUID,
-});
+// Spy on the real Crypto object so its prototype methods (getRandomValues, subtle) keep working.
+vi.spyOn(crypto, 'randomUUID').mockImplementation(
+  () => `test-id-${++uuidCounter}` as ReturnType<typeof crypto.randomUUID>,
+);
 
 // Mock the event dispatcher to avoid window is not defined error in Node.js env
 vi.mock("@/utils/events", () => ({

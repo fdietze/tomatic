@@ -103,7 +103,7 @@ class PwActionsReporter {
         try {
           browserLogs = JSON.parse(browserLogsAttachment.body.toString());
         } catch (e) {
-          console.log(`[PwActionsReporter] Failed to parse browser logs attachment: ${e}`);
+          console.log(`[PwActionsReporter] Failed to parse browser logs attachment: ${String(e)}`);
         }
       }
 
@@ -112,7 +112,7 @@ class PwActionsReporter {
         try {
           testSideLogs = JSON.parse(testSideLogsAttachment.body.toString());
         } catch (e) {
-          console.log(`[PwActionsReporter] Failed to parse test-side logs attachment: ${e}`);
+          console.log(`[PwActionsReporter] Failed to parse test-side logs attachment: ${String(e)}`);
         }
       }
 
