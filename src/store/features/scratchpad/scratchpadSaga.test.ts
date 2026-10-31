@@ -308,3 +308,44 @@ describe('scratchpadSaga.sendWorker', () => {
     expect(types).toContain(responseDone.type);
   });
 });
+
+describe('scratchpadSaga.regenerateWorker errors', () => {
+  it('shows an API error with its own type and message', async () => {
+    // Purpose: regression for API errors (thrown as AppError values) being stringified to
+    // "[object Object]" in the scratchpad response.
+    vi.resetModules();
+    const { streamChat } = await import('@/services/chatService');
+    const { createAppError } = await import('@/types/errors');
+    const { regenerateRequested, responseFailed } = await import('./scratchpadSlice');
+    const { regenerateWorker } = await import('./scratchpadSaga');
+    const apiError = createAppError.api('API Error: 401 Unauthorized', 401);
+    vi.mocked(streamChat).mockRejectedValueOnce(apiError);
+    const dispatched: DispatchedAction[] = [];
+    const state = {
+      scratchpad: {
+        currentSessionId: 's1', prevSessionId: null, nextSessionId: null,
+        inputs: [{ id: 'i1', raw_content: 'hello', resolved_content: 'hello' }],
+        response: null, selectedPromptName: null, includeLastResponse: false,
+        hasSessions: true, loading: 'idle' as const, submitting: false, error: null,
+      },
+      settings: { apiKey: 'k', modelName: 'gpt-4', autoScrollEnabled: true, selectedPromptName: null, initialChatPrompt: null, loading: 'idle' as const, saving: 'idle' as const },
+      prompts: { prompts: {}, loading: 'idle' as const, error: null },
+      snippets: { snippets: [] },
+    };
+
+    await runSaga(
+      {
+        channel: stdChannel(),
+        dispatch: ((a: DispatchedAction) => { dispatched.push(a); }) as (action: unknown) => void,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState: () => state as any,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      regenerateWorker as any,
+      regenerateRequested({ modelName: 'gpt-4' }),
+    ).toPromise();
+
+    const failure = dispatched.find((a) => a.type === responseFailed.type);
+    expect(failure?.payload).toEqual({ error: apiError });
+  });
+});

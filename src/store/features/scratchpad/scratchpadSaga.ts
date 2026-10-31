@@ -29,7 +29,7 @@ import {
   getMostRecentScratchpadId,
   saveScratchpadSession,
 } from '@/services/db/scratchpad-sessions';
-import { createAppError } from '@/types/errors';
+import { toAppError } from '@/types/errors';
 import { getNavigationService } from '@/services/NavigationProvider';
 import { ROUTES } from '@/utils/routes';
 import { resolveSnippetReferencesFromState } from '@/store/features/snippets/snippetsSaga';
@@ -56,7 +56,7 @@ export function* loadSessionWorker(action: ReturnType<typeof loadSession>) {
     const nb = (yield call(findNeighbourScratchpadIds, session)) as { prevId: string | null; nextId: string | null };
     yield put(loadSessionSuccess({ session, prevId: nb.prevId, nextId: nb.nextId }));
   } catch (e) {
-    yield put(loadSessionFailure(createAppError.unknown(String(e))));
+    yield put(loadSessionFailure(toAppError(e)));
   }
 }
 
@@ -264,7 +264,7 @@ export function* sendWorker(action: ReturnType<typeof sendRequested>): Generator
       void getNavigationService().navigate(ROUTES.scratchpad.session(newSessionId), { replace: true });
     }
   } catch (e) {
-    yield put(responseFailed({ error: createAppError.unknown(String(e)) }));
+    yield put(responseFailed({ error: toAppError(e) }));
   }
 }
 
@@ -294,7 +294,7 @@ export function* regenerateWorker(action: ReturnType<typeof regenerateRequested>
     yield put(responseDone({ model_name: action.payload.modelName }));
     yield call(persistCurrent);
   } catch (e) {
-    yield put(responseFailed({ error: createAppError.unknown(String(e)) }));
+    yield put(responseFailed({ error: toAppError(e) }));
   }
 }
 
